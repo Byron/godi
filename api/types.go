@@ -18,6 +18,8 @@ type FileInfo struct {
 
 	// hash of file
 	Sha1 []byte
+
+	MD5 []byte
 }
 
 type Priority uint8

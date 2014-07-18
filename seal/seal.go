@@ -1,6 +1,7 @@
 package seal
 
 import (
+	"crypto/md5"
 	"crypto/sha1"
 	"errors"
 	"flag"
@@ -166,6 +167,8 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup, done <-chan bool) {
 	defer wg.Done()
 	sha1gen := sha1.New()
+	md5gen := md5.New()
+	// allHashes := api.UncheckedParallelMultiWriter(sha1gen, md5gen)
 
 	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
@@ -180,12 +183,14 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		s.pCtrl.Channel() <- reader
 
 		sha1gen.Reset()
+		md5gen.Reset()
 		var written int64
-		written, *err = reader.WriteTo(sha1gen)
+		written, *err = reader.WriteTo(md5gen)
 		if *err != nil {
 			return
 		}
 		f.Sha1 = sha1gen.Sum(nil)
+		f.MD5 = md5gen.Sum(nil)
 		if written != f.Size {
 			*err = fmt.Errorf("Filesize of '%s' reported as %d, yet only %d bytes were hashed", f.Path, f.Size, written)
 			return
