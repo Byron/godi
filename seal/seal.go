@@ -168,7 +168,9 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 	defer wg.Done()
 	sha1gen := sha1.New()
 	md5gen := md5.New()
-	// allHashes := api.UncheckedParallelMultiWriter(sha1gen, md5gen)
+	// This makes the write as slow as the slowest hash, instead of hash+hash
+	allHashes := api.UncheckedParallelMultiWriter(sha1gen, md5gen)
+	// allHashes := io.MultiWriter(sha1gen, md5gen)
 
 	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
@@ -185,7 +187,7 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		sha1gen.Reset()
 		md5gen.Reset()
 		var written int64
-		written, *err = reader.WriteTo(md5gen)
+		written, *err = reader.WriteTo(allHashes)
 		if *err != nil {
 			return
 		}
@@ -244,7 +246,7 @@ func (s *SealCommand) Accumulate(results <-chan api.Result, done <-chan bool) <-
 						pathmap[sr.finfo.Path] = sr
 						count += 1
 						size += uint64(sr.finfo.Size)
-						accumResult <- &SealResult{nil, fmt.Sprintf("%s: %x", sr.finfo.Path, sr.finfo.Sha1), nil, api.Progress}
+						accumResult <- &SealResult{nil, fmt.Sprintf("%s: SHA1=%x MD5=%x", sr.finfo.Path, sr.finfo.Sha1, sr.finfo.MD5), nil, api.Progress}
 					}
 				} // default
 			} // select

@@ -44,7 +44,6 @@ type readResult struct {
 
 type ReadChannelController struct {
 	c chan ChannelReader
-	p sync.Pool
 }
 
 type WriteChannelController struct {
@@ -127,7 +126,6 @@ func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 		// Write what's possible
 		if res.n > 0 {
 			written, err = w.Write(res.buf)
-			p.ctrl.p.Put(res.buf)
 			n += int64(written)
 		}
 		// I could think of plenty of assertion here ... but there is no such thing
@@ -147,7 +145,6 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 
 	ctrl := ReadChannelController{
 		make(chan ChannelReader, nprocs),
-		sync.Pool{New: func() interface{} { return make([]byte, bufSize) }},
 	}
 
 	for i := 0; i < nprocs; i++ {
@@ -167,7 +164,7 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 				var nread int
 				for {
 					// The buffer will be put back by the one reading from the channel (e.g. in WriteTo()) !
-					buf := ctrl.p.Get().([]byte)
+					buf := make([]byte, bufSize)
 					nread, err = info.reader.Read(buf)
 					info.results <- readResult{buf[:nread], nread, err}
 					// we send all results, but abort if the reader is done for whichever reason
