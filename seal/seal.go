@@ -143,6 +143,10 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 						results <- &SealResult{nil, fmt.Sprintf("Ignoring symbolic link: '%s'", path), nil, api.Warn}
 						continue
 					}
+					if fi.Name()[0] == '.' {
+						results <- &SealResult{nil, fmt.Sprintf("Ignoring hidden file: '%s'", path), nil, api.Warn}
+						continue
+					}
 					files <- api.FileInfo{
 						Path: path,
 						Size: fi.Size(),
@@ -170,7 +174,6 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 	md5gen := md5.New()
 	// This makes the write as slow as the slowest hash, instead of hash+hash
 	allHashes := api.UncheckedParallelMultiWriter(sha1gen, md5gen)
-	// allHashes := io.MultiWriter(sha1gen, md5gen)
 
 	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
