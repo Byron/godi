@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -23,6 +22,9 @@ type SealCommand struct {
 
 	// One or more trees to seal
 	Trees []string
+
+	// parallel reader
+	pRead chan<- api.ChannelReader
 }
 
 // Implements information about a seal operation
@@ -89,6 +91,8 @@ func (s *SealCommand) SetupParser(parser *flag.FlagSet) error {
 func (s *SealCommand) Generate(done <-chan bool) (<-chan api.FileInfo, <-chan api.Result) {
 	files := make(chan api.FileInfo)
 	results := make(chan api.Result)
+
+	s.pRead = api.NewReadChannel(1)
 
 	go func() {
 		for _, tree := range s.Trees {
@@ -164,17 +168,13 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		err := &res.err
 		defer func(res *SealResult) { results <- res }(&res)
 
-		var fd *os.File
-		fd, *err = os.Open(f.Path)
-		defer fd.Close()
-
-		if *err != nil {
-			return
-		}
+		// let the other end open the file and close it as well
+		reader := api.NewChannelReaderFromPath(f.Path)
+		s.pRead <- reader
 
 		sha1gen.Reset()
 		var written int64
-		written, *err = io.Copy(sha1gen, fd)
+		written, *err = reader.WriteTo(sha1gen)
 		if *err != nil {
 			return
 		}

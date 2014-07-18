@@ -96,7 +96,7 @@ func NewReadChannel(nprocs int) chan<- ChannelReader {
 					// The buffer will be put back by the one reading from the channel (e.g. in WriteTo()) !
 					buf := bufPool.Get().([]byte)
 					nread, err = info.reader.Read(buf)
-					info.results <- readResult{buf, nread, err}
+					info.results <- readResult{buf[:nread], nread, err}
 					// we send all results, but abort if the reader is done for whichever reason
 					if err != nil {
 						break
