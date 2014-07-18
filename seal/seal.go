@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/Byron/godi/api"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -30,13 +29,14 @@ type SealResult struct {
 	finfo *api.FileInfo
 	msg   string
 	err   error
+	prio  api.Priority
 }
 
-func (s *SealResult) Info() string {
+func (s *SealResult) Info() (string, api.Priority) {
 	if s.err != nil {
-		return s.err.Error()
+		return s.err.Error(), api.Error
 	}
-	return s.msg
+	return s.msg, s.prio
 }
 
 func (s *SealResult) Error() error {
@@ -106,17 +106,28 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 	default:
 		{
 			// read dir and, build file info, and recurse into subdirectories
-			dirInfos, err := ioutil.ReadDir(tree)
+			f, err := os.Open(tree)
 			if err != nil {
-				results <- &SealResult{nil, "", err}
+				results <- &SealResult{nil, "", err, api.Error}
+				return false
+			}
+			dirInfos, err := f.Readdir(-1)
+			f.Close()
+			if err != nil {
+				results <- &SealResult{nil, "", err, api.Error}
 				return false
 			}
 
 			// first generate infos
 			for _, fi := range dirInfos {
 				if !fi.IsDir() {
+					path := filepath.Join(tree, fi.Name())
+					if !fi.Mode().IsRegular() {
+						results <- &SealResult{nil, fmt.Sprintf("Ignoring symbolic link: '%s'", path), nil, api.Warn}
+						continue
+					}
 					files <- api.FileInfo{
-						Path: filepath.Join(tree, fi.Name()),
+						Path: path,
 						Size: fi.Size(),
 					}
 				}
@@ -130,8 +141,8 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 					}
 				}
 			}
-		}
-	}
+		} //  default
+	} // selcect
 
 	return true
 }
@@ -144,7 +155,7 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
 	// be intersting for the mailing list.
 	handleHash := func(f api.FileInfo) {
-		res := SealResult{&f, "", nil}
+		res := SealResult{&f, "", nil, api.Progress}
 		err := &res.err
 		defer func(res *SealResult) { results <- res }(&res)
 
@@ -179,30 +190,51 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 	}
 }
 
-func (s *SealCommand) Accumulate(results <-chan api.Result) <-chan api.Result {
+func (s *SealCommand) Accumulate(results <-chan api.Result, done <-chan bool) <-chan api.Result {
 	accumResult := make(chan api.Result)
 
 	go func() {
 		defer close(accumResult)
+		pathmap := make(map[string]*SealResult)
 
 		var count uint = 0
 		var errCount uint = 0
 		var size uint64 = 0
 		st := time.Now()
+		wasCancelled := false
+
 		for r := range results {
 			if r.Error() != nil {
 				errCount += 1
 				accumResult <- r
 			}
-			// DEBUG
-			count += 1
-			sr := r.(*SealResult)
-			size += uint64(sr.finfo.Size)
-			accumResult <- &SealResult{nil, fmt.Sprintf("%s: %x", sr.finfo.Path, sr.finfo.Sha1), nil}
-		}
+
+			// Be sure we take note of cancellation.
+			// If this happens, soon our results will be drained and we leave naturally
+			select {
+			case <-done:
+				wasCancelled = true
+			default:
+				{
+					sr := r.(*SealResult)
+					_, ok := pathmap[sr.finfo.Path]
+					if ok {
+						// duplicate path - shouldn't happen, but we deal with it
+						sr.err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.finfo.Path)
+						errCount += 1
+						accumResult <- sr
+					} else {
+						pathmap[sr.finfo.Path] = sr
+						count += 1
+						size += uint64(sr.finfo.Size)
+						accumResult <- &SealResult{nil, fmt.Sprintf("%s: %x", sr.finfo.Path, sr.finfo.Sha1), nil, api.Progress}
+					}
+				} // default
+			} // select
+		} // range results
 		elapsed := time.Now().Sub(st).Seconds()
 		sizeMB := float32(size) / (1024.0 * 1024.0)
-		accumResult <- &SealResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount), nil}
+		accumResult <- &SealResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount, wasCancelled), nil, api.Info}
 	}()
 
 	return accumResult

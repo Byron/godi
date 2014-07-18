@@ -20,10 +20,19 @@ type FileInfo struct {
 	Sha1 []byte
 }
 
-type Result interface {
+type Priority uint8
 
+const (
+	Progress Priority = iota
+	Info
+	Warn
+	Error
+)
+
+type Result interface {
 	// Return a string indicating the result, which can can also state an error
-	Info() string
+	// The priority show the kind of result messgae, allowing you to filter them effectively
+	Info() (string, Priority)
 
 	// Return an error instance indicating what exactly when wrong
 	Error() error
@@ -52,7 +61,9 @@ type Runner interface {
 
 	// Accumulate the result channel and produce whatever you have to produce from the result of the Gather steps
 	// When you are done, place a single result instance into accumResult and close the channel
-	Accumulate(results <-chan Result) <-chan Result
+	// You must listen on done to know if the operation was aborted prematurely. This information should be useful
+	// for your result.
+	Accumulate(results <-chan Result, done <-chan bool) <-chan Result
 }
 
 func StartEngine(runner Runner, nprocs uint) {
@@ -85,7 +96,7 @@ func StartEngine(runner Runner, nprocs uint) {
 		wg.Wait()
 		close(results)
 	}()
-	accumResult := runner.Accumulate(results)
+	accumResult := runner.Accumulate(results, done)
 
 	// Return true if we should break the loop
 	resHandler := func(name string, res Result) bool {
@@ -97,7 +108,8 @@ func StartEngine(runner Runner, nprocs uint) {
 		if res.Error() != nil {
 			fmt.Fprintln(os.Stderr, res.Error())
 		} else {
-			fmt.Fprintln(os.Stdout, res.Info())
+			info, _ := res.Info()
+			fmt.Fprintln(os.Stdout, info)
 		}
 
 		return false

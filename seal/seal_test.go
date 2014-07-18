@@ -32,7 +32,7 @@ func makeFileOrPanic(path string, size int) string {
 }
 
 // Create a dataset for testing and return the newly created directory
-func makeDatasetOrPanic() (string, string) {
+func makeDatasetOrPanic() (string, string, string) {
 	base, err := ioutil.TempDir("", "dataset")
 	if err != nil {
 		panic(err)
@@ -53,7 +53,12 @@ func makeDatasetOrPanic() (string, string) {
 	}
 
 	file := makeFileOrPanic(filepath.Join(subdir, "somefile.ext"), 12345)
-	return base, file
+	symlink := filepath.Join(base, "symlink.ext")
+	err = os.Symlink(file, symlink)
+	if err != nil {
+		symlink = ""
+	}
+	return base, file, symlink
 }
 
 // Delete the given tree entirely. Should only be used in conjunction with makeDataset
@@ -74,7 +79,7 @@ func rmTree(tree string) {
 }
 
 func TestSeal(t *testing.T) {
-	datasetTree, dataFile := makeDatasetOrPanic()
+	datasetTree, dataFile, _ := makeDatasetOrPanic()
 	defer rmTree(datasetTree)
 	var cmd *seal.SealCommand
 
@@ -118,7 +123,7 @@ func TestSeal(t *testing.T) {
 		wg.Wait()
 		close(results)
 	}()
-	accumResult := cmd.Accumulate(results)
+	accumResult := cmd.Accumulate(results, done)
 
 	// Return true if we should break the loop
 	resHandler := func(name string, res api.Result) bool {
