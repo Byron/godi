@@ -1,0 +1,17 @@
+site_name: godi
+site_url: https://byron.github.io/godi
+site_description: Fast data integrity verification
+
+repo_url: https://github.com/Byron/godi
+dev_addr: 127.0.0.1:9995
+
+docs_dir: ../../src/md
+site_dir: ../../doc/mkdocs/html
+
+pages:
+- ['index.md', 'Home']
+- ['license.md', 'About', 'License']
+
+theme: yeti
+
+copyright: Copyright &copy; 2014, <a href="https://www.linkedin.com/in/sebastianthiel">Sebastian Thiel & Contributors</a>.
