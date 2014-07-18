@@ -23,6 +23,9 @@ type SealCommand struct {
 	// One or more trees to seal
 	Trees []string
 
+	// Amount of readers to use
+	nReaders int
+
 	// parallel reader
 	pRead chan<- api.ChannelReader
 }
@@ -80,11 +83,15 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 	if len(noTrees) > 0 {
 		return errors.New("The following trees are no directory: " + strings.Join(noTrees, ", "))
 	}
+	if s.nReaders < 1 {
+		return errors.New("--num-readers must not be smaller than 1")
+	}
 
 	return err
 }
 
 func (s *SealCommand) SetupParser(parser *flag.FlagSet) error {
+	parser.IntVar(&s.nReaders, "num-readers", 1, "Amount of parallel read streams we can use")
 	return nil
 }
 
@@ -92,7 +99,7 @@ func (s *SealCommand) Generate(done <-chan bool) (<-chan api.FileInfo, <-chan ap
 	files := make(chan api.FileInfo)
 	results := make(chan api.Result)
 
-	s.pRead = api.NewReadChannel(1)
+	s.pRead = api.NewReadChannel(s.nReaders)
 
 	go func() {
 		for _, tree := range s.Trees {

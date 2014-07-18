@@ -92,7 +92,7 @@ func TestSeal(t *testing.T) {
 		t.Log(err)
 	}
 
-	scmd, _ = cli.ParseArgs("seal", datasetTree)
+	scmd, _ = cli.ParseArgs("seal", fmt.Sprintf("--num-readers=%v", runtime.GOMAXPROCS(0)), datasetTree)
 	cmd = scmd.(*seal.SealCommand)
 	if err := cmd.SanitizeArgs(); err != nil {
 		t.Error("Sanitize didn't like existing tree")
