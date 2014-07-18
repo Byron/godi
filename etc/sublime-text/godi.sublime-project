@@ -7,13 +7,13 @@
 			"file_exclude_patterns" : [
 				"*.sublime-workspace",
 				".git",
-				".noseids",
-				".coverage"
 			],
 			"folder_exclude_patterns" : [
 				".git",
 				"cover",
-				"git/ext"
+				"git/ext",
+				"pages",
+				"doc"
 			]
 		},
 	]
