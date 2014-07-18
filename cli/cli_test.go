@@ -1,8 +1,8 @@
 package cli_test
 
 import (
-	"godi/cli"
-	"godi/seal"
+	"github.com/Byron/godi/cli"
+	"github.com/Byron/godi/seal"
 	"strings"
 	"testing"
 )

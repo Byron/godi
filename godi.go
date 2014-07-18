@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"godi/api"
-	"godi/cli"
+	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/cli"
 	"os"
 	"runtime"
 )
@@ -14,11 +14,9 @@ const (
 	OTHER_ERROR       = 3
 )
 
-// DEBUG - this should be a flag
-const nprocs = 2
-
 func main() {
-	runtime.GOMAXPROCS(nprocs)
+	// Always use all available CPUs - the user can limit resources using GOMAXPROCS and the flags for reader- and writer-procs
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	cmd, err := cli.ParseArgs(os.Args[1:]...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -42,7 +40,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Didn't get Runner interface from cli parser")
 			os.Exit(PROGRAMMING_ERROR)
 		} else {
-			api.StartEngine(runner, nprocs)
+			api.StartEngine(runner, uint(runtime.GOMAXPROCS(0)))
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid command type returned - it didn't support the runner interfacea: %#v", cmd)

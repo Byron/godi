@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"godi/seal"
+	"github.com/Byron/godi/seal"
 	"os"
 )
 

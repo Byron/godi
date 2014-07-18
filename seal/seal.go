@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"godi/api"
+	"github.com/Byron/godi/api"
 	"io"
 	"io/ioutil"
 	"math"

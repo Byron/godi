@@ -2,9 +2,9 @@ package seal_test
 
 import (
 	"fmt"
-	"godi/api"
-	"godi/cli"
-	"godi/seal"
+	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/cli"
+	"github.com/Byron/godi/seal"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -92,7 +92,7 @@ func TestSeal(t *testing.T) {
 		t.Error("Sanitize didn't like existing tree")
 	}
 
-	var nprocs uint = runtime.GOMAXPROCS(0)
+	var nprocs uint = uint(runtime.GOMAXPROCS(0))
 	if nprocs > cmd.MaxProcs() {
 		t.Error("Can't do less than one process here ... ")
 	}
