@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"godi"
+	"godi/api"
 	"godi/cli"
 	"os"
 	"runtime"
@@ -38,11 +38,11 @@ func main() {
 			os.Exit(ARGUMENT_ERROR)
 		}
 
-		if runner, ok := cmd.(godi.Runner); !ok {
+		if runner, ok := cmd.(api.Runner); !ok {
 			fmt.Fprintln(os.Stderr, "Didn't get Runner interface from cli parser")
 			os.Exit(PROGRAMMING_ERROR)
 		} else {
-			godi.StartEngine(runner, nprocs)
+			api.StartEngine(runner, nprocs)
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid command type returned - it didn't support the runner interfacea: %#v", cmd)

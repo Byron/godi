@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"godi"
+	"godi/api"
 	"io"
 	"io/ioutil"
 	"math"
@@ -27,7 +27,7 @@ type SealCommand struct {
 
 // Implements information about a seal operation
 type SealResult struct {
-	finfo *godi.FileInfo
+	finfo *api.FileInfo
 	msg   string
 	err   error
 }
@@ -81,9 +81,9 @@ func (s *SealCommand) SetupParser(parser *flag.FlagSet) error {
 	return nil
 }
 
-func (s *SealCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
-	files := make(chan godi.FileInfo)
-	results := make(chan godi.Result)
+func (s *SealCommand) Generate(done <-chan bool) (<-chan api.FileInfo, <-chan api.Result) {
+	files := make(chan api.FileInfo)
+	results := make(chan api.Result)
 
 	go func() {
 		for _, tree := range s.Trees {
@@ -99,7 +99,7 @@ func (s *SealCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan g
 }
 
 // Traverse recursively, return false if the caller should stop traversing due to an error
-func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, results chan<- godi.Result, done <-chan bool, tree string) bool {
+func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, results chan<- api.Result, done <-chan bool, tree string) bool {
 	select {
 	case <-done:
 		return false
@@ -115,7 +115,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 			// first generate infos
 			for _, fi := range dirInfos {
 				if !fi.IsDir() {
-					files <- godi.FileInfo{
+					files <- api.FileInfo{
 						Path: filepath.Join(tree, fi.Name()),
 						Size: fi.Size(),
 					}
@@ -136,14 +136,14 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 	return true
 }
 
-func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
+func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup, done <-chan bool) {
 	defer wg.Done()
 	sha1gen := sha1.New()
 
 	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
 	// be intersting for the mailing list.
-	handleHash := func(f godi.FileInfo) {
+	handleHash := func(f api.FileInfo) {
 		res := SealResult{&f, "", nil}
 		err := &res.err
 		defer func(res *SealResult) { results <- res }(&res)
@@ -179,8 +179,8 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 	}
 }
 
-func (s *SealCommand) Accumulate(results <-chan godi.Result) <-chan godi.Result {
-	accumResult := make(chan godi.Result)
+func (s *SealCommand) Accumulate(results <-chan api.Result) <-chan api.Result {
+	accumResult := make(chan api.Result)
 
 	go func() {
 		defer close(accumResult)

@@ -2,7 +2,7 @@ package seal_test
 
 import (
 	"fmt"
-	"godi"
+	"godi/api"
 	"godi/cli"
 	"godi/seal"
 	"io/ioutil"
@@ -97,7 +97,7 @@ func TestSeal(t *testing.T) {
 		t.Error("Can't do less than one process here ... ")
 	}
 
-	results := make(chan godi.Result, nprocs)
+	results := make(chan api.Result, nprocs)
 	done := make(chan bool)
 
 	// assure we close our done channel on signal
@@ -121,7 +121,7 @@ func TestSeal(t *testing.T) {
 	accumResult := cmd.Accumulate(results)
 
 	// Return true if we should break the loop
-	resHandler := func(name string, res godi.Result) bool {
+	resHandler := func(name string, res api.Result) bool {
 		if res == nil {
 			// channel closed, have to get out
 			t.Log("Channel", name, "is closed")
