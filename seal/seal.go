@@ -27,7 +27,7 @@ type SealCommand struct {
 	nReaders int
 
 	// parallel reader
-	pRead chan<- api.ChannelReader
+	pCtrl api.ReadChannelController
 }
 
 // Implements information about a seal operation
@@ -99,7 +99,7 @@ func (s *SealCommand) Generate(done <-chan bool) (<-chan api.FileInfo, <-chan ap
 	files := make(chan api.FileInfo)
 	results := make(chan api.Result)
 
-	s.pRead = api.NewReadChannel(s.nReaders)
+	s.pCtrl = api.NewReadChannelController(s.nReaders)
 
 	go func() {
 		for _, tree := range s.Trees {
@@ -176,8 +176,8 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		defer func(res *SealResult) { results <- res }(&res)
 
 		// let the other end open the file and close it as well
-		reader := api.NewChannelReaderFromPath(f.Path)
-		s.pRead <- reader
+		reader := s.pCtrl.NewChannelReaderFromPath(f.Path)
+		s.pCtrl.Channel() <- reader
 
 		sha1gen.Reset()
 		var written int64
