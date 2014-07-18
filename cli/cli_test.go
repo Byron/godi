@@ -1,10 +1,11 @@
 package cli_test
 
 import (
-	"github.com/Byron/godi/cli"
-	"github.com/Byron/godi/seal"
 	"strings"
 	"testing"
+
+	"github.com/Byron/godi/cli"
+	"github.com/Byron/godi/seal"
 )
 
 func TestParsing(t *testing.T) {

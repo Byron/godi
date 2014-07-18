@@ -4,8 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/Byron/godi/seal"
 	"os"
+
+	"github.com/Byron/godi/seal"
 )
 
 const usage = "godi {seal} [--help] args"

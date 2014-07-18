@@ -36,6 +36,9 @@ type Result interface {
 
 	// Return an error instance indicating what exactly when wrong
 	Error() error
+
+	// Return the FileInformation we represent
+	FileInformation() *FileInfo
 }
 
 type Runner interface {

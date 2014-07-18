@@ -2,9 +2,6 @@ package seal_test
 
 import (
 	"fmt"
-	"github.com/Byron/godi/api"
-	"github.com/Byron/godi/cli"
-	"github.com/Byron/godi/seal"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -14,6 +11,10 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/cli"
+	"github.com/Byron/godi/seal"
 )
 
 // Create a new file at given path and size, without possibly required intermediate directories

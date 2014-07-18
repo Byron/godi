@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/Byron/godi/api"
 	"io"
 	"math"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Byron/godi/api"
 )
 
 const Name = "seal"
@@ -41,6 +42,10 @@ func (s *SealResult) Info() (string, api.Priority) {
 
 func (s *SealResult) Error() error {
 	return s.err
+}
+
+func (s *SealResult) FileInformation() *api.FileInfo {
+	return s.finfo
 }
 
 func (s *SealCommand) SetUnparsedArgs(args []string) error {

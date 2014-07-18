@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/Byron/godi/api"
-	"github.com/Byron/godi/cli"
 	"os"
 	"runtime"
+
+	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/cli"
 )
 
 const (
