@@ -37,13 +37,14 @@ func UncheckedParallelMultiWriter(writers ...io.Writer) io.Writer {
 
 // The result of a read operation, similar to what Reader.Read returns
 type readResult struct {
-	buf []byte
+	buf *[bufSize]byte
 	n   int
 	err error
 }
 
 type ReadChannelController struct {
 	c chan ChannelReader
+	p sync.Pool
 }
 
 type WriteChannelController struct {
@@ -70,6 +71,11 @@ type ChannelReader struct {
 
 	// The channel to transport read results
 	results chan readResult
+
+	// Sync availability of our buffers, as we cam't use a sync.Pool due tot he slice truncation we have to do
+	// p.Put(p.Get()[:5]) will put in a different slice, even though they point to the same array. It's not possible
+	// to retrieve the underlying
+	// wg
 }
 
 type ChannelWriter struct {
@@ -125,7 +131,8 @@ func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 	for res := range p.results {
 		// Write what's possible
 		if res.n > 0 {
-			written, err = w.Write(res.buf)
+			written, err = w.Write(res.buf[:res.n])
+			p.ctrl.p.Put(res.buf)
 			n += int64(written)
 		}
 		// I could think of plenty of assertion here ... but there is no such thing
@@ -145,6 +152,7 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 
 	ctrl := ReadChannelController{
 		make(chan ChannelReader, nprocs),
+		sync.Pool{New: func() interface{} { return new([bufSize]byte) }},
 	}
 
 	for i := 0; i < nprocs; i++ {
@@ -164,9 +172,9 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 				var nread int
 				for {
 					// The buffer will be put back by the one reading from the channel (e.g. in WriteTo()) !
-					buf := make([]byte, bufSize)
-					nread, err = info.reader.Read(buf)
-					info.results <- readResult{buf[:nread], nread, err}
+					buf := ctrl.p.Get().(*[bufSize]byte)
+					nread, err = info.reader.Read(buf[:])
+					info.results <- readResult{buf, nread, err}
 					// we send all results, but abort if the reader is done for whichever reason
 					if err != nil {
 						break
