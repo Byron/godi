@@ -1,7 +1,6 @@
 package godi
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -78,7 +77,11 @@ type Runner interface {
 }
 
 // Runner Init must have been called beforehand as we don't know the values here
-func StartEngine(runner Runner, nprocs uint) {
+// The handlers receive a result of the respective stage and may perform whichever operation
+// Returns the last error we received in either generator or aggregation stage
+func StartEngine(runner Runner, nprocs uint,
+	generateHandler func(Result),
+	aggregateHandler func(Result)) (err error) {
 	if nprocs > runner.MaxProcs() {
 		nprocs = runner.MaxProcs()
 	}
@@ -111,19 +114,12 @@ func StartEngine(runner Runner, nprocs uint) {
 	accumResult := runner.Aggregate(results, done)
 
 	// Return true if we should break the loop
-	resHandler := func(name string, res Result) bool {
+	resHandler := func(handler func(Result), res Result) bool {
 		if res == nil {
 			// channel closed, have to get out
 			return true
 		}
-
-		if res.Error() != nil {
-			fmt.Fprintln(os.Stderr, res.Error())
-		} else {
-			info, _ := res.Info()
-			fmt.Fprintln(os.Stdout, info)
-		}
-
+		handler(res)
 		return false
 	} // end resHandler
 
@@ -132,16 +128,20 @@ infinity:
 		select {
 		case r := <-generateResult:
 			{
-				if resHandler("generator", r) {
+				if resHandler(generateHandler, r) {
 					break infinity
 				}
+				err = r.Error()
 			}
 		case r := <-accumResult:
 			{
-				if resHandler("accumulator", r) {
+				if resHandler(aggregateHandler, r) {
 					break infinity
 				}
+				err = r.Error()
 			}
 		} // select
 	} // infinty
+
+	return
 }
