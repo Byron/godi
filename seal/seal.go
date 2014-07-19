@@ -36,6 +36,14 @@ type SealCommand struct {
 	pCtrl api.ReadChannelController
 }
 
+// REVIEW:
+func NewCommand(trees []string, nReaders int) SealCommand {
+	c := SealCommand{}
+	c.Trees = trees
+	c.nReaders = nReaders
+	return c
+}
+
 // Implements information about a seal operation
 type SealResult struct {
 	finfo *api.FileInfo

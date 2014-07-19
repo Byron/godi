@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Byron/godi/api"
-	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/seal"
 )
 
@@ -86,26 +85,23 @@ func rmTree(tree string) {
 func TestSeal(t *testing.T) {
 	datasetTree, dataFile, _ := makeDatasetOrPanic()
 	defer rmTree(datasetTree)
-	var cmd *seal.SealCommand
+	var cmd seal.SealCommand
 
-	scmd, _ := cli.ParseArgs("seal", dataFile)
-	cmd = scmd.(*seal.SealCommand)
+	cmd = seal.NewCommand([]string{dataFile}, 1)
 	if err := cmd.SanitizeArgs(); err == nil {
 		t.Error("Expected it to not like files as directory")
 	} else {
 		t.Log(err)
 	}
 
-	scmd, _ = cli.ParseArgs("seal", datasetTree, filepath.Join(datasetTree, firstSubDir, "..", firstSubDir))
-	cmd = scmd.(*seal.SealCommand)
+	cmd = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, firstSubDir, "..", firstSubDir)}, 1)
 	if err := cmd.SanitizeArgs(); err != nil {
 		t.Error("Expected to not fail sanitization")
 	} else if len(cmd.Trees) != 1 {
 		t.Error("Trees should have been pruned, contained one should have been dropped")
 	}
 
-	scmd, _ = cli.ParseArgs("seal", fmt.Sprintf("--num-readers=%v", runtime.GOMAXPROCS(0)), datasetTree)
-	cmd = scmd.(*seal.SealCommand)
+	cmd = seal.NewCommand([]string{datasetTree}, runtime.GOMAXPROCS(0))
 	if err := cmd.SanitizeArgs(); err != nil {
 		t.Error("Sanitize didn't like existing tree")
 	}
