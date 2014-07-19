@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -70,12 +71,13 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 
 	invalidTrees := make([]string, 0, len(s.Trees))
 	noTrees := make([]string, 0, len(s.Trees))
-	for _, tree := range s.Trees {
+	for i, tree := range s.Trees {
 		if stat, err := os.Stat(tree); err != nil {
 			invalidTrees = append(invalidTrees, tree)
 		} else if !stat.IsDir() {
 			noTrees = append(noTrees, tree)
 		}
+		s.Trees[i] = path.Clean(tree)
 	}
 
 	if len(invalidTrees) > 0 {
@@ -86,6 +88,24 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 	}
 	if s.nReaders < 1 {
 		return errors.New("--num-readers must not be smaller than 1")
+	}
+
+	// drop trees which are a sub-tree of another
+	if len(s.Trees) > 0 {
+		validTrees := make([]string, 0, len(s.Trees))
+		for i, ltree := range s.Trees {
+			for x, rtree := range s.Trees {
+				if i == x || strings.HasPrefix(ltree, rtree) {
+					continue
+				}
+				validTrees = append(validTrees, ltree)
+			}
+		}
+		if len(validTrees) == 0 {
+			fmt.Fprintln(os.Stderr, "PANIC", len(validTrees), cap(validTrees))
+		}
+
+		s.Trees = validTrees
 	}
 
 	return err

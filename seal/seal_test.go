@@ -17,6 +17,10 @@ import (
 	"github.com/Byron/godi/seal"
 )
 
+const (
+	firstSubDir = "nothing"
+)
+
 // Create a new file at given path and size, without possibly required intermediate directories
 func makeFileOrPanic(path string, size int) string {
 	f, err := os.Create(path)
@@ -48,7 +52,7 @@ func makeDatasetOrPanic() (string, string, string) {
 	}
 	makeFileOrPanic(filepath.Join(subdir, "biggie.foo"), 1024*1024+5123)
 	makeFileOrPanic(filepath.Join(subdir, "smallie.blah"), 123)
-	subdir = filepath.Join(base, "nothing", "stillnothing", "ünicod€")
+	subdir = filepath.Join(base, firstSubDir, "stillnothing", "ünicod€")
 	if err := os.MkdirAll(subdir, 0777); err != nil {
 		panic(err)
 	}
@@ -90,6 +94,14 @@ func TestSeal(t *testing.T) {
 		t.Error("Expected it to not like files as directory")
 	} else {
 		t.Log(err)
+	}
+
+	scmd, _ = cli.ParseArgs("seal", datasetTree, filepath.Join(datasetTree, firstSubDir, "..", firstSubDir))
+	cmd = scmd.(*seal.SealCommand)
+	if err := cmd.SanitizeArgs(); err != nil {
+		t.Error("Expected to not fail sanitization")
+	} else if len(cmd.Trees) != 1 {
+		t.Error("Trees should have been pruned, contained one should have been dropped")
 	}
 
 	scmd, _ = cli.ParseArgs("seal", fmt.Sprintf("--num-readers=%v", runtime.GOMAXPROCS(0)), datasetTree)
