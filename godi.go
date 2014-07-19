@@ -37,11 +37,11 @@ func main() {
 			os.Exit(ARGUMENT_ERROR)
 		}
 
-		if runner, ok := cmd.(api.Runner); !ok {
+		if runner, ok := cmd.(godi.Runner); !ok {
 			fmt.Fprintln(os.Stderr, "Didn't get Runner interface from cli parser")
 			os.Exit(PROGRAMMING_ERROR)
 		} else {
-			api.StartEngine(runner, uint(runtime.GOMAXPROCS(0)))
+			godi.StartEngine(runner, uint(runtime.GOMAXPROCS(0)))
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid command type returned - it didn't support the runner interfacea: %#v", cmd)

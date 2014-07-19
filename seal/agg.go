@@ -28,7 +28,7 @@ func (s *SealCommand) IndexPath(tree string, extension string) string {
 // When called, we have seen no error and everything can be assumed to be in order
 // Returns error in case we can't write, and all index files written so far.
 // It's up to the caller to remove existing files on error
-func (s *SealCommand) writeIndex(treeMap map[string]map[string]*api.FileInfo) ([]string, error) {
+func (s *SealCommand) writeIndex(treeMap map[string]map[string]*godi.FileInfo) ([]string, error) {
 	// Serialize all fileinfo structures
 	// NOTE: As the parallel writer will send results only when writing finished, we can just operate serially here ...
 	// For this there is also no need to optimize performance
@@ -56,16 +56,16 @@ func (s *SealCommand) writeIndex(treeMap map[string]map[string]*api.FileInfo) ([
 	return indices, nil
 }
 
-func (s *SealCommand) Aggregate(results <-chan api.Result, done <-chan bool) <-chan api.Result {
-	accumResult := make(chan api.Result)
+func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
+	accumResult := make(chan godi.Result)
 
 	go func() {
 		defer close(accumResult)
-		treePathmap := make(map[string]map[string]*api.FileInfo)
+		treePathmap := make(map[string]map[string]*godi.FileInfo)
 
 		// Presort all paths by their root
 		for _, tree := range s.Trees {
-			treePathmap[tree] = make(map[string]*api.FileInfo)
+			treePathmap[tree] = make(map[string]*godi.FileInfo)
 		}
 
 		var count uint = 0
@@ -91,7 +91,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result, done <-chan bool) <-c
 				{
 					sr := r.(*SealResult)
 					// find root
-					var pathmap map[string]*api.FileInfo
+					var pathmap map[string]*godi.FileInfo
 					var pathTree string
 					for _, tree := range s.Trees {
 						if strings.HasPrefix(sr.finfo.Path, tree) {
@@ -116,7 +116,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result, done <-chan bool) <-c
 						pathmap[relaPath] = sr.finfo
 						count += 1
 						size += uint64(sr.finfo.Size)
-						accumResult <- &SealResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, api.Progress}
+						accumResult <- &SealResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, godi.Progress}
 					}
 				} // default
 			} // select
@@ -135,16 +135,16 @@ func (s *SealCommand) Aggregate(results <-chan api.Result, done <-chan bool) <-c
 			var err error
 			if indices, err = s.writeIndex(treePathmap); err != nil {
 				// NOTE: We keep successfully written indices as each tree is consistent in itself
-				accumResult <- &SealResult{nil, "", err, api.Error}
+				accumResult <- &SealResult{nil, "", err, godi.Error}
 			}
 
 			// Inform about successfully written indices
 			for _, index := range indices {
-				accumResult <- &SealResult{nil, fmt.Sprintf("Wrote seal at '%s'", index), err, api.Info}
+				accumResult <- &SealResult{nil, fmt.Sprintf("Wrote seal at '%s'", index), err, godi.Info}
 			}
 		}
 
-		accumResult <- &SealResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount, wasCancelled), nil, api.Info}
+		accumResult <- &SealResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount, wasCancelled), nil, godi.Info}
 	}()
 
 	return accumResult

@@ -18,7 +18,7 @@ const (
 // Used in the serialization format
 type gobValueV1 struct {
 	RelaPath string
-	FileInfo *api.FileInfo
+	FileInfo *godi.FileInfo
 }
 
 // Reads and writes a file structured like so
@@ -33,7 +33,7 @@ func (g *Gob) Extension() string {
 	return extension
 }
 
-func (g *Gob) Serialize(paths map[string]*api.FileInfo, writer io.Writer) (err error) {
+func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err error) {
 	gzipWriter, _ := gzip.NewWriterLevel(writer, 9)
 	defer gzipWriter.Close()
 	encoder := gob.NewEncoder(gzipWriter)

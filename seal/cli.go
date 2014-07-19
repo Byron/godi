@@ -11,9 +11,9 @@ import (
 	"github.com/Byron/godi/api"
 )
 
-func (s *SealResult) Info() (string, api.Priority) {
+func (s *SealResult) Info() (string, godi.Priority) {
 	if s.err != nil {
-		return s.err.Error(), api.Error
+		return s.err.Error(), godi.Error
 	}
 	return s.msg, s.prio
 }
@@ -22,7 +22,7 @@ func (s *SealResult) Error() error {
 	return s.err
 }
 
-func (s *SealResult) FileInformation() *api.FileInfo {
+func (s *SealResult) FileInformation() *godi.FileInfo {
 	return s.finfo
 }
 

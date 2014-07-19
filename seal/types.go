@@ -25,10 +25,10 @@ type SealCommand struct {
 
 // Implements information about a seal operation
 type SealResult struct {
-	finfo *api.FileInfo
+	finfo *godi.FileInfo
 	msg   string
 	err   error
-	prio  api.Priority
+	prio  godi.Priority
 }
 
 // REVIEW:

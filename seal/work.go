@@ -10,7 +10,7 @@ import (
 	"github.com/Byron/godi/utility"
 )
 
-func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup, done <-chan bool) {
+func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
 	defer wg.Done()
 	sha1gen := sha1.New()
 	md5gen := md5.New()
@@ -20,8 +20,8 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
 	// be intersting for the mailing list.
-	handleHash := func(f api.FileInfo) {
-		res := SealResult{&f, "", nil, api.Progress}
+	handleHash := func(f godi.FileInfo) {
+		res := SealResult{&f, "", nil, godi.Progress}
 		err := &res.err
 		defer func(res *SealResult) { results <- res }(&res)
 

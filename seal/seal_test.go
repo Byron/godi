@@ -111,7 +111,7 @@ func TestSeal(t *testing.T) {
 		t.Error("Can't do less than one process here ... ")
 	}
 
-	results := make(chan api.Result, nprocs)
+	results := make(chan godi.Result, nprocs)
 	done := make(chan bool)
 
 	// assure we close our done channel on signal
@@ -135,7 +135,7 @@ func TestSeal(t *testing.T) {
 	accumResult := cmd.Aggregate(results, done)
 
 	// Return true if we should break the loop
-	resHandler := func(name string, res api.Result) bool {
+	resHandler := func(name string, res godi.Result) bool {
 		if res == nil {
 			// channel closed, have to get out
 			t.Log("Channel", name, "is closed")
