@@ -1,6 +1,8 @@
 package seal
 
 import (
+	"math"
+
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/utility"
 )
@@ -14,10 +16,8 @@ const (
 type SealCommand struct {
 
 	// One or more trees to seal
+	// Exported just for test-cases - too lazy to make it a read-only copy through accessor
 	Trees []string
-
-	// Amount of readers to use
-	nReaders int
 
 	// parallel reader
 	pCtrl utility.ReadChannelController
@@ -31,10 +31,27 @@ type SealResult struct {
 	prio  godi.Priority
 }
 
+func (s *SealResult) Info() (string, godi.Priority) {
+	if s.err != nil {
+		return s.err.Error(), godi.Error
+	}
+	return s.msg, s.prio
+}
+
+func (s *SealResult) Error() error {
+	return s.err
+}
+
+func (s *SealResult) FileInformation() *godi.FileInfo {
+	return s.finfo
+}
+
+func (s *SealCommand) MaxProcs() uint {
+	return uint(math.MaxUint32)
+}
+
 // REVIEW:
-func NewCommand(trees []string, nReaders int) SealCommand {
-	c := SealCommand{}
-	c.Trees = trees
-	c.nReaders = nReaders
-	return c
+func NewCommand(trees []string, nReaders int) (c SealCommand, err error) {
+	err = c.Init(nReaders, 0, trees)
+	return
 }

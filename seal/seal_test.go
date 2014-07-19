@@ -1,8 +1,6 @@
 package seal_test
 
 import (
-	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -14,95 +12,31 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/seal"
+	"github.com/Byron/godi/testlib"
 )
-
-const (
-	firstSubDir = "nothing"
-)
-
-// Create a new file at given path and size, without possibly required intermediate directories
-func makeFileOrPanic(path string, size int) string {
-	f, err := os.Create(path)
-	if err != nil {
-		panic(err)
-	}
-
-	if size != 0 {
-		b := [1]byte{0}
-		f.WriteAt(b[:], int64(size-1))
-	}
-
-	return path
-}
-
-// Create a dataset for testing and return the newly created directory
-func makeDatasetOrPanic() (string, string, string) {
-	base, err := ioutil.TempDir("", "dataset")
-	if err != nil {
-		panic(err)
-	}
-
-	makeFileOrPanic(filepath.Join(base, "1mb.ext"), 1024*1024)
-	makeFileOrPanic(filepath.Join(base, "somebytes_noext"), 313)
-
-	subdir := filepath.Join(base, "subdir")
-	if err := os.Mkdir(subdir, 0777); err != nil {
-		panic(err)
-	}
-	makeFileOrPanic(filepath.Join(subdir, "biggie.foo"), 1024*1024+5123)
-	makeFileOrPanic(filepath.Join(subdir, "smallie.blah"), 123)
-	subdir = filepath.Join(base, firstSubDir, "stillnothing", "ünicod€")
-	if err := os.MkdirAll(subdir, 0777); err != nil {
-		panic(err)
-	}
-
-	file := makeFileOrPanic(filepath.Join(subdir, "somefile.ext"), 12345)
-	symlink := filepath.Join(base, "symlink.ext")
-	err = os.Symlink(file, symlink)
-	if err != nil {
-		symlink = ""
-	}
-	return base, file, symlink
-}
-
-// Delete the given tree entirely. Should only be used in conjunction with makeDataset
-// Panics if something is wrong
-// Will only do the work if we are not already in panic
-func rmTree(tree string) {
-	if len(tree) == 0 {
-		panic("Invalid tree given")
-	}
-	res := recover()
-	if res != nil {
-		fmt.Fprintf(os.Stderr, "Keeping tree for debugging at '%s'", tree)
-		panic(res)
-	}
-	if err := os.RemoveAll(tree); err != nil {
-		panic(err)
-	}
-}
 
 func TestSeal(t *testing.T) {
-	datasetTree, dataFile, _ := makeDatasetOrPanic()
-	defer rmTree(datasetTree)
+	datasetTree, dataFile, _ := testlib.MakeDatasetOrPanic()
+	defer testlib.RmTree(datasetTree)
 	var cmd seal.SealCommand
+	var err error
 
-	cmd = seal.NewCommand([]string{dataFile}, 1)
-	if err := cmd.SanitizeArgs(); err == nil {
+	_, err = seal.NewCommand([]string{dataFile}, 1)
+	if err == nil {
 		t.Error("Expected it to not like files as directory")
 	} else {
 		t.Log(err)
 	}
 
-	cmd = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, firstSubDir, "..", firstSubDir)}, 1)
-	if err := cmd.SanitizeArgs(); err != nil {
+	cmd, err = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, testlib.FirstSubDir, "..", testlib.FirstSubDir)}, 1)
+	if err != nil {
 		t.Error("Expected to not fail sanitization")
 	} else if len(cmd.Trees) != 1 {
 		t.Error("Trees should have been pruned, contained one should have been dropped")
 	}
 
-	cmd = seal.NewCommand([]string{datasetTree}, runtime.GOMAXPROCS(0))
-	if err := cmd.SanitizeArgs(); err != nil {
+	cmd, err = seal.NewCommand([]string{datasetTree}, runtime.GOMAXPROCS(0))
+	if err != nil {
 		t.Error("Sanitize didn't like existing tree")
 	}
 

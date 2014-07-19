@@ -1,12 +1,35 @@
 package cli
 
 import (
+	"errors"
+	"runtime"
+
+	"github.com/Byron/godi/api"
+
 	"github.com/codegangsta/cli"
 )
 
 const (
-	NumReadersFlagName = "num-readers"
+	numReadersFlagName = "num-readers"
 )
+
+// Runs a standard runner from within the cli, dealing with errors accoringly
+func RunAction(cmd godi.Runner, c *cli.Context) {
+	// checkArgs must have initialized the seal command, so we can just run it
+	// TODO: Error handling
+	godi.StartEngine(cmd, uint(runtime.GOMAXPROCS(0)))
+}
+
+// Check common args and init a command with them.
+// Further init and checking should be done in specialized function
+func CheckCommonArgs(cmd godi.Runner, c *cli.Context) error {
+	// Put parsed args in cmd and sanitize it
+	nr := c.GlobalInt(numReadersFlagName)
+	if nr < 1 {
+		return errors.New("--num-readers must not be smaller than 1")
+	}
+	return cmd.Init(nr, 0, c.Args())
+}
 
 // Builds a Cli app from all commands we know and returns it
 func NewGodiApp(cmds []cli.Command) *cli.App {
@@ -16,7 +39,7 @@ func NewGodiApp(cmds []cli.Command) *cli.App {
 
 	// general flags
 	app.Flags = []cli.Flag{
-		cli.IntFlag{NumReadersFlagName + ", nr", 1, "Amount of parallel read streams we can use"},
+		cli.IntFlag{numReadersFlagName + ", nr", 1, "Amount of parallel read streams we can use"},
 	}
 	app.Version = "v0.1.0"
 

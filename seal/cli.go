@@ -2,15 +2,13 @@ package seal
 
 import (
 	"errors"
-	"flag"
-	"math"
 	"os"
 	"path"
-	"runtime"
+	"path/filepath"
 	"strings"
 
-	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
+	"github.com/Byron/godi/utility"
 
 	gcli "github.com/codegangsta/cli"
 )
@@ -24,52 +22,18 @@ func SubCommands() []gcli.Command {
 		Name:      Name,
 		ShortName: "",
 		Usage:     "Generate a seal for one ore more directories, which allows them to be verified later on",
-		Action:    func(c *gcli.Context) { seal(&cmd, c) },
-		Before:    func(c *gcli.Context) error { return checkArgs(&cmd, c) },
+		Action:    func(c *gcli.Context) { cli.RunAction(&cmd, c) },
+		Before:    func(c *gcli.Context) error { return cli.CheckCommonArgs(&cmd, c) },
 	}
 
 	out[0] = seal
 	return out
 }
 
-func seal(cmd *SealCommand, c *gcli.Context) {
-	// checkArgs must have initialized the seal command, so we can just run it
-	// TODO: Error handling
-	godi.StartEngine(cmd, uint(runtime.GOMAXPROCS(0)))
-}
+func (s *SealCommand) Init(numReaders, numWriters int, items []string) error {
+	s.pCtrl = utility.NewReadChannelController(numReaders)
+	s.Trees = items
 
-func checkArgs(cmd *SealCommand, c *gcli.Context) error {
-	// Put parsed args in cmd and sanitize it
-	cmd.nReaders = c.GlobalInt(cli.NumReadersFlagName)
-	cmd.SetUnparsedArgs(c.Args())
-	return cmd.SanitizeArgs()
-}
-
-func (s *SealResult) Info() (string, godi.Priority) {
-	if s.err != nil {
-		return s.err.Error(), godi.Error
-	}
-	return s.msg, s.prio
-}
-
-func (s *SealResult) Error() error {
-	return s.err
-}
-
-func (s *SealResult) FileInformation() *godi.FileInfo {
-	return s.finfo
-}
-
-func (s *SealCommand) SetUnparsedArgs(args []string) error {
-	s.Trees = args
-	return nil
-}
-
-func (s *SealCommand) MaxProcs() uint {
-	return uint(math.MaxUint32)
-}
-
-func (s *SealCommand) SanitizeArgs() (err error) {
 	if len(s.Trees) == 0 {
 		return errors.New("Please provide at least one tree to work on")
 	}
@@ -82,7 +46,15 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 		} else if !stat.IsDir() {
 			noTrees = append(noTrees, tree)
 		}
-		s.Trees[i] = path.Clean(tree)
+		tree = path.Clean(tree)
+		if !filepath.IsAbs(tree) {
+			var err error
+			tree, err = filepath.Abs(tree)
+			if err != nil {
+				return err
+			}
+		}
+		s.Trees[i] = tree
 	}
 
 	if len(invalidTrees) > 0 {
@@ -90,9 +62,6 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 	}
 	if len(noTrees) > 0 {
 		return errors.New("The following trees are no directory: " + strings.Join(noTrees, ", "))
-	}
-	if s.nReaders < 1 {
-		return errors.New("--num-readers must not be smaller than 1")
 	}
 
 	// drop trees which are a sub-tree of another
@@ -113,10 +82,5 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 		s.Trees = validTrees
 	}
 
-	return err
-}
-
-func (s *SealCommand) SetupParser(parser *flag.FlagSet) error {
-	parser.IntVar(&s.nReaders, "num-readers", 1, "Amount of parallel read streams we can use")
 	return nil
 }

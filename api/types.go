@@ -49,6 +49,12 @@ type Runner interface {
 	// It's also based on our options, and no more than MaxProcs() go routines shouldbe started for Gather
 	MaxProcs() uint
 
+	// Intialize required members to deal with controlled reading and writing. numReaders and numWriters
+	// can be assumed to be valid
+	// Sets the items we are supposed to be working on - must be checked by implementation, as they are
+	// very generic in nature
+	Init(numReaders, numWriters int, items []string) error
+
 	// Launches a go-routine which fills the returned FileInfo channel
 	// Must close FileInfo channel when done
 	// Must listen for SIGTERM|SIGINT signals and abort if received
@@ -71,6 +77,7 @@ type Runner interface {
 	Aggregate(results <-chan Result, done <-chan bool) <-chan Result
 }
 
+// Runner Init must have been called beforehand as we don't know the values here
 func StartEngine(runner Runner, nprocs uint) {
 	if nprocs > runner.MaxProcs() {
 		nprocs = runner.MaxProcs()

@@ -26,6 +26,7 @@ func main() {
 	// Always use all available CPUs - the user can limit resources using GOMAXPROCS and the flags for reader- and writer-procs
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	app := cli.NewGodiApp(cmds)
+
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(OTHER_ERROR)
