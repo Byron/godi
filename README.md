@@ -20,6 +20,19 @@ TODO:
 * Abort if destination file exists - see atomic mode !
 * atomic mode (always on) - on cancel, remove all created files and directories
 * print information about read and write performance to stderr every x seconds (allows to tune readers and writer counts thanks to atomic mode)
+* save mode - verify after copy
+
+## Benefits over MHL
+
+* **Performance**
+    + `godi` is up to multiple times faster
+    + Those inclined may maximize bandwidth by tuning parallelism
+* **Copy or archive on the fly**
+    + While hashing, you can also transfer the data, reading it only once in the process. With MHL, you need to copy first, and hash afterwards, which reads the data twice. `godi`s operation assumes the storage works correctly, however, there is a safe mode which verifies the copy nonetheless.
+    + It will never overwrite existing files.
+* **Atomic Operation**
+    + It will not produce intermediate results, and either finish successfully, or not at all.
+    + Particularly useful when copying or archiving, as it will not leave any written file(s), allowing to safely abort and retry at will. The latter is good during performance tuning.
 
 ## Performance
 

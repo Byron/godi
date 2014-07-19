@@ -15,9 +15,13 @@ import (
 	"time"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/codec"
 )
 
-const Name = "seal"
+const (
+	IndexBaseName = "godi_"
+	Name          = "seal"
+)
 
 // A type representing all arguments required to drive a Seal operation
 type SealCommand struct {
@@ -91,7 +95,7 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 	}
 
 	// drop trees which are a sub-tree of another
-	if len(s.Trees) > 0 {
+	if len(s.Trees) > 1 {
 		validTrees := make([]string, 0, len(s.Trees))
 		for i, ltree := range s.Trees {
 			for x, rtree := range s.Trees {
@@ -102,7 +106,7 @@ func (s *SealCommand) SanitizeArgs() (err error) {
 			}
 		}
 		if len(validTrees) == 0 {
-			fmt.Fprintln(os.Stderr, "PANIC", len(validTrees), cap(validTrees))
+			panic("Didn't find a single valid tree")
 		}
 
 		s.Trees = validTrees
@@ -232,12 +236,52 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 	}
 }
 
+// return a path to an index file residing at tree
+func (s *SealCommand) IndexPath(tree string, extension string) string {
+	return filepath.Join(tree, fmt.Sprintf("%s%s.%s", IndexBaseName, time.Now().Format(time.RFC3339), extension))
+}
+
+// When called, we have seen no error and everything can be assumed to be in order
+// Returns error in case we can't write, and all index files written so far.
+// It's up to the caller to remove existing files on error
+func (s *SealCommand) writeIndex(treeMap map[string]map[string]*api.FileInfo) ([]string, error) {
+	// Serialize all fileinfo structures
+	// NOTE: As the parallel writer will send results only when writing finished, we can just operate serially here ...
+	// For this there is also no need to optimize performance
+	// However, we could use a parallel writer if we are so inclined
+	// For now, we do only gob
+	encoder := codec.Gob{}
+	indices := make([]string, 0, len(treeMap))
+	for tree, paths := range treeMap {
+		fd, err := os.OpenFile(s.IndexPath(tree, encoder.Extension()), os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			return indices, err
+		}
+
+		err = encoder.Serialize(paths, fd)
+		fd.Close()
+		if err != nil {
+			// remove possibly half-written file
+			os.Remove(fd.Name())
+			return indices, err
+		}
+		indices = append(indices, fd.Name())
+	}
+
+	return indices, nil
+}
+
 func (s *SealCommand) Accumulate(results <-chan api.Result, done <-chan bool) <-chan api.Result {
 	accumResult := make(chan api.Result)
 
 	go func() {
 		defer close(accumResult)
-		pathmap := make(map[string]*SealResult)
+		treePathmap := make(map[string]map[string]*api.FileInfo)
+
+		// Presort all paths by their root
+		for _, tree := range s.Trees {
+			treePathmap[tree] = make(map[string]*api.FileInfo)
+		}
 
 		var count uint = 0
 		var errCount uint = 0
@@ -245,6 +289,8 @@ func (s *SealCommand) Accumulate(results <-chan api.Result, done <-chan bool) <-
 		st := time.Now()
 		wasCancelled := false
 
+		// ACCUMULATE PATHS INFO
+		/////////////////////////
 		for r := range results {
 			if r.Error() != nil {
 				errCount += 1
@@ -259,23 +305,60 @@ func (s *SealCommand) Accumulate(results <-chan api.Result, done <-chan bool) <-
 			default:
 				{
 					sr := r.(*SealResult)
-					_, ok := pathmap[sr.finfo.Path]
+					// find root
+					var pathmap map[string]*api.FileInfo
+					var pathTree string
+					for _, tree := range s.Trees {
+						if strings.HasPrefix(sr.finfo.Path, tree) {
+							pathTree = tree
+							pathmap = treePathmap[tree]
+							break
+						}
+					}
+					if pathmap == nil {
+						panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.finfo.Path, s.Trees))
+					}
+					// we store only relative paths in the map - this is all we want to serialize
+					relaPath := sr.finfo.Path[len(pathTree)+1:]
+
+					_, ok := pathmap[relaPath]
 					if ok {
 						// duplicate path - shouldn't happen, but we deal with it
 						sr.err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.finfo.Path)
 						errCount += 1
 						accumResult <- sr
 					} else {
-						pathmap[sr.finfo.Path] = sr
+						pathmap[relaPath] = sr.finfo
 						count += 1
 						size += uint64(sr.finfo.Size)
-						accumResult <- &SealResult{nil, fmt.Sprintf("%s: SHA1=%x MD5=%x", sr.finfo.Path, sr.finfo.Sha1, sr.finfo.MD5), nil, api.Progress}
+						accumResult <- &SealResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, api.Progress}
 					}
 				} // default
 			} // select
 		} // range results
 		elapsed := time.Now().Sub(st).Seconds()
 		sizeMB := float32(size) / (1024.0 * 1024.0)
+
+		// INDEX HANDLING
+		//////////////////
+		// Serialize all fileinfo structures
+		// NOTE: As the parallel writer will send results only when writing finished, we can just operate serially here ...
+		// For this there is also no need to optimize performance
+		// However, we could use a parallel writer if we are so inclined
+		if !wasCancelled {
+			var indices []string
+			var err error
+			if indices, err = s.writeIndex(treePathmap); err != nil {
+				// NOTE: We keep successfully written indices as each tree is consistent in itself
+				accumResult <- &SealResult{nil, "", err, api.Error}
+			}
+
+			// Inform about successfully written indices
+			for _, index := range indices {
+				accumResult <- &SealResult{nil, fmt.Sprintf("Wrote seal at '%s'", index), err, api.Info}
+			}
+		}
+
 		accumResult <- &SealResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount, wasCancelled), nil, api.Info}
 	}()
 
