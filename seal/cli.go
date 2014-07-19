@@ -6,10 +6,44 @@ import (
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/cli"
+
+	gcli "github.com/codegangsta/cli"
 )
+
+// return subcommands for our particular area of algorithms
+func SubCommands() []gcli.Command {
+	out := make([]gcli.Command, 1)
+	cmd := SealCommand{}
+
+	seal := gcli.Command{
+		Name:      Name,
+		ShortName: "",
+		Usage:     "Generate a seal for one ore more directories, which allows them to be verified later on",
+		Action:    func(c *gcli.Context) { seal(&cmd, c) },
+		Before:    func(c *gcli.Context) error { return checkArgs(&cmd, c) },
+	}
+
+	out[0] = seal
+	return out
+}
+
+func seal(cmd *SealCommand, c *gcli.Context) {
+	// checkArgs must have initialized the seal command, so we can just run it
+	// TODO: Error handling
+	godi.StartEngine(cmd, uint(runtime.GOMAXPROCS(0)))
+}
+
+func checkArgs(cmd *SealCommand, c *gcli.Context) error {
+	// Put parsed args in cmd and sanitize it
+	cmd.nReaders = c.GlobalInt(cli.NumReadersFlagName)
+	cmd.SetUnparsedArgs(c.Args())
+	return cmd.SanitizeArgs()
+}
 
 func (s *SealResult) Info() (string, godi.Priority) {
 	if s.err != nil {
