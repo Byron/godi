@@ -132,7 +132,7 @@ func TestSeal(t *testing.T) {
 		wg.Wait()
 		close(results)
 	}()
-	accumResult := cmd.Accumulate(results, done)
+	accumResult := cmd.Aggregate(results, done)
 
 	// Return true if we should break the loop
 	resHandler := func(name string, res api.Result) bool {

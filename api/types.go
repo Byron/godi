@@ -64,11 +64,11 @@ type Runner interface {
 	// Must listen on done and return asap
 	Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, done <-chan bool)
 
-	// Accumulate the result channel and produce whatever you have to produce from the result of the Gather steps
+	// Aggregate the result channel and produce whatever you have to produce from the result of the Gather steps
 	// When you are done, place a single result instance into accumResult and close the channel
 	// You must listen on done to know if the operation was aborted prematurely. This information should be useful
 	// for your result.
-	Accumulate(results <-chan Result, done <-chan bool) <-chan Result
+	Aggregate(results <-chan Result, done <-chan bool) <-chan Result
 }
 
 func StartEngine(runner Runner, nprocs uint) {
@@ -101,7 +101,7 @@ func StartEngine(runner Runner, nprocs uint) {
 		wg.Wait()
 		close(results)
 	}()
-	accumResult := runner.Accumulate(results, done)
+	accumResult := runner.Aggregate(results, done)
 
 	// Return true if we should break the loop
 	resHandler := func(name string, res Result) bool {
