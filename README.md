@@ -33,6 +33,8 @@ TODO:
 * **Atomic Operation**
     + It will not produce intermediate results, and either finish successfully, or not at all.
     + Particularly useful when copying or archiving, as it will not leave any written file(s), allowing to safely abort and retry at will. The latter is good during performance tuning.
+* **It just works**
+    + `mhl` will fail (for some reason) if it finds a hidden file. `godi` will just ignore hidden files and symbolic links and otherwise process everything in its way.
 
 ## Performance
 

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	IndexBaseName = "godi_"
+	IndexBaseName = "godi"
 	Name          = "seal"
 )
 
@@ -238,7 +238,16 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 
 // return a path to an index file residing at tree
 func (s *SealCommand) IndexPath(tree string, extension string) string {
-	return filepath.Join(tree, fmt.Sprintf("%s%s.%s", IndexBaseName, time.Now().Format(time.RFC3339), extension))
+	n := time.Now()
+	return filepath.Join(tree, fmt.Sprintf("%s_%04d-%02d-%02d_%02d%02d%02d.%s",
+		IndexBaseName,
+		n.Year(),
+		n.Month(),
+		n.Day(),
+		n.Hour(),
+		n.Minute(),
+		n.Second(),
+		extension))
 }
 
 // When called, we have seen no error and everything can be assumed to be in order
@@ -253,7 +262,8 @@ func (s *SealCommand) writeIndex(treeMap map[string]map[string]*api.FileInfo) ([
 	encoder := codec.Gob{}
 	indices := make([]string, 0, len(treeMap))
 	for tree, paths := range treeMap {
-		fd, err := os.OpenFile(s.IndexPath(tree, encoder.Extension()), os.O_CREATE|os.O_WRONLY, 0666)
+		// This will and should fail if the file already exists
+		fd, err := os.OpenFile(s.IndexPath(tree, encoder.Extension()), os.O_EXCL|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			return indices, err
 		}
