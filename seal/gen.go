@@ -6,13 +6,14 @@ import (
 	"path/filepath"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/utility"
 )
 
 func (s *SealCommand) Generate(done <-chan bool) (<-chan api.FileInfo, <-chan api.Result) {
 	files := make(chan api.FileInfo)
 	results := make(chan api.Result)
 
-	s.pCtrl = api.NewReadChannelController(s.nReaders)
+	s.pCtrl = utility.NewReadChannelController(s.nReaders)
 
 	go func() {
 		for _, tree := range s.Trees {

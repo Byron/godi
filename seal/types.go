@@ -2,6 +2,7 @@ package seal
 
 import (
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/utility"
 )
 
 const (
@@ -19,7 +20,7 @@ type SealCommand struct {
 	nReaders int
 
 	// parallel reader
-	pCtrl api.ReadChannelController
+	pCtrl utility.ReadChannelController
 }
 
 // Implements information about a seal operation

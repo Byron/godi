@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/utility"
 )
 
 func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup, done <-chan bool) {
@@ -14,7 +15,7 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 	sha1gen := sha1.New()
 	md5gen := md5.New()
 	// This makes the write as slow as the slowest hash, instead of hash+hash
-	allHashes := api.UncheckedParallelMultiWriter(sha1gen, md5gen)
+	allHashes := utility.UncheckedParallelMultiWriter(sha1gen, md5gen)
 
 	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
