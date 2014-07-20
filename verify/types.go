@@ -26,8 +26,8 @@ type VerifyCommand struct {
 
 // Implements information about a verify operation
 type VerifyResult struct {
-	*godi.BasicResult
-	nfinfo *godi.FileInfo // the newly gathered file information
+	*godi.BasicResult                // will contain the actual file information from the disk file
+	ifinfo            *godi.FileInfo // the file information we have seen in the index
 }
 
 // NewCommand returns an initialized verify command
@@ -41,6 +41,7 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 	results := make(chan godi.Result)
 
 	go func() {
+		defer close(files)
 		for _, index := range s.Indices {
 			c := codec.NewByPath(index)
 			if c == nil {
@@ -73,24 +74,20 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 	return files, results
 }
 
-// TODO: this should really be the same as in seal, but use a different result type. There should be a Gather utility function
 func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
-	defer wg.Done()
-
-	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
-	// we will get f overwritten by the next iteration variable ... it's kind of special, might
-	// be intersting for the mailing list.
-	handleHash := func(f godi.FileInfo) {
-	}
-
-	for f := range files {
-		select {
-		case <-done:
-			return
-		default:
-			handleHash(f)
+	makeResult := func(f *godi.FileInfo) (godi.Result, *godi.BasicResult) {
+		fcpy := *f
+		res := VerifyResult{
+			BasicResult: &godi.BasicResult{
+				Finfo: f,
+				Prio:  godi.Progress,
+			},
+			ifinfo: &fcpy,
 		}
+		return &res, res.BasicResult
 	}
+
+	godi.Gather(files, results, wg, done, makeResult, &s.pCtrl)
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {

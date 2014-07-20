@@ -14,13 +14,13 @@ func (s *SealCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan g
 	results := make(chan godi.Result)
 
 	go func() {
+		defer close(files)
 		for _, tree := range s.Trees {
 			if !s.traverseFilesRecursively(files, results, done, tree) {
 				// interrupted usually, or there was an error
 				break
 			}
 		}
-		defer close(files)
 	}()
 
 	return files, results
