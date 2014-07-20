@@ -82,10 +82,23 @@ type AggregateFinalizerState struct {
 	Elapsed             float64
 }
 
+// String generates a string with performance information
+func (a *AggregateFinalizerState) String() string {
+	sizeMB := float32(a.SizeBytes) / (1024.0 * 1024.0)
+	return fmt.Sprintf(
+		"Processed %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v",
+		sizeMB,
+		a.Elapsed,
+		float64(sizeMB)/a.Elapsed,
+		a.ErrCount,
+		a.WasCancelled,
+	)
+}
+
 // Aggregate is a general purpose implementation to gather fileInfo results
 func Aggregate(results <-chan Result, done <-chan bool,
 	resultHandler func(Result, chan<- Result) bool,
-	finalizer func(chan<- Result, AggregateFinalizerState)) <-chan Result {
+	finalizer func(chan<- Result, *AggregateFinalizerState)) <-chan Result {
 	accumResult := make(chan Result)
 
 	go func() {
@@ -121,7 +134,7 @@ func Aggregate(results <-chan Result, done <-chan bool,
 		} // range results
 		s.Elapsed = time.Now().Sub(st).Seconds()
 
-		finalizer(accumResult, s)
+		finalizer(accumResult, &s)
 	}()
 
 	return accumResult

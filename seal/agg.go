@@ -81,23 +81,23 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 		// we store only relative paths in the map - this is all we want to serialize
 		relaPath := sr.Finfo.Path[len(pathTree)+1:]
 
-		_, pathSeen := pathmap[relaPath]
-		if pathSeen {
+		hasError := false
+		if _, pathSeen := pathmap[relaPath]; pathSeen {
 			// duplicate path - shouldn't happen, but we deal with it
 			sr.Err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.Finfo.Path)
-			accumResult <- sr
-			return false
+			hasError = true
 		} else {
 			pathmap[relaPath] = sr.Finfo
-			accumResult <- &godi.BasicResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, godi.Progress}
+			sr.Msg = fmt.Sprintf("DONE ...%s", relaPath)
 		}
 
-		return true
+		accumResult <- sr
+		return !hasError
 	}
 
 	finalizer := func(
 		accumResult chan<- godi.Result,
-		st godi.AggregateFinalizerState) {
+		st *godi.AggregateFinalizerState) {
 		// INDEX HANDLING
 		//////////////////
 		// Serialize all fileinfo structures
@@ -121,16 +121,11 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 			}
 		}
 
-		sizeMB := float32(st.SizeBytes) / (1024.0 * 1024.0)
 		accumResult <- &godi.BasicResult{
 			Msg: fmt.Sprintf(
-				"Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)",
+				"Sealed %d files (%v)",
 				st.FileCount,
-				sizeMB,
-				st.Elapsed,
-				float64(sizeMB)/st.Elapsed,
-				st.ErrCount,
-				st.WasCancelled,
+				st,
 			),
 			Prio: godi.Info,
 		}

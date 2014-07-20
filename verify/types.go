@@ -2,6 +2,8 @@
 package verify
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -93,13 +95,52 @@ func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.R
 
 func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
 
+	var signatureMismatches uint = 0
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
-		return true
+		vr := r.(*VerifyResult)
+
+		hasError := false
+		if bytes.Compare(vr.ifinfo.Sha1, vr.Finfo.Sha1) != 0 ||
+			bytes.Compare(vr.ifinfo.MD5, vr.Finfo.MD5) != 0 {
+			vr.Err = fmt.Errorf("HASH MISMATCH: %s", vr.Finfo.Path)
+			signatureMismatches += 1
+			hasError = true
+		} else {
+			vr.Msg = fmt.Sprintf("OK: %s", vr.Finfo.Path)
+		}
+		accumResult <- vr
+		return !hasError
 	}
 
 	finalizer := func(
 		accumResult chan<- godi.Result,
-		st godi.AggregateFinalizerState) {
+		st *godi.AggregateFinalizerState) {
+
+		if signatureMismatches == 0 {
+			accumResult <- &VerifyResult{
+				BasicResult: &godi.BasicResult{
+					Msg: fmt.Sprintf(
+						"All %d files did not change after sealing (%v)",
+						st.FileCount,
+						st,
+					),
+					Prio: godi.Info,
+				},
+			}
+		} else {
+			st.ErrCount -= signatureMismatches
+			accumResult <- &VerifyResult{
+				BasicResult: &godi.BasicResult{
+					Msg: fmt.Sprintf(
+						"%d of %d files have changed on disk after sealing (%v)",
+						signatureMismatches,
+						st.FileCount,
+						st,
+					),
+					Prio: godi.Info,
+				},
+			}
+		}
 
 	}
 
