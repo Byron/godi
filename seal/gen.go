@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/Byron/godi/api"
 )
@@ -53,7 +54,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 						results <- &godi.BasicResult{nil, fmt.Sprintf("Ignoring symbolic link: '%s'", path), nil, godi.Warn}
 						continue
 					}
-					if fi.Name()[0] == '.' {
+					if fr, _ := utf8.DecodeRuneInString(fi.Name()); fr == '.' {
 						results <- &godi.BasicResult{nil, fmt.Sprintf("Ignoring hidden file: '%s'", path), nil, godi.Warn}
 						continue
 					}

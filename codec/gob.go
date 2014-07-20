@@ -4,15 +4,16 @@ import (
 	"compress/gzip"
 	"crypto/sha1"
 	"encoding/gob"
+	"errors"
 	"io"
 
 	"github.com/Byron/godi/api"
 )
 
 const (
-	Name      = "gob"
-	extension = "gobz"
-	version   = 1
+	GobName      = "gob"
+	GobExtension = "gobz"
+	version      = 1
 )
 
 // Used in the serialization format
@@ -30,7 +31,7 @@ type Gob struct {
 }
 
 func (g *Gob) Extension() string {
-	return extension
+	return GobExtension
 }
 
 func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err error) {
@@ -50,6 +51,7 @@ func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err 
 
 	// NOTE: we re-encode to get rid of the map
 	for relaPath, finfo := range paths {
+		sha1enc.Write([]byte(relaPath))
 		sha1enc.Write(finfo.Sha1)
 		sha1enc.Write(finfo.MD5)
 		if err = encoder.Encode(gobValueV1{relaPath, finfo}); err != nil {
@@ -66,4 +68,8 @@ func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err 
 	}
 
 	return
+}
+
+func (g *Gob) Deserialize(reader io.Reader) (res []godi.FileInfo, err error) {
+	return nil, errors.New("not implemented")
 }

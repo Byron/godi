@@ -34,4 +34,11 @@ func TestSeal(t *testing.T) {
 	if err != nil {
 		t.Error("Sanitize didn't like existing tree")
 	}
+
+	// Return true if we should break the loop
+	resHandler := testlib.ResultHandler(t)
+
+	if err := godi.StartEngine(&cmd, uint(runtime.GOMAXPROCS(0)), resHandler, resHandler); err != nil {
+		t.Error(err)
+	}
 }

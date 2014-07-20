@@ -77,11 +77,6 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 		// ACCUMULATE PATHS INFO
 		/////////////////////////
 		for r := range results {
-			if r.Error() != nil {
-				errCount += 1
-				accumResult <- r
-			}
-
 			// Be sure we take note of cancellation.
 			// If this happens, soon our results will be drained and we leave naturally
 			select {
@@ -89,6 +84,12 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 				wasCancelled = true
 			default:
 				{
+					if r.Error() != nil {
+						errCount += 1
+						accumResult <- r
+						continue
+					}
+
 					sr := r.(*godi.BasicResult)
 					// find root
 					var pathmap map[string]*godi.FileInfo
