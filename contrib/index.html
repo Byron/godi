@@ -6,10 +6,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
         
-        <link rel="canonical" href="https://byron.github.io/godi/godi/">
+        <link rel="canonical" href="https://byron.github.io/godi/contrib/">
         <link rel="shortcut icon" href="../img/favicon.ico">
 
-        <title>Manual - godi</title>
+        <title>Contribute - godi</title>
 
         <link href="../css/bootstrap-custom.min.css" rel="stylesheet">
         <link href="../css/font-awesome-4.0.3.css" rel="stylesheet">
@@ -56,14 +56,14 @@
             
             
             
-                <li class="active">
-                    <a href="./">Manual</a>
+                <li >
+                    <a href="../godi/">Manual</a>
                 </li>
             
             
             
-                <li >
-                    <a href="../contrib/">Contribute</a>
+                <li class="active">
+                    <a href="./">Contribute</a>
                 </li>
             
             
@@ -86,12 +86,12 @@
             <ul class="nav navbar-nav navbar-right">
                 
                 <li >
-                    <a rel="next" href="..">
+                    <a rel="next" href="../godi/">
                         <i class="fa fa-arrow-left"></i> Previous
                     </a>
                 </li>
                 <li >
-                    <a rel="prev" href="../contrib/">
+                    <a rel="prev" href="../license/">
                         Next <i class="fa fa-arrow-right"></i>
                     </a>
                 </li>
@@ -114,45 +114,16 @@
             <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
     <ul class="nav bs-sidenav">
     
-        <li class="main active"><a href="#subcommands">Subcommands</a></li>
-        
-            <li><a href="#seal">Seal</a></li>
-        
-            <li><a href="#verify">Verify</a></li>
-        
-            <li><a href="#sealed-copy">Sealed Copy</a></li>
-        
-    
-        <li class="main "><a href="#increasing-performance">Increasing Performance</a></li>
-        
-            <li><a href="#performance-example">Performance Example</a></li>
+        <li class="main active"><a href="#package-structure">Package Structure</a></li>
         
     
     </ul>
 </div></div>
             <div class="col-md-9" role="main">
 
-<p>This page explains all sub-commands and how to use them.</p>
-<p>When it's your intend to transfer large amounts of data in high-speed and in a sealed (and possibly verified) fashion, <code>sealed-copy</code> is the sub-command for you.</p>
-<p>Otherwise, you can seal existing folders, and verify them at another time to assure the data is still what it is supposed to be. Please note that filesystems like ZFS have this kind of feature built-in - <code>godi</code> just allows you to assert your data's integrity on any storage system.</p>
-<p><img alt="under construction" src="https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png" /></p>
-<h1 id="subcommands">Subcommands</h1>
-<h2 id="seal">Seal</h2>
-<h2 id="verify">Verify</h2>
-<h2 id="sealed-copy">Sealed Copy</h2>
-<h1 id="increasing-performance">Increasing Performance</h1>
-<p>For understanding this paragraph, it's beneficial to understand how data is processed in godi. Without getting into too much detail, you can see that data is first read from storage, then hashed, and possibly be written in any of the copy-enabled modes.</p>
-<p><img alt="architecture" src="../img/arch.dia.txt.png" /></p>
-<p>As the <em>Hasher</em> part can easily deliver 450MB/s per core, you can imagine that the bottleneck will occour during disk-based input-output operations. For example, reading from an SSD with a cold filesystem cache will rarely deliver more than 500MB/s, and writing to an SSD would not be much faster either.</p>
-<p>Nonetheless, depending on the type of storage, you might benefit from multiple simultaneous reads, and/or multiple simultaneous writes, which may drastically increase the perceived performance.</p>
-<p>It is vital to test for good values for <code>--num-readers</code> and <code>--num-writers</code> to get optimal performance for your respective hardware. By default, there may be as many hashers as you have cores, and this rarely needs a change unless <code>godi</code> is competing with other programs for the CPU.</p>
-<h2 id="performance-example">Performance Example</h2>
-<ul>
-<li><strong>TODO</strong><ul>
-<li>show how various settings are affecting each other, especially on a hot cache or through a network.</li>
-</ul>
-</li>
-</ul>
+<p>This page provdes more inforamtion about how godi is structured in case someone seeks to make contributions.</p>
+<h1 id="package-structure">Package Structure</h1>
+<p><img alt="architecture" src="../img/packages.dia.txt.png" /></p>
 </div>
         </div>
 

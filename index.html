@@ -62,6 +62,12 @@
             
             
             
+                <li >
+                    <a href="contrib/">Contribute</a>
+                </li>
+            
+            
+            
                 <li class="dropdown">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">About <b class="caret"></b></a>
                     <ul class="dropdown-menu">
@@ -111,6 +117,9 @@
         <li class="main active"><a href="#usage">Usage</a></li>
         
     
+        <li class="main "><a href="#benefits-over-mhl">Benefits over MHL</a></li>
+        
+    
         <li class="main "><a href="#performance">Performance</a></li>
         
     
@@ -137,6 +146,33 @@ godi seal tree/
 <li>nprocs - specify how many parallel gather routines there are</li>
 <li>abort-on-error - if False, we continue as long as possible, otherwise we abort and interrupt all currently running procedures</li>
 <li>log-mode - either off, or verbose, and in future, maybe even a binary one which provides a whole lot of additional information</li>
+<li>Abort if destination file exists - see atomic mode !</li>
+<li>atomic mode (always on) - on cancel, remove all created files and directories</li>
+<li>print information about read and write performance to stderr every x seconds (allows to tune readers and writer counts thanks to atomic mode)</li>
+<li>safe mode - verify after copy</li>
+</ul>
+<h2 id="benefits-over-mhl">Benefits over MHL</h2>
+<ul>
+<li><strong>Performance</strong><ul>
+<li><code>godi</code> is up to multiple times faster</li>
+<li>Those inclined may maximize bandwidth by tuning parallelism</li>
+</ul>
+</li>
+<li><strong>Copy or archive on the fly</strong><ul>
+<li>While hashing, you can also transfer the data, reading it only once in the process. With MHL, you need to copy first, and hash afterwards, which reads the data twice. <code>godi</code>s operation assumes the storage works correctly, however, there is a safe mode which verifies the copy nonetheless.</li>
+<li>It will never overwrite existing files.</li>
+</ul>
+</li>
+<li><strong>Atomic Operation</strong><ul>
+<li>It will not produce intermediate results, and either finish successfully, or not at all.</li>
+<li>Particularly useful when copying or archiving, as it will not leave any written file(s), allowing to safely abort and retry at will. The latter is good during performance tuning.</li>
+</ul>
+</li>
+<li><strong>Usability</strong><ul>
+<li><code>godi</code> just works. <code>mhl</code> will fail (for some reason) if it finds a hidden file. <code>godi</code> will just ignore hidden files and symbolic links and otherwise process everything in its way.</li>
+<li><code>godi</code> comes with a state of the art commandline interface, allowing to learn the command by using it. No manual required.</li>
+</ul>
+</li>
 </ul>
 <h2 id="performance">Performance</h2>
 <p>Intermediate results indicate a throughput of up to 900MB/s on 2 cores, which is a little more than twice as fast as the single-threaded <a href="http://mediahashlist.org/">mhl</a>.</p>
