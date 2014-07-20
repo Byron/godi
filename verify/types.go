@@ -1,1 +1,70 @@
+// Implements verification of seal files previously written with seal command
 package verify
+
+import (
+	"sync"
+
+	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/utility"
+)
+
+const (
+	Name = "verify"
+)
+
+// A type representing all arguments required to drive a Seal operation
+type VerifyCommand struct {
+
+	// The index files we are to verify
+	Indices []string
+
+	// parallel reader
+	pCtrl utility.ReadChannelController
+}
+
+// Implements information about a verify operation
+type VerifyResult struct {
+	*godi.BasicResult
+	nfinfo *godi.FileInfo // the newly gathered file information
+}
+
+// NewCommand returns an initialized verify command
+func NewCommand(trees []string, nReaders int) (c VerifyCommand, err error) {
+	err = c.Init(nReaders, 0, trees)
+	return
+}
+
+func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
+	files := make(chan godi.FileInfo)
+	results := make(chan godi.Result)
+
+	// TODO: go routine doing the work
+
+	return files, results
+}
+
+// TODO: this should really be the same as in seal, but use a different result type. There should be a Gather utility function
+func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
+	defer wg.Done()
+
+	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
+	// we will get f overwritten by the next iteration variable ... it's kind of special, might
+	// be intersting for the mailing list.
+	handleHash := func(f godi.FileInfo) {
+	}
+
+	for f := range files {
+		select {
+		case <-done:
+			return
+		default:
+			handleHash(f)
+		}
+	}
+}
+
+func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
+	accumResult := make(chan godi.Result)
+	defer close(accumResult)
+	return accumResult
+}

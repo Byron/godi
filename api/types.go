@@ -42,11 +42,31 @@ type Result interface {
 	FileInformation() *FileInfo
 }
 
-type Runner interface {
+// Implements information about any operation
+// It's the minimum we need to work
+type BasicResult struct {
+	Finfo *FileInfo
+	Msg   string
+	Err   error
+	Prio  Priority
+}
 
-	// Return maximum amount of processes we can handle.
-	// It's also based on our options, and no more than MaxProcs() go routines shouldbe started for Gather
-	MaxProcs() uint
+func (s *BasicResult) Info() (string, Priority) {
+	if s.Err != nil {
+		return s.Err.Error(), Error
+	}
+	return s.Msg, s.Prio
+}
+
+func (s *BasicResult) Error() error {
+	return s.Err
+}
+
+func (s *BasicResult) FileInformation() *FileInfo {
+	return s.Finfo
+}
+
+type Runner interface {
 
 	// Intialize required members to deal with controlled reading and writing. numReaders and numWriters
 	// can be assumed to be valid
@@ -82,11 +102,8 @@ type Runner interface {
 func StartEngine(runner Runner, nprocs uint,
 	generateHandler func(Result),
 	aggregateHandler func(Result)) (err error) {
-	if nprocs > runner.MaxProcs() {
-		nprocs = runner.MaxProcs()
-	}
 	if nprocs == 0 {
-		panic("Can't use nprocs = 0 - check implementation of MaxProcs()")
+		panic("Can't use nprocs = 0")
 	}
 
 	results := make(chan Result, nprocs)

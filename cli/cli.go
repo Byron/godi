@@ -55,7 +55,7 @@ func NewGodiApp(cmds []cli.Command) *cli.App {
 	app.Flags = []cli.Flag{
 		cli.IntFlag{numReadersFlagName + ", nr", 1, "Amount of parallel read streams we can use"},
 	}
-	app.Version = "v0.1.0"
+	app.Version = "v0.2.0"
 
 	return app
 }

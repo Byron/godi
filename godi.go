@@ -7,6 +7,7 @@ import (
 
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/seal"
+	"github.com/Byron/godi/verify"
 
 	gcli "github.com/codegangsta/cli"
 )
@@ -22,6 +23,7 @@ func main() {
 	// build up all known commands
 	cmds := []gcli.Command{}
 	cmds = append(cmds, seal.SubCommands()...)
+	cmds = append(cmds, verify.SubCommands()...)
 
 	// Always use all available CPUs - the user can limit resources using GOMAXPROCS and the flags for reader- and writer-procs
 	runtime.GOMAXPROCS(runtime.NumCPU())

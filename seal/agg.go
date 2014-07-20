@@ -89,34 +89,34 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 				wasCancelled = true
 			default:
 				{
-					sr := r.(*SealResult)
+					sr := r.(*godi.BasicResult)
 					// find root
 					var pathmap map[string]*godi.FileInfo
 					var pathTree string
 					for _, tree := range s.Trees {
-						if strings.HasPrefix(sr.finfo.Path, tree) {
+						if strings.HasPrefix(sr.Finfo.Path, tree) {
 							pathTree = tree
 							pathmap = treePathmap[tree]
 							break
 						}
 					}
 					if pathmap == nil {
-						panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.finfo.Path, s.Trees))
+						panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.Finfo.Path, s.Trees))
 					}
 					// we store only relative paths in the map - this is all we want to serialize
-					relaPath := sr.finfo.Path[len(pathTree)+1:]
+					relaPath := sr.Finfo.Path[len(pathTree)+1:]
 
 					_, ok := pathmap[relaPath]
 					if ok {
 						// duplicate path - shouldn't happen, but we deal with it
-						sr.err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.finfo.Path)
+						sr.Err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.Finfo.Path)
 						errCount += 1
 						accumResult <- sr
 					} else {
-						pathmap[relaPath] = sr.finfo
+						pathmap[relaPath] = sr.Finfo
 						count += 1
-						size += uint64(sr.finfo.Size)
-						accumResult <- &SealResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, godi.Progress}
+						size += uint64(sr.Finfo.Size)
+						accumResult <- &godi.BasicResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, godi.Progress}
 					}
 				} // default
 			} // select
@@ -135,16 +135,19 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 			var err error
 			if indices, err = s.writeIndex(treePathmap); err != nil {
 				// NOTE: We keep successfully written indices as each tree is consistent in itself
-				accumResult <- &SealResult{nil, "", err, godi.Error}
+				accumResult <- &godi.BasicResult{nil, "", err, godi.Error}
 			}
 
 			// Inform about successfully written indices
 			for _, index := range indices {
-				accumResult <- &SealResult{nil, fmt.Sprintf("Wrote seal at '%s'", index), err, godi.Info}
+				accumResult <- &godi.BasicResult{
+					&godi.FileInfo{Path: index, Size: -1},
+					fmt.Sprintf("Wrote seal at '%s'", index), err, godi.Info,
+				}
 			}
 		}
 
-		accumResult <- &SealResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount, wasCancelled), nil, godi.Info}
+		accumResult <- &godi.BasicResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount, wasCancelled), nil, godi.Info}
 	}()
 
 	return accumResult

@@ -20,7 +20,7 @@ TODO:
 * Abort if destination file exists - see atomic mode !
 * atomic mode (always on) - on cancel, remove all created files and directories
 * print information about read and write performance to stderr every x seconds (allows to tune readers and writer counts thanks to atomic mode)
-* save mode - verify after copy
+* safe mode - verify after copy
 
 ## Benefits over MHL
 
@@ -33,8 +33,9 @@ TODO:
 * **Atomic Operation**
     + It will not produce intermediate results, and either finish successfully, or not at all.
     + Particularly useful when copying or archiving, as it will not leave any written file(s), allowing to safely abort and retry at will. The latter is good during performance tuning.
-* **It just works**
-    + `mhl` will fail (for some reason) if it finds a hidden file. `godi` will just ignore hidden files and symbolic links and otherwise process everything in its way.
+* **Usability**
+    + `godi` just works. `mhl` will fail (for some reason) if it finds a hidden file. `godi` will just ignore hidden files and symbolic links and otherwise process everything in its way.
+    + `godi` comes with a state of the art commandline interface, allowing to learn the command by using it. No manual required.
 
 ## Performance
 

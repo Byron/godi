@@ -21,9 +21,9 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
 	// be intersting for the mailing list.
 	handleHash := func(f godi.FileInfo) {
-		res := SealResult{&f, "", nil, godi.Progress}
-		err := &res.err
-		defer func(res *SealResult) { results <- res }(&res)
+		res := godi.BasicResult{&f, "", nil, godi.Progress}
+		err := &res.Err
+		defer func(res *godi.BasicResult) { results <- res }(&res)
 
 		// let the other end open the file and close it as well
 		reader := s.pCtrl.NewChannelReaderFromPath(f.Path)

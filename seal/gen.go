@@ -35,13 +35,13 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 			// read dir and, build file info, and recurse into subdirectories
 			f, err := os.Open(tree)
 			if err != nil {
-				results <- &SealResult{nil, "", err, godi.Error}
+				results <- &godi.BasicResult{nil, "", err, godi.Error}
 				return false
 			}
 			dirInfos, err := f.Readdir(-1)
 			f.Close()
 			if err != nil {
-				results <- &SealResult{nil, "", err, godi.Error}
+				results <- &godi.BasicResult{nil, "", err, godi.Error}
 				return false
 			}
 
@@ -50,11 +50,11 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 				if !fi.IsDir() {
 					path := filepath.Join(tree, fi.Name())
 					if !fi.Mode().IsRegular() {
-						results <- &SealResult{nil, fmt.Sprintf("Ignoring symbolic link: '%s'", path), nil, godi.Warn}
+						results <- &godi.BasicResult{nil, fmt.Sprintf("Ignoring symbolic link: '%s'", path), nil, godi.Warn}
 						continue
 					}
 					if fi.Name()[0] == '.' {
-						results <- &SealResult{nil, fmt.Sprintf("Ignoring hidden file: '%s'", path), nil, godi.Warn}
+						results <- &godi.BasicResult{nil, fmt.Sprintf("Ignoring hidden file: '%s'", path), nil, godi.Warn}
 						continue
 					}
 					files <- godi.FileInfo{
