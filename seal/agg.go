@@ -57,81 +57,54 @@ func (s *SealCommand) writeIndex(treeMap map[string]map[string]*godi.FileInfo) (
 }
 
 func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
-	accumResult := make(chan godi.Result)
+	treePathmap := make(map[string]map[string]*godi.FileInfo)
+	// Presort all paths by their root
+	for _, tree := range s.Trees {
+		treePathmap[tree] = make(map[string]*godi.FileInfo)
+	}
 
-	go func() {
-		defer close(accumResult)
-		treePathmap := make(map[string]map[string]*godi.FileInfo)
-
-		// Presort all paths by their root
+	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
+		sr := r.(*godi.BasicResult)
+		// find root
+		var pathmap map[string]*godi.FileInfo
+		var pathTree string
 		for _, tree := range s.Trees {
-			treePathmap[tree] = make(map[string]*godi.FileInfo)
+			if strings.HasPrefix(sr.Finfo.Path, tree) {
+				pathTree = tree
+				pathmap = treePathmap[tree]
+				break
+			}
+		}
+		if pathmap == nil {
+			panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.Finfo.Path, s.Trees))
+		}
+		// we store only relative paths in the map - this is all we want to serialize
+		relaPath := sr.Finfo.Path[len(pathTree)+1:]
+
+		_, pathSeen := pathmap[relaPath]
+		if pathSeen {
+			// duplicate path - shouldn't happen, but we deal with it
+			sr.Err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.Finfo.Path)
+			accumResult <- sr
+			return false
+		} else {
+			pathmap[relaPath] = sr.Finfo
+			accumResult <- &godi.BasicResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, godi.Progress}
 		}
 
-		var count uint = 0
-		var errCount uint = 0
-		var size uint64 = 0
-		st := time.Now()
-		wasCancelled := false
+		return true
+	}
 
-		// ACCUMULATE PATHS INFO
-		/////////////////////////
-		for r := range results {
-			// Be sure we take note of cancellation.
-			// If this happens, soon our results will be drained and we leave naturally
-			select {
-			case <-done:
-				wasCancelled = true
-			default:
-				{
-					if r.Error() != nil {
-						errCount += 1
-						accumResult <- r
-						continue
-					}
-
-					sr := r.(*godi.BasicResult)
-					// find root
-					var pathmap map[string]*godi.FileInfo
-					var pathTree string
-					for _, tree := range s.Trees {
-						if strings.HasPrefix(sr.Finfo.Path, tree) {
-							pathTree = tree
-							pathmap = treePathmap[tree]
-							break
-						}
-					}
-					if pathmap == nil {
-						panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.Finfo.Path, s.Trees))
-					}
-					// we store only relative paths in the map - this is all we want to serialize
-					relaPath := sr.Finfo.Path[len(pathTree)+1:]
-
-					_, ok := pathmap[relaPath]
-					if ok {
-						// duplicate path - shouldn't happen, but we deal with it
-						sr.Err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.Finfo.Path)
-						errCount += 1
-						accumResult <- sr
-					} else {
-						pathmap[relaPath] = sr.Finfo
-						count += 1
-						size += uint64(sr.Finfo.Size)
-						accumResult <- &godi.BasicResult{nil, fmt.Sprintf("DONE ...%s", relaPath), nil, godi.Progress}
-					}
-				} // default
-			} // select
-		} // range results
-		elapsed := time.Now().Sub(st).Seconds()
-		sizeMB := float32(size) / (1024.0 * 1024.0)
-
+	finalizer := func(
+		accumResult chan<- godi.Result,
+		st godi.AggregateFinalizerState) {
 		// INDEX HANDLING
 		//////////////////
 		// Serialize all fileinfo structures
 		// NOTE: As the parallel writer will send results only when writing finished, we can just operate serially here ...
 		// For this there is also no need to optimize performance
 		// However, we could use a parallel writer if we are so inclined
-		if !wasCancelled {
+		if !st.WasCancelled {
 			var indices []string
 			var err error
 			if indices, err = s.writeIndex(treePathmap); err != nil {
@@ -148,8 +121,20 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 			}
 		}
 
-		accumResult <- &godi.BasicResult{nil, fmt.Sprintf("Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)", count, sizeMB, elapsed, float64(sizeMB)/elapsed, errCount, wasCancelled), nil, godi.Info}
-	}()
+		sizeMB := float32(st.SizeBytes) / (1024.0 * 1024.0)
+		accumResult <- &godi.BasicResult{
+			Msg: fmt.Sprintf(
+				"Sealed %d files with total size of %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v)",
+				st.FileCount,
+				sizeMB,
+				st.Elapsed,
+				float64(sizeMB)/st.Elapsed,
+				st.ErrCount,
+				st.WasCancelled,
+			),
+			Prio: godi.Info,
+		}
+	}
 
-	return accumResult
+	return godi.Aggregate(results, done, resultHandler, finalizer)
 }

@@ -94,7 +94,16 @@ func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.R
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
-	accumResult := make(chan godi.Result)
-	defer close(accumResult)
-	return accumResult
+
+	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
+		return true
+	}
+
+	finalizer := func(
+		accumResult chan<- godi.Result,
+		st godi.AggregateFinalizerState) {
+
+	}
+
+	return godi.Aggregate(results, done, resultHandler, finalizer)
 }
