@@ -10,20 +10,16 @@ import (
 )
 
 func (s *SealCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
-	files := make(chan godi.FileInfo)
-	results := make(chan godi.Result)
-
-	go func() {
-		defer close(files)
+	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
 		for _, tree := range s.Trees {
 			if !s.traverseFilesRecursively(files, results, done, tree) {
 				// interrupted usually, or there was an error
 				break
 			}
 		}
-	}()
+	}
 
-	return files, results
+	return godi.Generate(done, generate)
 }
 
 // Traverse recursively, return false if the caller should stop traversing due to an error

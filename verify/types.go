@@ -37,11 +37,7 @@ func NewCommand(trees []string, nReaders int) (c VerifyCommand, err error) {
 }
 
 func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
-	files := make(chan godi.FileInfo)
-	results := make(chan godi.Result)
-
-	go func() {
-		defer close(files)
+	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
 		for _, index := range s.Indices {
 			c := codec.NewByPath(index)
 			if c == nil {
@@ -69,9 +65,9 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 				continue
 			}
 		} // for each index
-	}()
+	}
 
-	return files, results
+	return godi.Generate(done, generate)
 }
 
 func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {

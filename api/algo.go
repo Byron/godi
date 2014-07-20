@@ -10,6 +10,21 @@ import (
 	"github.com/Byron/godi/utility"
 )
 
+// Generate does all boilerplate required to be a valid generator
+func Generate(
+	done <-chan bool,
+	generate func(chan<- FileInfo, chan<- Result)) (<-chan FileInfo, <-chan Result) {
+	files := make(chan FileInfo)
+	results := make(chan Result)
+
+	go func() {
+		defer close(files)
+		generate(files, results)
+	}()
+
+	return files, results
+}
+
 // Reads
 func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, done <-chan bool,
 	makeResult func(*FileInfo) (Result, *BasicResult),
