@@ -48,4 +48,8 @@ func TestVerify(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	// Alter File
+
+	// Remove File
 }

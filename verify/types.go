@@ -100,8 +100,8 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) 
 		vr := r.(*VerifyResult)
 
 		hasError := false
-		if bytes.Compare(vr.ifinfo.Sha1, vr.Finfo.Sha1) != 0 ||
-			bytes.Compare(vr.ifinfo.MD5, vr.Finfo.MD5) != 0 {
+		if (len(vr.ifinfo.Sha1) > 0 && bytes.Compare(vr.ifinfo.Sha1, vr.Finfo.Sha1) != 0) ||
+			(len(vr.ifinfo.MD5) > 0 && bytes.Compare(vr.ifinfo.MD5, vr.Finfo.MD5) != 0) {
 			vr.Err = fmt.Errorf("HASH MISMATCH: %s", vr.Finfo.Path)
 			signatureMismatches += 1
 			hasError = true

@@ -1,5 +1,7 @@
 *~
 *.sublime-workspace
 
+godi
+/build/
 /pages/
 /doc/
