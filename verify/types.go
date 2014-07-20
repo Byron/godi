@@ -2,9 +2,11 @@
 package verify
 
 import (
+	"os"
 	"sync"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/codec"
 	"github.com/Byron/godi/utility"
 )
 
@@ -38,7 +40,35 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 	files := make(chan godi.FileInfo)
 	results := make(chan godi.Result)
 
-	// TODO: go routine doing the work
+	go func() {
+		for _, index := range s.Indices {
+			c := codec.NewByPath(index)
+			if c == nil {
+				panic("Should have a codec here - this was checked before")
+			}
+
+			fd, err := os.Open(index)
+			if err != nil {
+				results <- &VerifyResult{
+					BasicResult: &godi.BasicResult{Err: err},
+				}
+				continue
+			}
+
+			fileInfos, err := c.Deserialize(fd)
+			fd.Close()
+			if err == nil {
+				for _, fi := range fileInfos {
+					files <- fi
+				}
+			} else {
+				results <- &VerifyResult{
+					BasicResult: &godi.BasicResult{Err: err},
+				}
+				continue
+			}
+		} // for each index
+	}()
 
 	return files, results
 }
