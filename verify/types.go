@@ -3,6 +3,7 @@ package verify
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/Byron/godi/api"
@@ -54,9 +55,13 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 
 			fileInfos, err := c.Deserialize(fd)
 			fd.Close()
+
+			indexDir := filepath.Dir(index)
 			if err == nil {
-				for _, fi := range fileInfos {
-					files <- fi
+				for _, sfi := range fileInfos {
+					// Figure out the path to use - for now we use the relative one
+					sfi.FileInfo.Path = filepath.Join(indexDir, sfi.RelaPath)
+					files <- sfi.FileInfo
 				}
 			} else {
 				results <- &VerifyResult{
