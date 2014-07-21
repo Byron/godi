@@ -33,6 +33,13 @@ type SealCommand struct {
 	pWriters map[uint64]utility.RootedWriteController
 }
 
+// A result which is also able to hold information about the source of a file
+type SealResult struct {
+	*godi.BasicResult
+	// source of a copy operation, may be unset
+	source string
+}
+
 // NewCommand returns an initialized seal command
 func NewCommand(trees []string, nReaders, nWriters int) (c SealCommand, err error) {
 	if nWriters == 0 {
@@ -53,5 +60,5 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 		return &res, &res
 	}
 
-	godi.Gather(files, results, wg, done, makeResult, &s.pCtrl)
+	godi.Gather(files, results, wg, done, makeResult, &s.pCtrl, s.pWriters)
 }

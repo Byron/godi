@@ -32,7 +32,7 @@ func TestVerify(t *testing.T) {
 		}
 	}
 
-	var maxProcs uint = uint(runtime.GOMAXPROCS(0))
+	var maxProcs = runtime.GOMAXPROCS(0)
 	err := godi.StartEngine(&sealcmd, maxProcs, resHandler, aggHandler)
 	if err != nil {
 		t.Error(err)

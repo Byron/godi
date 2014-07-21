@@ -7,14 +7,14 @@ import (
 
 // Similar to MultiWriter, but assumes writes never fail, and provides the same buffer
 // to all writers in parallel. However, it will return only when all writes are finished
-type uncheckedParallelMultiWriter struct {
-	writers []io.Writer
+type UncheckedParallelMultiWriter struct {
+	Writers []io.Writer
 	wg      sync.WaitGroup
 }
 
-func (t *uncheckedParallelMultiWriter) Write(p []byte) (n int, err error) {
-	t.wg.Add(len(t.writers))
-	for _, w := range t.writers {
+func (t *UncheckedParallelMultiWriter) Write(p []byte) (n int, err error) {
+	t.wg.Add(len(t.Writers))
+	for _, w := range t.Writers {
 		go func(w io.Writer) {
 			w.Write(p)
 			t.wg.Done()
@@ -24,10 +24,10 @@ func (t *uncheckedParallelMultiWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func UncheckedParallelMultiWriter(writers ...io.Writer) io.Writer {
+func NewUncheckedParallelMultiWriter(writers ...io.Writer) UncheckedParallelMultiWriter {
 	w := make([]io.Writer, len(writers))
 	copy(w, writers)
-	return &uncheckedParallelMultiWriter{w, sync.WaitGroup{}}
+	return UncheckedParallelMultiWriter{Writers: w}
 }
 
 type ChannelWriter struct {

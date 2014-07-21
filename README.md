@@ -11,18 +11,6 @@ godi seal tree/
 # results in godi-seal.xml file
 ```
 
-
-TODO: 
-
-* nprocs - specify how many parallel gather routines there are
-* abort-on-error - if False, we continue as long as possible, otherwise we abort and interrupt all currently running procedures
-* log-mode - either off, or verbose, and in future, maybe even a binary one which provides a whole lot of additional information
-* Abort if destination file exists - see atomic mode !
-* atomic mode (always on) - on cancel, remove all created files and directories
-* print information about read and write performance to stderr every x seconds (allows to tune readers and writer counts thanks to atomic mode)
-* safe mode - verify after copy
-* Allow to abort reads of large files (and writes)
-
 ## Benefits over MHL
 
 * **Performance**

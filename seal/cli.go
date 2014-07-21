@@ -154,7 +154,6 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 					}
 					s.pWriters[did] = utility.RootedWriteController{dtree, utility.NewWriteChannelController(numWriters)}
 				}
-
 				return nil
 			}
 		} // for each item
