@@ -11,7 +11,7 @@ import (
 
 func (s *SealCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
 	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
-		for _, tree := range s.Trees {
+		for _, tree := range s.SourceTrees {
 			if !s.traverseFilesRecursively(files, results, done, tree) {
 				// interrupted usually, or there was an error
 				break

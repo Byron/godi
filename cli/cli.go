@@ -13,6 +13,7 @@ import (
 
 const (
 	NumReadersFlagName = "num-readers"
+	NumWritersFlagName = "num-writers"
 )
 
 // Runs a standard runner from within the cli, dealing with errors accoringly
@@ -28,7 +29,7 @@ func RunAction(cmd godi.Runner, c *cli.Context) {
 		}
 	}
 
-	err := godi.StartEngine(cmd, uint(runtime.GOMAXPROCS(0)), logger, logger)
+	err := godi.StartEngine(cmd, runtime.GOMAXPROCS(0), logger, logger)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -42,5 +43,11 @@ func CheckCommonArgs(cmd godi.Runner, c *cli.Context) error {
 	if nr < 1 {
 		return errors.New("--num-readers must not be smaller than 1")
 	}
-	return cmd.Init(nr, 0, c.Args())
+
+	nw := c.GlobalInt(NumWritersFlagName)
+	if nw < 1 {
+		return errors.New("--num-writers must not be smaller than 1")
+	}
+
+	return cmd.Init(nr, nw, c.Args())
 }

@@ -99,7 +99,7 @@ type Runner interface {
 // Runner Init must have been called beforehand as we don't know the values here
 // The handlers receive a result of the respective stage and may perform whichever operation
 // Returns the last error we received in either generator or aggregation stage
-func StartEngine(runner Runner, nprocs uint,
+func StartEngine(runner Runner, nprocs int,
 	generateHandler func(Result),
 	aggregateHandler func(Result)) (err error) {
 	if nprocs == 0 {
@@ -120,7 +120,7 @@ func StartEngine(runner Runner, nprocs uint,
 	files, generateResult := runner.Generate(done)
 
 	wg := sync.WaitGroup{}
-	for i := 0; uint(i) < nprocs; i++ {
+	for i := 0; i < nprocs; i++ {
 		wg.Add(1)
 		go runner.Gather(files, results, &wg, done)
 	}

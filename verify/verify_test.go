@@ -14,7 +14,7 @@ func TestVerify(t *testing.T) {
 	datasetTree, _, _ := testlib.MakeDatasetOrPanic()
 	defer testlib.RmTree(datasetTree)
 
-	sealcmd, _ := seal.NewCommand([]string{datasetTree}, 1)
+	sealcmd, _ := seal.NewCommand([]string{datasetTree}, 1, 0)
 	resHandler := testlib.ResultHandler(t)
 
 	// keeps track of created indices

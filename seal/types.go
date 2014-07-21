@@ -10,6 +10,9 @@ import (
 const (
 	IndexBaseName = "godi"
 	Name          = "seal"
+
+	modeSeal = Name
+	modeCopy = "sealed-copy"
 )
 
 // A type representing all arguments required to drive a Seal operation
@@ -17,15 +20,23 @@ type SealCommand struct {
 
 	// One or more trees to seal
 	// Exported just for test-cases - too lazy to make it a read-only copy through accessor
-	Trees []string
+	SourceTrees, DestinationTrees []string
+
+	// The type of seal operation we are supposed to perform
+	mode string
 
 	// parallel reader
 	pCtrl utility.ReadChannelController
 }
 
 // NewCommand returns an initialized seal command
-func NewCommand(trees []string, nReaders int) (c SealCommand, err error) {
-	err = c.Init(nReaders, 0, trees)
+func NewCommand(trees []string, nReaders, nWriters int) (c SealCommand, err error) {
+	if nWriters == 0 {
+		c.mode = modeSeal
+	} else {
+		c.mode = modeCopy
+	}
+	err = c.Init(nReaders, nWriters, trees)
 	return
 }
 

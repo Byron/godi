@@ -1,6 +1,8 @@
 package seal_test
 
 import (
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -16,21 +18,22 @@ func TestSeal(t *testing.T) {
 	var cmd seal.SealCommand
 	var err error
 
-	_, err = seal.NewCommand([]string{dataFile}, 1)
+	_, err = seal.NewCommand([]string{dataFile}, 1, 0)
 	if err == nil {
 		t.Error("Expected it to not like files as directory")
 	} else {
 		t.Log(err)
 	}
 
-	cmd, err = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, testlib.FirstSubDir, "..", testlib.FirstSubDir)}, 1)
+	cmd, err = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, testlib.FirstSubDir, "..", testlib.FirstSubDir)}, 1, 0)
 	if err != nil {
 		t.Error("Expected to not fail sanitization")
-	} else if len(cmd.Trees) != 1 {
+	} else if len(cmd.SourceTrees) != 1 {
 		t.Error("Trees should have been pruned, contained one should have been dropped")
 	}
 
-	cmd, err = seal.NewCommand([]string{datasetTree}, runtime.GOMAXPROCS(0))
+	maxProcs := runtime.GOMAXPROCS(0)
+	cmd, err = seal.NewCommand([]string{datasetTree}, maxProcs, 0)
 	if err != nil {
 		t.Error("Sanitize didn't like existing tree")
 	}
@@ -38,7 +41,53 @@ func TestSeal(t *testing.T) {
 	// Return true if we should break the loop
 	resHandler := testlib.ResultHandler(t)
 
-	if err := godi.StartEngine(&cmd, uint(runtime.GOMAXPROCS(0)), resHandler, resHandler); err != nil {
+	if err := godi.StartEngine(&cmd, maxProcs, resHandler, resHandler); err != nil {
 		t.Error(err)
 	}
+
+	// SEALED COPY
+	//////////////
+	cmd, err = seal.NewCommand([]string{datasetTree}, maxProcs, 1)
+	if err == nil {
+		t.Fatal("Can't copy with just a source")
+	} else {
+		t.Log(err)
+	}
+
+	cmd, err = seal.NewCommand([]string{datasetTree, seal.Sep, filepath.Join(datasetTree, "..", filepath.Base(datasetTree))}, maxProcs, 1)
+	if err == nil {
+		t.Fatal("Must rule out possiblity of copying something onto itself")
+	} else {
+		t.Log(err)
+	}
+
+	invalidDestination := filepath.Join(datasetTree, "copy-destination")
+	if err = os.Mkdir(invalidDestination, 0777); err != nil {
+		t.Fatal(err)
+	}
+	cmd, err = seal.NewCommand([]string{datasetTree, seal.Sep, invalidDestination}, maxProcs, 1)
+	if err == nil {
+		t.Fatal("Cannot copy something into itself - gather would become somewhat recursive !")
+	} else {
+		t.Log(err)
+	}
+
+	cmd, err = seal.NewCommand([]string{datasetTree, seal.Sep, "does/not/exist"}, maxProcs, 1)
+	if err == nil {
+		t.Fatal("Destination must exist")
+	} else {
+		t.Log(err)
+	}
+
+	copyDestination1, _ := ioutil.TempDir("", "sealed-copy")
+	defer testlib.RmTree(copyDestination1)
+	copyDestination2, _ := ioutil.TempDir("", "sealed-copy")
+	defer testlib.RmTree(copyDestination2)
+
+	cmd, err = seal.NewCommand([]string{datasetTree, seal.Sep, copyDestination1, copyDestination2}, maxProcs, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Finally, perform the operation
 }

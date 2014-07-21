@@ -59,7 +59,7 @@ func (s *SealCommand) writeIndex(treeMap map[string]map[string]*godi.FileInfo) (
 func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
 	treePathmap := make(map[string]map[string]*godi.FileInfo)
 	// Presort all paths by their root
-	for _, tree := range s.Trees {
+	for _, tree := range s.SourceTrees {
 		treePathmap[tree] = make(map[string]*godi.FileInfo)
 	}
 
@@ -68,7 +68,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 		// find root
 		var pathmap map[string]*godi.FileInfo
 		var pathTree string
-		for _, tree := range s.Trees {
+		for _, tree := range s.SourceTrees {
 			if strings.HasPrefix(sr.Finfo.Path, tree) {
 				pathTree = tree
 				pathmap = treePathmap[tree]
@@ -76,7 +76,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 			}
 		}
 		if pathmap == nil {
-			panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.Finfo.Path, s.Trees))
+			panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.Finfo.Path, s.SourceTrees))
 		}
 		// we store only relative paths in the map - this is all we want to serialize
 		relaPath := sr.Finfo.Path[len(pathTree)+1:]

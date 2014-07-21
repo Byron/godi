@@ -22,9 +22,10 @@ func NewGodiApp() *cli.App {
 
 	// general flags
 	app.Flags = []cli.Flag{
-		cli.IntFlag{gocli.NumReadersFlagName + ", nr", 1, "Amount of parallel read streams we can use"},
+		cli.IntFlag{gocli.NumReadersFlagName + ", nr", 1, "Amount of parallel read streams during seal and verify"},
+		cli.IntFlag{gocli.NumWritersFlagName + ", nw", 1, "Amount of parallel write streams during sealed-copy"},
 	}
-	app.Version = "v0.2.0"
+	app.Version = "v0.3.0"
 
 	return app
 }
