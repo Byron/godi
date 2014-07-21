@@ -109,7 +109,8 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 			var err error
 			if indices, err = s.writeIndex(treePathmap); err != nil {
 				// NOTE: We keep successfully written indices as each tree is consistent in itself
-				accumResult <- &godi.BasicResult{nil, "", err, godi.Error}
+				st.ErrCount += 1
+				accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}
 			}
 
 			// Inform about successfully written indices

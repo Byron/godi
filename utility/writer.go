@@ -63,6 +63,13 @@ type WriteChannelController struct {
 	// However, large buffers could be beneficial for the hashing already as we do less small hash calls
 }
 
+// A utility structure to associate a tree with a writer.
+// That way, writers can be more easily associated with a device which hosts Tree
+type RootedWriteController struct {
+	Tree string
+	Ctrl WriteChannelController
+}
+
 // Create a new controller which deals with writing all incoming requests with nprocs go-routines
 func NewWriteChannelController(nprocs int) WriteChannelController {
 	ctrl := WriteChannelController{

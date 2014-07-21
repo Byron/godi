@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/utility"
@@ -97,6 +98,7 @@ func parseSources(items []string) (res []string, err error) {
 
 func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err error) {
 	s.pCtrl = utility.NewReadChannelController(numReaders)
+	s.pWriters = make(map[uint64]utility.RootedWriteController)
 
 	if s.mode == modeSeal {
 		if len(items) == 0 {
@@ -104,6 +106,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 		}
 		s.SourceTrees, err = parseSources(items)
 	} else if s.mode == modeCopy {
+		// Parses [src, ...] => [dst, ...]
 		err = errors.New(usage)
 		if len(items) < 3 {
 			return
@@ -121,18 +124,35 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 				if err != nil {
 					return
 				}
-				s.DestinationTrees, err = parseSources(items[i+1:])
+
+				var dtrees []string
+				dtrees, err = parseSources(items[i+1:])
 				if err != nil {
 					return
 				}
 
 				// Make sure we don't copy onto ourselves
 				for _, stree := range s.SourceTrees {
-					for _, dtree := range s.DestinationTrees {
+					for _, dtree := range dtrees {
 						if strings.HasPrefix(dtree, stree) {
 							return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
 						}
 					}
+				}
+
+				// build the device map with all writer destinations
+				// If something doesn't work, we assume it's the same device ...
+				const defaultDevice uint64 = 0
+				for _, dtree := range dtrees {
+					fi, ferr := os.Stat(dtree)
+					did := defaultDevice
+					if ferr == nil {
+						st, ok := fi.Sys().(*syscall.Stat_t)
+						if ok {
+							did = uint64(st.Dev)
+						}
+					}
+					s.pWriters[did] = utility.RootedWriteController{dtree, utility.NewWriteChannelController(numWriters)}
 				}
 
 				return nil

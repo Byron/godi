@@ -20,29 +20,29 @@ func TestSeal(t *testing.T) {
 
 	_, err = seal.NewCommand([]string{dataFile}, 1, 0)
 	if err == nil {
-		t.Error("Expected it to not like files as directory")
+		t.Fatal("Expected it to not like files as directory")
 	} else {
 		t.Log(err)
 	}
 
 	cmd, err = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, testlib.FirstSubDir, "..", testlib.FirstSubDir)}, 1, 0)
 	if err != nil {
-		t.Error("Expected to not fail sanitization")
+		t.Fatal("Expected to not fail sanitization")
 	} else if len(cmd.SourceTrees) != 1 {
-		t.Error("Trees should have been pruned, contained one should have been dropped")
+		t.Fatal("Trees should have been pruned, contained one should have been dropped")
 	}
 
 	maxProcs := runtime.GOMAXPROCS(0)
 	cmd, err = seal.NewCommand([]string{datasetTree}, maxProcs, 0)
 	if err != nil {
-		t.Error("Sanitize didn't like existing tree")
+		t.Fatal("Sanitize didn't like existing tree")
 	}
 
 	// Return true if we should break the loop
 	resHandler := testlib.ResultHandler(t)
 
 	if err := godi.StartEngine(&cmd, maxProcs, resHandler, resHandler); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	// SEALED COPY
@@ -90,4 +90,7 @@ func TestSeal(t *testing.T) {
 	}
 
 	// Finally, perform the operation
+	if err := godi.StartEngine(&cmd, maxProcs, resHandler, resHandler); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -20,13 +20,17 @@ type SealCommand struct {
 
 	// One or more trees to seal
 	// Exported just for test-cases - too lazy to make it a read-only copy through accessor
-	SourceTrees, DestinationTrees []string
+	SourceTrees []string
 
 	// The type of seal operation we are supposed to perform
 	mode string
 
 	// parallel reader
 	pCtrl utility.ReadChannelController
+
+	// A map of writers - there may just be one writer per device.
+	// Map may be unset if we are not in write mode
+	pWriters map[uint64]utility.RootedWriteController
 }
 
 // NewCommand returns an initialized seal command
