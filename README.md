@@ -21,6 +21,7 @@ TODO:
 * atomic mode (always on) - on cancel, remove all created files and directories
 * print information about read and write performance to stderr every x seconds (allows to tune readers and writer counts thanks to atomic mode)
 * safe mode - verify after copy
+* Allow to abort reads of large files (and writes)
 
 ## Benefits over MHL
 
