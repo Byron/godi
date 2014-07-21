@@ -9,16 +9,24 @@ import (
 
 // A struct holding information about a task, including
 type FileInfo struct {
+
 	// path to file to handle
 	Path string
+
+	// Path relative to the directory it was found in
+	RelaPath string
 
 	// size of file
 	Size int64
 
-	// hash of file
+	// hashes of file
 	Sha1 []byte
+	MD5  []byte
+}
 
-	MD5 []byte
+// Compute the root of this file - it is the top-level directory used to specify all files to process
+func (f *FileInfo) Root() string {
+	return f.Path[:len(f.Path)-len(f.RelaPath)-1]
 }
 
 type Priority uint8

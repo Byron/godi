@@ -60,10 +60,10 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 
 			indexDir := filepath.Dir(index)
 			if err == nil {
-				for _, sfi := range fileInfos {
+				for _, fi := range fileInfos {
 					// Figure out the path to use - for now we use the relative one
-					sfi.FileInfo.Path = filepath.Join(indexDir, sfi.RelaPath)
-					files <- sfi.FileInfo
+					fi.Path = filepath.Join(indexDir, fi.RelaPath)
+					files <- fi
 				}
 			} else {
 				results <- &VerifyResult{

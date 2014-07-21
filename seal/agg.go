@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Byron/godi/api"
@@ -28,7 +27,7 @@ func (s *SealCommand) IndexPath(tree string, extension string) string {
 // When called, we have seen no error and everything can be assumed to be in order
 // Returns error in case we can't write, and all index files written so far.
 // It's up to the caller to remove existing files on error
-func (s *SealCommand) writeIndex(treeMap map[string]map[string]*godi.FileInfo) ([]string, error) {
+func (s *SealCommand) writeIndices(treeMap map[string]map[string]*godi.FileInfo) ([]string, error) {
 	// Serialize all fileinfo structures
 	// NOTE: As the parallel writer will send results only when writing finished, we can just operate serially here ...
 	// For this there is also no need to optimize performance
@@ -37,6 +36,10 @@ func (s *SealCommand) writeIndex(treeMap map[string]map[string]*godi.FileInfo) (
 	encoder := codec.Gob{}
 	indices := make([]string, 0, len(treeMap))
 	for tree, paths := range treeMap {
+		// It's currently possible to have no paths as we pre-allocate these and don't care if we are in copy mode
+		if len(paths) == 0 {
+			continue
+		}
 		// This will and should fail if the file already exists
 		fd, err := os.OpenFile(s.IndexPath(tree, encoder.Extension()), os.O_EXCL|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
@@ -63,25 +66,23 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 		treePathmap[tree] = make(map[string]*godi.FileInfo)
 	}
 
+	for _, ctrl := range s.pWriters {
+		treePathmap[ctrl.Tree] = make(map[string]*godi.FileInfo)
+	}
+
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
 		sr := r.(*godi.BasicResult)
+
 		// find root
-		var pathmap map[string]*godi.FileInfo
-		var pathTree string
-		for _, tree := range s.SourceTrees {
-			if strings.HasPrefix(sr.Finfo.Path, tree) {
-				pathTree = tree
-				pathmap = treePathmap[tree]
-				break
-			}
-		}
+		pathmap := treePathmap[sr.Finfo.Root()]
+
 		if pathmap == nil {
-			panic(fmt.Sprintf("Couldn't determine root of path '%s', roots are %v", sr.Finfo.Path, s.SourceTrees))
+			panic(fmt.Sprintf("Didn't find map matching root '%s'", sr.Finfo.Root()))
 		}
 		// we store only relative paths in the map - this is all we want to serialize
-		relaPath := sr.Finfo.Path[len(pathTree)+1:]
-
+		relaPath := sr.Finfo.Path[len(sr.Finfo.RelaPath)+1:]
 		hasError := false
+
 		if _, pathSeen := pathmap[relaPath]; pathSeen {
 			// duplicate path - shouldn't happen, but we deal with it
 			sr.Err = fmt.Errorf("Path '%s' was handled multiple times - ignoring occurrence", sr.Finfo.Path)
@@ -107,7 +108,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 		if !st.WasCancelled {
 			var indices []string
 			var err error
-			if indices, err = s.writeIndex(treePathmap); err != nil {
+			if indices, err = s.writeIndices(treePathmap); err != nil {
 				// NOTE: We keep successfully written indices as each tree is consistent in itself
 				st.ErrCount += 1
 				accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}

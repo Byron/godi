@@ -58,7 +58,7 @@ func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err 
 	// NOTE: we re-encode to get rid of the map
 	for relaPath, finfo := range paths {
 		hashInfo(sha1enc, relaPath, finfo)
-		if err = encoder.Encode(SerializedFileInfo{*finfo, relaPath}); err != nil {
+		if err = encoder.Encode(finfo); err != nil {
 			return
 		}
 	}
@@ -70,7 +70,7 @@ func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err 
 	return
 }
 
-func (g *Gob) Deserialize(reader io.Reader) ([]SerializedFileInfo, error) {
+func (g *Gob) Deserialize(reader io.Reader) ([]godi.FileInfo, error) {
 	gzipReader, _ := gzip.NewReader(reader)
 	sha1enc := sha1.New()
 	d := gob.NewDecoder(gzipReader)
@@ -91,14 +91,14 @@ func (g *Gob) Deserialize(reader io.Reader) ([]SerializedFileInfo, error) {
 		return nil, err
 	}
 
-	res := make([]SerializedFileInfo, numValues)
+	res := make([]godi.FileInfo, numValues)
 	for i := 0; i < numValues; i++ {
 		v := &res[i]
 		if err := d.Decode(v); err != nil {
 			return nil, err
 		}
 
-		hashInfo(sha1enc, v.RelaPath, &v.FileInfo)
+		hashInfo(sha1enc, v.RelaPath, v)
 	}
 
 	var signature []byte
