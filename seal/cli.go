@@ -97,11 +97,12 @@ func parseSources(items []string) (res []string, err error) {
 }
 
 func (s *SealCommand) NumChannels() int {
-	return s.pCtrl.Streams()
+	return utility.ReadChannelDeviceMapStreams(s.pReaders)
 }
 
 func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err error) {
-	s.pCtrl = utility.NewReadChannelController(numReaders)
+	// make sure it's not forgotten - it's not the simple'st function of them all
+	defer func() { s.pReaders = utility.NewReadChannelDeviceMap(numReaders, s.SourceTrees) }()
 
 	if s.mode == modeSeal {
 		if len(items) == 0 {
@@ -152,7 +153,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 				c := 0
 				for _, trees := range dm {
 					// each device as so and so many destinations. Each destination uses the same write controller
-					wctrl := utility.NewWriteChannelController(numWriters, len(trees))
+					wctrl := utility.NewWriteChannelController(numWriters)
 					for _, tree := range trees {
 						s.pWriters[c] = utility.RootedWriteController{tree, &wctrl}
 						c += 1
@@ -163,7 +164,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 			}
 		} // for each item
 
-		// not found
+		// source-destinatio separator not found - prints usage
 		return
 	} else {
 		panic(fmt.Sprintf("Unsupported mode: %s", s.mode))

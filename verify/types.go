@@ -24,7 +24,7 @@ type VerifyCommand struct {
 	Indices []string
 
 	// parallel reader
-	pCtrl utility.ReadChannelController
+	pReaders map[string]*utility.ReadChannelController
 }
 
 // Implements information about a verify operation
@@ -40,7 +40,7 @@ func NewCommand(trees []string, nReaders int) (c VerifyCommand, err error) {
 }
 
 func (v *VerifyCommand) NumChannels() int {
-	return v.pCtrl.Streams()
+	return utility.ReadChannelDeviceMapStreams(v.pReaders)
 }
 
 func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
@@ -66,6 +66,10 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 			if err == nil {
 				for _, fi := range fileInfos {
 					// Figure out the path to use - for now we use the relative one
+					// NOTE: We need to use the relative one as our read-controller device map is based on that.
+					// If it was the absolute file path we use here, it could possibly point to a file far away,
+					// in any case our read controller map will not yield the expected result unless we set it
+					// up here, which is dangerous as it is async ! So let's not use the absolute path, ever !
 					fi.Path = filepath.Join(indexDir, fi.RelaPath)
 					files <- fi
 				}
@@ -95,7 +99,7 @@ func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.R
 		return &res
 	}
 
-	godi.Gather(files, results, wg, done, makeResult, &s.pCtrl, nil)
+	godi.Gather(files, results, wg, done, makeResult, s.pReaders, nil)
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {

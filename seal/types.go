@@ -26,7 +26,7 @@ type SealCommand struct {
 	mode string
 
 	// parallel reader
-	pCtrl utility.ReadChannelController
+	pReaders map[string]*utility.ReadChannelController
 
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
@@ -68,5 +68,5 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 		return &res
 	}
 
-	godi.Gather(files, results, wg, done, makeResult, &s.pCtrl, s.pWriters)
+	godi.Gather(files, results, wg, done, makeResult, s.pReaders, s.pWriters)
 }

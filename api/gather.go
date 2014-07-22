@@ -16,11 +16,14 @@ import (
 // Listens on done to abort early, and notifies wg when we are done to know when results can be closed.
 // If wctrls is set, we will setup parallel writer which writes the bytes used for hashing
 // to all controllers at the same time, which will be as slow as the slowest device
+// TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
+// Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
+// What we want is at max Y files being written continuously at a time
 func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, done <-chan bool,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
-	rctrl *utility.ReadChannelController,
+	rctrls map[string]*utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
-	if rctrl == nil || wg == nil {
+	if len(rctrls) == 0 || wg == nil {
 		panic("ReadChannelController and WaitGroup must be set")
 	}
 	defer wg.Done()
@@ -71,6 +74,11 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
 	// be intersting for the mailing list.
 	handleHash := func(f FileInfo) {
+		rctrl, hasRCtrlForRoot := rctrls[f.Root()]
+		if !hasRCtrlForRoot {
+			panic(fmt.Sprintf("Couldn't find read controller for directory at '%s'", f.Root()))
+		}
+
 		// In hash-only mode, there is only one result
 		var err error
 		if isWriteMode {

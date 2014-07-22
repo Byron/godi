@@ -34,7 +34,6 @@ godi seal tree/
 * Multi-device optimizations don't currently apply on windows
 * Sealed copy ignores executable bits and permissions in general. Files are created with mode `0666`, directories with `0777`
 
-
 ## Development Status
 
 [![Build Status](https://travis-ci.org/Byron/godi.svg?branch=master)](https://travis-ci.org/Byron/godi)

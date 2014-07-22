@@ -152,3 +152,48 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 
 	return ctrl
 }
+
+// NewReadChannelDeviceMap returns a mapping from each of the given trees to a controller which deals with the
+// device the tree is on. If all trees are on the same device, you will get a map with len(trees) length, each one
+// referring to the same controller
+func NewReadChannelDeviceMap(nprocs int, trees []string) map[string]*ReadChannelController {
+	dm := DeviceMap(trees)
+	res := make(map[string]*ReadChannelController, len(dm))
+
+	for _, dirs := range dm {
+		rctrl := NewReadChannelController(nprocs)
+		for _, dir := range dirs {
+			res[dir] = &rctrl
+		}
+	}
+
+	return res
+}
+
+// NOTE: Can this be a custom type, with just a function ? I think so !
+// Return the number of streams being handled in parallel
+func ReadChannelDeviceMapStreams(rm map[string]*ReadChannelController) int {
+	if len(rm) == 0 {
+		panic("Input map was empty")
+	}
+
+	nstreams := 0
+	// count unique controllers to figure out stream multiplier
+	seen := make([]*ReadChannelController, 0, len(rm))
+
+	for _, ctrl := range rm {
+		cseen := false
+		for _, c := range seen {
+			if c == ctrl {
+				cseen = true
+				break
+			}
+		}
+		if !cseen {
+			seen = append(seen, ctrl)
+			nstreams += ctrl.Streams()
+		}
+	}
+
+	return nstreams
+}

@@ -189,12 +189,9 @@ type RootedWriteController struct {
 }
 
 // Create a new controller which deals with writing all incoming requests with nprocs go-routines
-// npointers is the amount of pointers to the controller you intend to hold and use in parallel.
-// If it doesn't match the amount you are holding, this function can block your routine, and in the worst
-// case stall your program
-func NewWriteChannelController(nprocs, npointers int) WriteChannelController {
+func NewWriteChannelController(nprocs int) WriteChannelController {
 	ctrl := WriteChannelController{
-		make(chan *channelWriter, nprocs*npointers),
+		make(chan *channelWriter, nprocs),
 	}
 
 	for i := 0; i < nprocs; i++ {
