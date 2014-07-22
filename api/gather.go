@@ -17,7 +17,7 @@ import (
 // If wctrls is set, we will setup parallel writer which writes the bytes used for hashing
 // to all controllers at the same time, which will be as slow as the slowest device
 func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, done <-chan bool,
-	makeResult func(*FileInfo, error) Result,
+	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrl *utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
 	if rctrl == nil || wg == nil {
@@ -49,7 +49,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 	sendResults := func(f *FileInfo, err error) {
 		if !isWriteMode {
 			// We have to take care of sending the read-result
-			results <- makeResult(f, err)
+			results <- makeResult(f, nil, err)
 		} else {
 			// check each writer for errors and return produce a result, one per  non-hash writer
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
@@ -62,7 +62,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path
 
 				// it doesn't matter here if there actually is an error, aggregator will handle it
-				results <- makeResult(&wfi, e)
+				results <- makeResult(&wfi, f, e)
 			} // for each write controller to write to
 		} // handle write mode
 	} // sendResults

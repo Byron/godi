@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	Sep                = "=>"
+	Sep                = "---"
 	usage              = "Please specify sealed copies like so: source/ => destination/"
 	numWritersFlagName = "num-writers"
 )

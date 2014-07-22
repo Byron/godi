@@ -75,7 +75,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 	}
 
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
-		sr := r.(*godi.BasicResult)
+		sr := r.(*SealResult)
 
 		// find root
 		pathmap := treePathmap[sr.Finfo.Root()]
@@ -93,7 +93,11 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 			hasError = true
 		} else {
 			pathmap[relaPath] = sr.Finfo
-			sr.Msg = fmt.Sprintf("DONE ...%s", relaPath)
+			if len(sr.source) == 0 {
+				sr.Msg = fmt.Sprintf("DONE ...%s", relaPath)
+			} else {
+				sr.Msg = fmt.Sprintf("DONE CP %s -> %s", sr.source, sr.Finfo.Path)
+			}
 		}
 
 		accumResult <- sr

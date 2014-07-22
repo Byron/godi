@@ -150,7 +150,7 @@ func (l *LazyFileWriteCloser) Write(b []byte) (n int, err error) {
 		if err != nil {
 			return 0, err
 		}
-		l.writer, err = os.OpenFile(l.Path, os.O_WRONLY|os.O_CREATE, 0666)
+		l.writer, err = os.OpenFile(l.Path, os.O_EXCL|os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			return 0, err
 		}

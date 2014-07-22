@@ -29,8 +29,8 @@ type VerifyCommand struct {
 
 // Implements information about a verify operation
 type VerifyResult struct {
-	*godi.BasicResult                // will contain the actual file information from the disk file
-	ifinfo            *godi.FileInfo // the file information we have seen in the index
+	godi.BasicResult                // will contain the actual file information from the disk file
+	ifinfo           *godi.FileInfo // the file information we have seen in the index
 }
 
 // NewCommand returns an initialized verify command
@@ -54,7 +54,7 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 			fd, err := os.Open(index)
 			if err != nil {
 				results <- &VerifyResult{
-					BasicResult: &godi.BasicResult{Err: err},
+					BasicResult: godi.BasicResult{Err: err},
 				}
 				continue
 			}
@@ -71,7 +71,7 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 				}
 			} else {
 				results <- &VerifyResult{
-					BasicResult: &godi.BasicResult{Err: err},
+					BasicResult: godi.BasicResult{Err: err},
 				}
 				continue
 			}
@@ -82,10 +82,10 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 }
 
 func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
-	makeResult := func(f *godi.FileInfo, err error) godi.Result {
+	makeResult := func(f, source *godi.FileInfo, err error) godi.Result {
 		fcpy := *f
 		res := VerifyResult{
-			BasicResult: &godi.BasicResult{
+			BasicResult: godi.BasicResult{
 				Finfo: f,
 				Prio:  godi.Progress,
 				Err:   err,
@@ -123,7 +123,7 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) 
 
 		if signatureMismatches == 0 {
 			accumResult <- &VerifyResult{
-				BasicResult: &godi.BasicResult{
+				BasicResult: godi.BasicResult{
 					Msg: fmt.Sprintf(
 						"All %d files did not change after sealing (%v)",
 						st.FileCount,
@@ -135,7 +135,7 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) 
 		} else {
 			st.ErrCount -= signatureMismatches
 			accumResult <- &VerifyResult{
-				BasicResult: &godi.BasicResult{
+				BasicResult: godi.BasicResult{
 					Msg: fmt.Sprintf(
 						"%d of %d files have changed on disk after sealing (%v)",
 						signatureMismatches,

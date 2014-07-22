@@ -35,7 +35,7 @@ type SealCommand struct {
 
 // A result which is also able to hold information about the source of a file
 type SealResult struct {
-	*godi.BasicResult
+	godi.BasicResult
 	// source of a copy operation, may be unset
 	source string
 }
@@ -52,11 +52,18 @@ func NewCommand(trees []string, nReaders, nWriters int) (c SealCommand, err erro
 }
 
 func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
-	makeResult := func(f *godi.FileInfo, err error) godi.Result {
-		res := godi.BasicResult{
-			Finfo: f,
-			Prio:  godi.Progress,
-			Err:   err,
+	makeResult := func(f, source *godi.FileInfo, err error) godi.Result {
+		s := ""
+		if source != nil {
+			s = source.Path
+		}
+		res := SealResult{
+			BasicResult: godi.BasicResult{
+				Finfo: f,
+				Prio:  godi.Progress,
+				Err:   err,
+			},
+			source: s,
 		}
 		return &res
 	}
