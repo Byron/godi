@@ -61,6 +61,7 @@ func TestSeal(t *testing.T) {
 		t.Log(err)
 	}
 
+	// this one is deleted in rmTree of datasetTree - it's a subdir !
 	invalidDestination := filepath.Join(datasetTree, "copy-destination")
 	if err = os.Mkdir(invalidDestination, 0777); err != nil {
 		t.Fatal(err)

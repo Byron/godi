@@ -16,6 +16,8 @@ godi seal tree/
 * **Performance**
     + `godi` is up to multiple times faster
     + Those inclined may maximize bandwidth by tuning parallelism
+    + Will read in parallel from multiple devices, leveraging all device's maximum bandwidth.
+    + Can write to multiple devices at once, creating multiple duplicates of your data as fast as your slowest writer.
 * **Copy or archive on the fly**
     + While hashing, you can also transfer the data, reading it only once in the process. With MHL, you need to copy first, and hash afterwards, which reads the data twice. `godi`s operation assumes the storage works correctly, however, there is a safe mode which verifies the copy nonetheless.
     + It will never overwrite existing files.
@@ -26,41 +28,11 @@ godi seal tree/
     + `godi` just works. `mhl` will fail (for some reason) if it finds a hidden file. `godi` will just ignore hidden files and symbolic links and otherwise process everything in its way.
     + `godi` comes with a state of the art commandline interface, allowing to learn the command by using it. No manual required.
 
-## Performance
 
-Intermediate results indicate a throughput of up to 900MB/s on 2 cores, which is a little more than twice as fast as the single-threaded [mhl](http://mediahashlist.org/).
+## Limitations
 
-I am still wondering why it doesn't benefit from more cores.
+* Multi-device optimizations don't currently apply on windows
 
-```bash
-$ time  ./godi seal ~/Movies
-Sealed 479 files with total size of 407.74786MB in 0.47895445400000003s (851.3290989659139 MB/s, 0 errors)
-
-real    0m0.486s
-user    0m0.879s
-sys 0m0.076s
-```
-
-```bash
-$ time mhl seal -v -t sha1 -o ~/Movies  ~/Movies
-----------------------
-Finished generating checksums for: 
-   480 file(s) 
-   with total filesize of 407 MB (427719586 bytes)
-----------------------
-Summary:
-   480 of 480 files SUCCEEDED
--------------------
-End of input.
-Finish date in UTC: 2014-07-17 22:02:42
-MHL file path(s):
-   /Users/byron/Movies/Movies_2014-07-17_220241.mhl
-===================
-
-real    0m1.186s
-user    0m1.100s
-sys 0m0.085s
-```
 
 ## Development Status
 

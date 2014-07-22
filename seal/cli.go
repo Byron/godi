@@ -148,7 +148,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 
 				// Finally, put all actual values into our list to have a deterministic iteration order.
 				// After all, we don't really care about the device from this point on
-				s.pWriters = make([]utility.RootedWriteController, 0, len(dtrees))
+				s.pWriters = make([]utility.RootedWriteController, len(dtrees))
 				c := 0
 				for _, trees := range dm {
 					// each device as so and so many destinations. Each destination uses the same write controller
