@@ -7,7 +7,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/utility"
@@ -103,7 +102,6 @@ func (s *SealCommand) NumChannels() int {
 
 func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err error) {
 	s.pCtrl = utility.NewReadChannelController(numReaders)
-	writers := make(map[uint64]utility.RootedWriteController)
 
 	if s.mode == modeSeal {
 		if len(items) == 0 {
@@ -146,28 +144,20 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 				}
 
 				// build the device map with all writer destinations
-				// If something doesn't work, we assume it's the same device ...
-				const defaultDevice uint64 = 0
-				for _, dtree := range dtrees {
-					fi, ferr := os.Stat(dtree)
-					did := defaultDevice
-					if ferr == nil {
-						st, ok := fi.Sys().(*syscall.Stat_t)
-						if ok {
-							did = uint64(st.Dev)
-						}
-					}
-					if _, ok := writers[did]; !ok {
-						writers[did] = utility.RootedWriteController{dtree, utility.NewWriteChannelController(numWriters)}
-					}
-				}
+				dm := utility.DeviceMap(dtrees)
 
 				// Finally, put all actual values into our list to have a deterministic iteration order.
 				// After all, we don't really care about the device from this point on
-				s.pWriters = make([]utility.RootedWriteController, 0, len(writers))
-				for _, ctrl := range writers {
-					s.pWriters = append(s.pWriters, ctrl)
-				}
+				s.pWriters = make([]utility.RootedWriteController, 0, len(dtrees))
+				c := 0
+				for _, trees := range dm {
+					// each device as so and so many destinations. Each destination uses the same write controller
+					wctrl := utility.NewWriteChannelController(numWriters, len(trees))
+					for _, tree := range trees {
+						s.pWriters[c] = utility.RootedWriteController{tree, &wctrl}
+						c += 1
+					}
+				} // for each tree set in deviceMap
 
 				return nil
 			}

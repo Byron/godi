@@ -180,14 +180,20 @@ type WriteChannelController struct {
 // A utility structure to associate a tree with a writer.
 // That way, writers can be more easily associated with a device which hosts Tree
 type RootedWriteController struct {
+	// The tree the controller should write to
 	Tree string
-	Ctrl WriteChannelController
+
+	// A possibly shared controller which may write to the given tree
+	Ctrl *WriteChannelController
 }
 
 // Create a new controller which deals with writing all incoming requests with nprocs go-routines
-func NewWriteChannelController(nprocs int) WriteChannelController {
+// npointers is the amount of pointers to the controller you intend to hold and use in parallel.
+// If it doesn't match the amount you are holding, this function can block your routine, and in the worst
+// case stall your program
+func NewWriteChannelController(nprocs, npointers int) WriteChannelController {
 	ctrl := WriteChannelController{
-		make(chan channelWriter, nprocs),
+		make(chan channelWriter, nprocs*npointers),
 	}
 
 	for i := 0; i < nprocs; i++ {
