@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
 )
+
+// Must be kept in sync with IndexPath generator
+var reIsIndexPath = regexp.MustCompile(fmt.Sprintf(`%s_\d{4}-\d{2}-\d{2}_\d{2}\d{2}\d{2}\.%s`, IndexBaseName, codec.GobExtension))
 
 // return a path to an index file residing at tree
 func (s *SealCommand) IndexPath(tree string, extension string) string {

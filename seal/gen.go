@@ -47,13 +47,27 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 				if !fi.IsDir() {
 					path := filepath.Join(tree, fi.Name())
 					if !fi.Mode().IsRegular() {
-						results <- &godi.BasicResult{nil, fmt.Sprintf("Ignoring symbolic link: '%s'", path), nil, godi.Warn}
+						results <- &godi.BasicResult{
+							Msg:  fmt.Sprintf("Ignoring symbolic link: '%s'", path),
+							Prio: godi.Warn,
+						}
 						continue
 					}
 					if fr, _ := utf8.DecodeRuneInString(fi.Name()); fr == '.' {
-						results <- &godi.BasicResult{nil, fmt.Sprintf("Ignoring hidden file: '%s'", path), nil, godi.Warn}
+						results <- &godi.BasicResult{
+							Msg:  fmt.Sprintf("Ignoring hidden file: '%s'", path),
+							Prio: godi.Warn,
+						}
 						continue
 					}
+					if reIsIndexPath.Match([]byte(fi.Name())) {
+						results <- &godi.BasicResult{
+							Msg:  fmt.Sprintf("Ignoring godi index: '%s'", path),
+							Prio: godi.Warn,
+						}
+						continue
+					}
+
 					files <- godi.FileInfo{
 						Path:     path,
 						RelaPath: path[len(root)+1:],
