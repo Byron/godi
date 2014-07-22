@@ -34,8 +34,8 @@ type VerifyResult struct {
 }
 
 // NewCommand returns an initialized verify command
-func NewCommand(trees []string, nReaders int) (c VerifyCommand, err error) {
-	err = c.Init(nReaders, 0, trees)
+func NewCommand(indices []string, nReaders int) (c VerifyCommand, err error) {
+	err = c.Init(nReaders, 0, indices)
 	return
 }
 

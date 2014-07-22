@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/logging"
 
 	"github.com/codegangsta/cli"
 )
@@ -17,16 +18,7 @@ const (
 func RunAction(cmd godi.Runner, c *cli.Context) {
 	// checkArgs must have initialized the seal command, so we can just run it
 
-	logger := func(r godi.Result) {
-		if r.Error() != nil {
-			fmt.Fprintln(os.Stderr, r.Error())
-		} else {
-			info, _ := r.Info()
-			fmt.Fprintln(os.Stdout, info)
-		}
-	}
-
-	err := godi.StartEngine(cmd, logger, logger)
+	err := godi.StartEngine(cmd, logging.CLILogger, logging.CLILogger)
 	if err != nil {
 		os.Exit(1)
 	}

@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	Sep                = "---"
-	usage              = "Please specify sealed copies like so: source/ => destination/"
-	numWritersFlagName = "num-writers"
+	Sep             = "---"
+	usage           = "Please specify sealed copies like so: source/ => destination/"
+	verifyAfterCopy = "verify"
 )
 
 // return subcommands for our particular area of algorithms
@@ -39,8 +39,21 @@ func SubCommands() []gcli.Command {
 			Usage:     "Generate a seal for one ore more directories and copy their contents to a destination directory",
 			Action:    func(c *gcli.Context) { cli.RunAction(&cmdcopy, c) },
 			Before:    func(c *gcli.Context) error { return cli.CheckCommonArgs(&cmdcopy, c) },
+			Flags: []gcli.Flag{
+				gcli.BoolFlag{verifyAfterCopy, "Run `godi verify` on all produced seals when copy is finished"},
+			},
 		},
 	}
+}
+
+func checkSealedCopyArgs(cmd *SealCommand, c *gcli.Context) error {
+	err := cli.CheckCommonArgs(cmd, c)
+	if err != nil {
+		return err
+	}
+
+	cmd.Verify = c.Bool(verifyAfterCopy)
+	return nil
 }
 
 // Parse all valid source items from the given list.

@@ -91,6 +91,8 @@ func TestSeal(t *testing.T) {
 	}
 
 	// Finally, perform the operation
+	// And verify as well ...
+	cmd.Verify = true
 	if err := godi.StartEngine(&cmd, resHandler, resHandler); err != nil {
 		t.Fatal(err)
 	}
