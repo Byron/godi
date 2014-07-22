@@ -80,7 +80,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 			panic(fmt.Sprintf("Didn't find map matching root '%s'", sr.Finfo.Root()))
 		}
 		// we store only relative paths in the map - this is all we want to serialize
-		relaPath := sr.Finfo.Path[len(sr.Finfo.RelaPath)+1:]
+		relaPath := sr.Finfo.RelaPath
 		hasError := false
 
 		if _, pathSeen := pathmap[relaPath]; pathSeen {

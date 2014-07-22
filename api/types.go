@@ -82,6 +82,9 @@ type Runner interface {
 	// very generic in nature
 	Init(numReaders, numWriters int, items []string) error
 
+	// Return the amount of io-channels the runner may be using in parallel per device
+	NumChannels() int
+
 	// Launches a go-routine which fills the returned FileInfo channel
 	// Must close FileInfo channel when done
 	// Must listen for SIGTERM|SIGINT signals and abort if received
@@ -107,13 +110,11 @@ type Runner interface {
 // Runner Init must have been called beforehand as we don't know the values here
 // The handlers receive a result of the respective stage and may perform whichever operation
 // Returns the last error we received in either generator or aggregation stage
-func StartEngine(runner Runner, nprocs int,
+func StartEngine(runner Runner,
 	generateHandler func(Result),
 	aggregateHandler func(Result)) (err error) {
-	if nprocs == 0 {
-		panic("Can't use nprocs = 0")
-	}
 
+	nprocs := runner.NumChannels()
 	results := make(chan Result, nprocs)
 	done := make(chan bool)
 

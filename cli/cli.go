@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/Byron/godi/api"
 
@@ -12,8 +10,7 @@ import (
 )
 
 const (
-	NumReadersFlagName = "num-readers"
-	NumWritersFlagName = "num-writers"
+	NumStreamsPerDeviceFlagName = "streams-per-device"
 )
 
 // Runs a standard runner from within the cli, dealing with errors accoringly
@@ -29,7 +26,7 @@ func RunAction(cmd godi.Runner, c *cli.Context) {
 		}
 	}
 
-	err := godi.StartEngine(cmd, runtime.GOMAXPROCS(0), logger, logger)
+	err := godi.StartEngine(cmd, logger, logger)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -39,15 +36,10 @@ func RunAction(cmd godi.Runner, c *cli.Context) {
 // Further init and checking should be done in specialized function
 func CheckCommonArgs(cmd godi.Runner, c *cli.Context) error {
 	// Put parsed args in cmd and sanitize it
-	nr := c.GlobalInt(NumReadersFlagName)
-	if nr < 1 {
-		return errors.New("--num-readers must not be smaller than 1")
+	ns := c.GlobalInt(NumStreamsPerDeviceFlagName)
+	if ns < 1 {
+		return fmt.Errorf("--%v must not be smaller than 1", NumStreamsPerDeviceFlagName)
 	}
 
-	nw := c.GlobalInt(NumWritersFlagName)
-	if nw < 1 {
-		return errors.New("--num-writers must not be smaller than 1")
-	}
-
-	return cmd.Init(nr, nw, c.Args())
+	return cmd.Init(ns, ns, c.Args())
 }

@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	Sep   = "=>"
-	usage = "Please specify sealed copies like so: source/ => destination/"
+	Sep                = "=>"
+	usage              = "Please specify sealed copies like so: source/ => destination/"
+	numWritersFlagName = "num-writers"
 )
 
 // return subcommands for our particular area of algorithms
@@ -96,9 +97,13 @@ func parseSources(items []string) (res []string, err error) {
 	return res, nil
 }
 
+func (s *SealCommand) NumChannels() int {
+	return s.pCtrl.Streams()
+}
+
 func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err error) {
 	s.pCtrl = utility.NewReadChannelController(numReaders)
-	s.pWriters = make(map[uint64]utility.RootedWriteController)
+	writers := make(map[uint64]utility.RootedWriteController)
 
 	if s.mode == modeSeal {
 		if len(items) == 0 {
@@ -152,8 +157,18 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 							did = uint64(st.Dev)
 						}
 					}
-					s.pWriters[did] = utility.RootedWriteController{dtree, utility.NewWriteChannelController(numWriters)}
+					if _, ok := writers[did]; !ok {
+						writers[did] = utility.RootedWriteController{dtree, utility.NewWriteChannelController(numWriters)}
+					}
 				}
+
+				// Finally, put all actual values into our list to have a deterministic iteration order.
+				// After all, we don't really care about the device from this point on
+				s.pWriters = make([]utility.RootedWriteController, 0, len(writers))
+				for _, ctrl := range writers {
+					s.pWriters = append(s.pWriters, ctrl)
+				}
+
 				return nil
 			}
 		} // for each item

@@ -1,7 +1,6 @@
 package verify_test
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/Byron/godi/api"
@@ -32,8 +31,7 @@ func TestVerify(t *testing.T) {
 		}
 	}
 
-	var maxProcs = runtime.GOMAXPROCS(0)
-	err := godi.StartEngine(&sealcmd, maxProcs, resHandler, aggHandler)
+	err := godi.StartEngine(&sealcmd, resHandler, aggHandler)
 	if err != nil {
 		t.Error(err)
 	}
@@ -44,7 +42,7 @@ func TestVerify(t *testing.T) {
 
 	verifycmd, _ := verify.NewCommand([]string{index}, 1)
 
-	err = godi.StartEngine(&verifycmd, maxProcs, resHandler, resHandler)
+	err = godi.StartEngine(&verifycmd, resHandler, resHandler)
 	if err != nil {
 		t.Error(err)
 	}

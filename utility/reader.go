@@ -46,12 +46,12 @@ type ChannelReader struct {
 	// Hanging occurred most of the time, but not always, which points at some async issue, maybe a bug in Pool ?
 	wg *sync.WaitGroup
 
-	// buffers we swap to allow reading while the writer is still busy writing, at least once ...
 	buf *[bufSize]byte
 }
 
-func (r *ReadChannelController) Channel() chan<- ChannelReader {
-	return r.c
+// Return amount of streams we handle in parallel
+func (r *ReadChannelController) Streams() int {
+	return cap(r.c)
 }
 
 // Return a new channel reader
@@ -59,17 +59,23 @@ func (r *ReadChannelController) Channel() chan<- ChannelReader {
 func (r *ReadChannelController) NewChannelReaderFromPath(path string) ChannelReader {
 	// NOTE: size of this channel controls how much we can cache into memory before we block
 	// as the consumer doesn't keep up
-	return ChannelReader{r, path, nil, make(chan readResult, readChannelSize),
+	cr := ChannelReader{r, path, nil, make(chan readResult, readChannelSize),
 		&sync.WaitGroup{},
 		new([bufSize]byte),
 	}
+
+	r.c <- cr
+	return cr
 }
 
 func (r *ReadChannelController) NewChannelReaderFromReader(reader io.Reader) ChannelReader {
-	return ChannelReader{r, "", reader, make(chan readResult, readChannelSize),
+	cr := ChannelReader{r, "", reader, make(chan readResult, readChannelSize),
 		&sync.WaitGroup{},
 		new([bufSize]byte),
 	}
+
+	r.c <- cr
+	return cr
 }
 
 // Allows to use a ChannelReader as source for io.Copy operations

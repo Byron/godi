@@ -39,6 +39,10 @@ func NewCommand(trees []string, nReaders int) (c VerifyCommand, err error) {
 	return
 }
 
+func (v *VerifyCommand) NumChannels() int {
+	return v.pCtrl.Streams()
+}
+
 func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
 	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
 		for _, index := range s.Indices {
@@ -141,7 +145,6 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) 
 				},
 			}
 		}
-
 	}
 
 	return godi.Aggregate(results, done, resultHandler, finalizer)

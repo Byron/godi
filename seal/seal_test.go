@@ -41,7 +41,7 @@ func TestSeal(t *testing.T) {
 	// Return true if we should break the loop
 	resHandler := testlib.ResultHandler(t)
 
-	if err := godi.StartEngine(&cmd, maxProcs, resHandler, resHandler); err != nil {
+	if err := godi.StartEngine(&cmd, resHandler, resHandler); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +90,7 @@ func TestSeal(t *testing.T) {
 	}
 
 	// Finally, perform the operation
-	if err := godi.StartEngine(&cmd, maxProcs, resHandler, resHandler); err != nil {
+	if err := godi.StartEngine(&cmd, resHandler, resHandler); err != nil {
 		t.Fatal(err)
 	}
 }

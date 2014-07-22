@@ -30,7 +30,7 @@ type SealCommand struct {
 
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
-	pWriters map[uint64]utility.RootedWriteController
+	pWriters []utility.RootedWriteController
 }
 
 // A result which is also able to hold information about the source of a file
