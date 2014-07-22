@@ -52,12 +52,13 @@ func NewCommand(trees []string, nReaders, nWriters int) (c SealCommand, err erro
 }
 
 func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
-	makeResult := func(f *godi.FileInfo) (godi.Result, *godi.BasicResult) {
+	makeResult := func(f *godi.FileInfo, err error) godi.Result {
 		res := godi.BasicResult{
 			Finfo: f,
 			Prio:  godi.Progress,
+			Err:   err,
 		}
-		return &res, &res
+		return &res
 	}
 
 	godi.Gather(files, results, wg, done, makeResult, &s.pCtrl, s.pWriters)

@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"path/filepath"
 	"sync"
 
 	"github.com/Byron/godi/utility"
@@ -16,37 +17,55 @@ import (
 // If wctrls is set, we will setup parallel writer which writes the bytes used for hashing
 // to all controllers at the same time, which will be as slow as the slowest device
 func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, done <-chan bool,
-	makeResult func(*FileInfo) (Result, *BasicResult),
+	makeResult func(*FileInfo, error) Result,
 	rctrl *utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
 	if rctrl == nil || wg == nil {
 		panic("ReadChannelController and WaitGroup must be set")
 	}
 	defer wg.Done()
+
 	sha1gen := sha1.New()
 	md5gen := md5.New()
-	var deviceWriter, multiWriter io.Writer
+	const nHashes = 2
+	isWriteMode := len(wctrls) > 0
+
+	var multiWriter io.Writer
 
 	// Build the multi-writer which will dispatch all writes to a write controller
-	if len(wctrls) > 0 {
-		writers := make([]io.Writer, len(wctrls)+2)
-		// for _, wctrl := range wmap {
-		// 	wctrl.Tree
-		// }
+	if isWriteMode {
+		writers := make([]io.Writer, len(wctrls)+nHashes)
+
 		// Writer with full checking enabled - it will never show anything for the hashes, but might
 		// report errrs for the real writers
-		writers[len(wctrls)] = sha1gen
-		writers[len(wctrls)+1] = md5gen
-		multiWriter = utility.ParallelMultiWriter(writers)
+		// We place the hashes last, as the writers will be changed in each iteration
+		writers[len(writers)-1] = sha1gen
+		writers[len(writers)-2] = md5gen
+		multiWriter = utility.NewParallelMultiWriter(writers)
 	} else {
 		multiWriter = utility.NewUncheckedParallelMultiWriter(sha1gen, md5gen)
 	}
 
-	sendErrorResult := func(f *FileInfo, err error) {
-		sres, res := makeResult(f)
-		res.Err = err
-		results <- sres
-	}
+	sendResults := func(f *FileInfo, err error) {
+		if !isWriteMode {
+			// We have to take care of sending the read-result
+			results <- makeResult(f, err)
+		} else {
+			// check each writer for errors and return produce a result, one per  non-hash writer
+			pmw := multiWriter.(*utility.ParallelMultiWriter)
+			for i := 0; i < len(wctrls); i++ {
+				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
+				var wfi FileInfo = *f
+				w, e := pmw.WriterAtIndex(i)
+				wc := w.(utility.WriteCloser)
+				wc.Close()
+				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path
+
+				// it doesn't matter here if there actually is an error, aggregator will handle it
+				results <- makeResult(&wfi, e)
+			} // for each write controller to write to
+		} // handle write mode
+	} // sendResults
 
 	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
 	// we will get f overwritten by the next iteration variable ... it's kind of special, might
@@ -54,9 +73,16 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 	handleHash := func(f FileInfo) {
 		// In hash-only mode, there is only one result
 		var err error
-		if deviceWriter != nil {
+		if isWriteMode {
 			// in write mode, there are as many results as we have destinations
-			// therefore, result handlling is not done by the writer itself
+			// therefore, result handlling is needs to be done once per writer.
+			pmw := multiWriter.(*utility.ParallelMultiWriter)
+			for i, wctrl := range wctrls {
+				// get destination path
+				destPath := filepath.Join(wctrl.Tree, f.RelaPath)
+				cw := wctrl.Ctrl.NewChannelWriter(&utility.LazyFileWriteCloser{Path: destPath})
+				pmw.SetWriterAtIndex(i, cw)
+			}
 		}
 
 		// let the other end open the file and close it as well
@@ -66,24 +92,25 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 		md5gen.Reset()
 		var written int64
 		written, err = reader.WriteTo(multiWriter)
+
 		if err != nil {
-			sendErrorResult(&f, err)
+			// This should actually never fail, the way we are implemented.
+			// If it does, it's the WriteTo() implementation, and as we are decoupled from it,
+			// let's make the check here anyway ...
+			sendResults(&f, err)
 			return
 		}
 		f.Sha1 = sha1gen.Sum(nil)
 		f.MD5 = md5gen.Sum(nil)
 		if written != f.Size {
 			err = fmt.Errorf("Filesize of '%s' reported as %d, yet only %d bytes were hashed", f.Path, f.Size, written)
-			sendErrorResult(&f, err)
+			sendResults(&f, err)
 			return
+		} else {
+			// all good
+			sendResults(&f, nil)
 		}
-
-		if deviceWriter == nil {
-			// We have to take care of sending the read-result
-			sres, _ := makeResult(&f)
-			results <- sres
-		}
-	}
+	} // func() handleHash
 
 	for f := range files {
 		select {

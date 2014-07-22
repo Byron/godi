@@ -43,6 +43,7 @@ func MakeDatasetOrPanic() (string, string, string) {
 	}
 	MakeFileOrPanic(filepath.Join(subdir, "biggie.foo"), 1024*1024+5123)
 	MakeFileOrPanic(filepath.Join(subdir, "smallie.blah"), 123)
+	MakeFileOrPanic(filepath.Join(subdir, "empty.file"), 0)
 	subdir = filepath.Join(base, FirstSubDir, "stillnothing", "ünicod€")
 	if err := os.MkdirAll(subdir, 0777); err != nil {
 		panic(err)

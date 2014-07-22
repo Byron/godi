@@ -25,10 +25,6 @@ type ReadChannelController struct {
 
 // Contains all information about a file or reader to be read
 type ChannelReader struct {
-
-	// Our controller, providing the pool we deal with
-	ctrl *ReadChannelController
-
 	// An optional path, which will be opened for reading when Reader is nil
 	path string
 
@@ -59,7 +55,7 @@ func (r *ReadChannelController) Streams() int {
 func (r *ReadChannelController) NewChannelReaderFromPath(path string) ChannelReader {
 	// NOTE: size of this channel controls how much we can cache into memory before we block
 	// as the consumer doesn't keep up
-	cr := ChannelReader{r, path, nil, make(chan readResult, readChannelSize),
+	cr := ChannelReader{path, nil, make(chan readResult, readChannelSize),
 		&sync.WaitGroup{},
 		new([bufSize]byte),
 	}
@@ -69,7 +65,7 @@ func (r *ReadChannelController) NewChannelReaderFromPath(path string) ChannelRea
 }
 
 func (r *ReadChannelController) NewChannelReaderFromReader(reader io.Reader) ChannelReader {
-	cr := ChannelReader{r, "", reader, make(chan readResult, readChannelSize),
+	cr := ChannelReader{"", reader, make(chan readResult, readChannelSize),
 		&sync.WaitGroup{},
 		new([bufSize]byte),
 	}

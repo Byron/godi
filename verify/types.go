@@ -82,16 +82,17 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 }
 
 func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
-	makeResult := func(f *godi.FileInfo) (godi.Result, *godi.BasicResult) {
+	makeResult := func(f *godi.FileInfo, err error) godi.Result {
 		fcpy := *f
 		res := VerifyResult{
 			BasicResult: &godi.BasicResult{
 				Finfo: f,
 				Prio:  godi.Progress,
+				Err:   err,
 			},
 			ifinfo: &fcpy,
 		}
-		return &res, res.BasicResult
+		return &res
 	}
 
 	godi.Gather(files, results, wg, done, makeResult, &s.pCtrl, nil)
