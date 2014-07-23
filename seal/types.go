@@ -62,5 +62,5 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 		return &res
 	}
 
-	godi.Gather(files, results, wg, s.Done, makeResult, s.RootedReaders, s.pWriters)
+	godi.Gather(files, results, wg, makeResult, s.RootedReaders, s.pWriters)
 }

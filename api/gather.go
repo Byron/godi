@@ -13,13 +13,12 @@ import (
 
 // Drains FileInfos from files channel, reads them using ctrl and generates hashes.
 // Creates a Result using makeResult() and sends it down the results channel.
-// Listens on done to abort early, and notifies wg when we are done to know when results can be closed.
 // If wctrls is set, we will setup parallel writer which writes the bytes used for hashing
 // to all controllers at the same time, which will be as slow as the slowest device
 // TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
 // Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
 // What we want is at max Y files being written continuously at a time
-func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, done <-chan bool,
+func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrls map[string]*utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
@@ -70,6 +69,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 		} // handle write mode
 	} // sendResults
 
+	// NOTE: This loop must not return ! It must be finished !!
 	for fo := range files {
 		// Make a copy - we pass this on as pointer, therefore we need to assure it's not the same
 		// thing after all. Range writes the same memory block all over again.
@@ -106,14 +106,14 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 			// If it does, it's the WriteTo() implementation, and as we are decoupled from it,
 			// let's make the check here anyway ...
 			sendResults(&f, err)
-			return
+			continue
 		}
 		f.Sha1 = sha1gen.Sum(nil)
 		f.MD5 = md5gen.Sum(nil)
 		if written != f.Size {
 			err = fmt.Errorf("Filesize of '%s' reported as %d, yet only %d bytes were hashed", f.Path, f.Size, written)
 			sendResults(&f, err)
-			return
+			continue
 		}
 		// all good
 

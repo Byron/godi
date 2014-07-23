@@ -60,22 +60,25 @@ func Aggregate(results <-chan Result, done <-chan bool,
 			select {
 			case <-done:
 				s.WasCancelled = true
+				// fallthrough doesn't work in selects :(
 			default:
-				{
-					if r.Error() != nil {
-						s.ErrCount += 1
-						accumResult <- r
-						continue
-					}
+				// we are just checking, but don't want to loose a result.
+				// If the following code would be here, the last result
+				// would not be pulled before closing
+			}
 
-					if !resultHandler(r, accumResult) {
-						s.ErrCount += 1
-					} else {
-						s.FileCount += 1
-						s.SizeBytes += uint64(r.FileInformation().Size)
-					}
-				} // default
-			} // select
+			if r.Error() != nil {
+				s.ErrCount += 1
+				accumResult <- r
+				continue
+			}
+
+			if !resultHandler(r, accumResult) {
+				s.ErrCount += 1
+			} else {
+				s.FileCount += 1
+				s.SizeBytes += uint64(r.FileInformation().Size)
+			}
 		} // range results
 		s.Elapsed = time.Now().Sub(st).Seconds()
 

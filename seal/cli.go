@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	Sep             = "---"
-	usage           = "Please specify sealed copies like so: source/ => destination/"
+	Sep             = "--"
+	usage           = "Please specify sealed copies like so: source/ -- destination/"
 	verifyAfterCopy = "verify"
 )
 
@@ -166,14 +166,13 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 					return
 				}
 				sources, e := parseSources(items[:i])
-				if err != nil {
+				if e != nil {
 					return e
 				}
 
-				var dtrees []string
-				dtrees, err = parseSources(items[i+1:])
-				if err != nil {
-					return
+				dtrees, e := parseSources(items[i+1:])
+				if e != nil {
+					return e
 				}
 
 				// Make sure we don't copy onto ourselves
@@ -184,7 +183,6 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 						}
 					}
 				}
-
 				s.InitBasicRunner(numReaders, sources)
 
 				// build the device map with all writer destinations

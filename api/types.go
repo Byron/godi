@@ -98,6 +98,9 @@ func (b *BasicRunner) InitBasicRunner(numReaders int, items []string) {
 	b.Items = items
 	b.Done = make(chan bool)
 	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, b.Done)
+	if len(b.RootedReaders) == 0 {
+		panic("Didn't manage to build readers from input items")
+	}
 }
 
 func (b *BasicRunner) CancelChannel() chan bool {

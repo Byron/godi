@@ -41,6 +41,7 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string) error {
 		indexDirs[i] = filepath.Dir(index)
 	}
 
-	s.InitBasicRunner(numReaders, items)
+	s.InitBasicRunner(numReaders, indexDirs)
+	s.Items = items
 	return nil
 }

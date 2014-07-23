@@ -100,7 +100,7 @@ func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.R
 		return &res
 	}
 
-	godi.Gather(files, results, wg, s.Done, makeResult, s.RootedReaders, nil)
+	godi.Gather(files, results, wg, makeResult, s.RootedReaders, nil)
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
