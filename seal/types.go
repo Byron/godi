@@ -17,16 +17,10 @@ const (
 
 // A type representing all arguments required to drive a Seal operation
 type SealCommand struct {
-
-	// One or more trees to seal
-	// Exported just for test-cases - too lazy to make it a read-only copy through accessor
-	SourceTrees []string
+	godi.BasicRunner
 
 	// The type of seal operation we are supposed to perform
 	mode string
-
-	// parallel reader
-	pReaders map[string]*utility.ReadChannelController
 
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
@@ -51,7 +45,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (c SealCommand, err erro
 	return
 }
 
-func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
+func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup) {
 	makeResult := func(f, source *godi.FileInfo, err error) godi.Result {
 		s := ""
 		if source != nil {
@@ -68,5 +62,5 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 		return &res
 	}
 
-	godi.Gather(files, results, wg, done, makeResult, s.pReaders, s.pWriters)
+	godi.Gather(files, results, wg, s.Done, makeResult, s.RootedReaders, s.pWriters)
 }

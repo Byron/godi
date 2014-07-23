@@ -5,6 +5,8 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/Byron/godi/utility"
 )
 
 // A struct holding information about a task, including
@@ -74,6 +76,37 @@ func (s *BasicResult) FileInformation() *FileInfo {
 	return s.Finfo
 }
 
+// A partial implementation of a runner, which can be shared between the various commands
+type BasicRunner struct {
+	// Items we work on
+	Items []string
+	// A map of readers which maps from a root to the reader to use to read files that share the same root
+	RootedReaders map[string]*utility.ReadChannelController
+	// A channel to let everyone know we should finish as soon as possible - this is done by closing the channel
+	Done chan bool
+}
+
+func (b *BasicRunner) NumChannels() int {
+	if len(b.RootedReaders) == 0 {
+		panic("NumChannels called before InitBasicRunner()")
+	}
+	return utility.ReadChannelDeviceMapStreams(b.RootedReaders)
+}
+
+// Initialize our Readers and items with the given information, including our cannel
+func (b *BasicRunner) InitBasicRunner(numReaders int, items []string) {
+	b.Items = items
+	b.Done = make(chan bool)
+	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, b.Done)
+}
+
+func (b *BasicRunner) CancelChannel() chan bool {
+	if b.Done == nil {
+		panic("CancelChannel( called before InitBasicRunner()")
+	}
+	return b.Done
+}
+
 type Runner interface {
 
 	// Intialize required members to deal with controlled reading and writing. numReaders and numWriters
@@ -85,26 +118,30 @@ type Runner interface {
 	// Return the amount of io-channels the runner may be using in parallel per device
 	NumChannels() int
 
+	// CancelChannel returns the channel to close when the operation should stop prematurely
+	// NOTE: Only valid after Init was called, and it's an error to call it beforehand
+	CancelChannel() chan bool
+
 	// Launches a go-routine which fills the returned FileInfo channel
 	// Must close FileInfo channel when done
 	// Must listen for SIGTERM|SIGINT signals and abort if received
 	// May report errrors or information about the progress through generateResult, which must NOT be closed when done. Return nothing
 	// if there is nothing to report
 	// Must listen on done and return asap
-	Generate(done <-chan bool) (files <-chan FileInfo, generateResult <-chan Result)
+	Generate() (files <-chan FileInfo, generateResult <-chan Result)
 
 	// Will be launched as go routine and perform whichever operation on the FileInfo received from input channel
 	// Produces one result per input FileInfo and returns it in the given results channel
 	// Must listen for SIGTERM|SIGINT signals
 	// Use the wait group to mark when done
 	// Must listen on done and return asap
-	Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, done <-chan bool)
+	Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup)
 
 	// Aggregate the result channel and produce whatever you have to produce from the result of the Gather steps
 	// When you are done, place a single result instance into accumResult and close the channel
 	// You must listen on done to know if the operation was aborted prematurely. This information should be useful
 	// for your result.
-	Aggregate(results <-chan Result, done <-chan bool) <-chan Result
+	Aggregate(results <-chan Result) <-chan Result
 }
 
 // Runner Init must have been called beforehand as we don't know the values here
@@ -116,7 +153,7 @@ func StartEngine(runner Runner,
 
 	nprocs := runner.NumChannels()
 	results := make(chan Result, nprocs)
-	done := make(chan bool)
+	done := runner.CancelChannel()
 
 	// assure we close our done channel on signal
 	signals := make(chan os.Signal, 2)
@@ -126,18 +163,18 @@ func StartEngine(runner Runner,
 		close(done)
 	}()
 
-	files, generateResult := runner.Generate(done)
+	files, generateResult := runner.Generate()
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < nprocs; i++ {
 		wg.Add(1)
-		go runner.Gather(files, results, &wg, done)
+		go runner.Gather(files, results, &wg)
 	}
 	go func() {
 		wg.Wait()
 		close(results)
 	}()
-	accumResult := runner.Aggregate(results, done)
+	accumResult := runner.Aggregate(results)
 
 	// Let's not hot-loop over anything, instead just process asynchronously
 	rwg := sync.WaitGroup{}

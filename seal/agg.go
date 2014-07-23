@@ -63,10 +63,10 @@ func (s *SealCommand) writeIndices(treeMap map[string]map[string]*godi.FileInfo)
 	return indices, nil
 }
 
-func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
+func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 	treePathmap := make(map[string]map[string]*godi.FileInfo)
 	// Presort all paths by their root
-	for _, tree := range s.SourceTrees {
+	for _, tree := range s.Items {
 		treePathmap[tree] = make(map[string]*godi.FileInfo)
 	}
 
@@ -141,5 +141,5 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 		}
 	}
 
-	return godi.Aggregate(results, done, resultHandler, finalizer)
+	return godi.Aggregate(results, s.Done, resultHandler, finalizer)
 }

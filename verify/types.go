@@ -10,7 +10,6 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
-	"github.com/Byron/godi/utility"
 )
 
 const (
@@ -19,12 +18,7 @@ const (
 
 // A type representing all arguments required to drive a Seal operation
 type VerifyCommand struct {
-
-	// The index files we are to verify
-	Indices []string
-
-	// parallel reader
-	pReaders map[string]*utility.ReadChannelController
+	godi.BasicRunner
 }
 
 // Implements information about a verify operation
@@ -39,13 +33,9 @@ func NewCommand(indices []string, nReaders int) (c VerifyCommand, err error) {
 	return
 }
 
-func (v *VerifyCommand) NumChannels() int {
-	return utility.ReadChannelDeviceMapStreams(v.pReaders)
-}
-
-func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
+func (s *VerifyCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
 	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
-		for _, index := range s.Indices {
+		for _, index := range s.Items {
 			c := codec.NewByPath(index)
 			if c == nil {
 				panic("Should have a codec here - this was checked before")
@@ -64,14 +54,14 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 
 			indexDir := filepath.Dir(index)
 			if err == nil {
-			fileInfoLoop:
+			forEachFileInfo:
 				for _, fi := range fileInfos {
 					// Have to be able to abort early. One must know that even though we may read super fast,
 					// we will block until the gather threads have done the work.
 					// Therefore it makes sense to check and abort here
 					select {
-					case <-done:
-						break fileInfoLoop
+					case <-s.Done:
+						break forEachFileInfo
 					default:
 						{
 							// Figure out the path to use - for now we use the relative one
@@ -96,7 +86,7 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 	return godi.Generate(generate)
 }
 
-func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {
+func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup) {
 	makeResult := func(f, source *godi.FileInfo, err error) godi.Result {
 		fcpy := *f
 		res := VerifyResult{
@@ -110,10 +100,10 @@ func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.R
 		return &res
 	}
 
-	godi.Gather(files, results, wg, done, makeResult, s.pReaders, nil)
+	godi.Gather(files, results, wg, s.Done, makeResult, s.RootedReaders, nil)
 }
 
-func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-chan godi.Result {
+func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 
 	var signatureMismatches uint = 0
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
@@ -163,5 +153,5 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result, done <-chan bool) 
 		}
 	}
 
-	return godi.Aggregate(results, done, resultHandler, finalizer)
+	return godi.Aggregate(results, s.Done, resultHandler, finalizer)
 }

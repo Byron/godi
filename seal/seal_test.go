@@ -29,7 +29,7 @@ func TestSeal(t *testing.T) {
 	cmd, err = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, testlib.FirstSubDir, "..", testlib.FirstSubDir)}, 1, 0)
 	if err != nil {
 		t.Fatal("Expected to not fail sanitization")
-	} else if len(cmd.SourceTrees) != 1 {
+	} else if len(cmd.Items) != 1 {
 		t.Fatal("Trees should have been pruned, contained one should have been dropped")
 	}
 

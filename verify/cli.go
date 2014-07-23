@@ -7,7 +7,6 @@ import (
 
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/codec"
-	"github.com/Byron/godi/utility"
 
 	gcli "github.com/codegangsta/cli"
 )
@@ -30,22 +29,18 @@ func SubCommands() []gcli.Command {
 }
 
 func (s *VerifyCommand) Init(numReaders, numWriters int, items []string) error {
-	s.Indices = items
-
-	if len(s.Indices) == 0 {
+	if len(items) == 0 {
 		return errors.New("Please provide at least one seal file")
 	}
 
-	indexDirs := make([]string, len(s.Indices))
-	for i, index := range s.Indices {
+	indexDirs := make([]string, len(items))
+	for i, index := range items {
 		if codec := codec.NewByPath(index); codec == nil {
 			return fmt.Errorf("Unknown seal file format: '%s'", index)
 		}
 		indexDirs[i] = filepath.Dir(index)
 	}
 
-	// NOTE: This only works as long as we use relative paths for the gen step !
-	s.pReaders = utility.NewReadChannelDeviceMap(numReaders, indexDirs)
-
+	s.InitBasicRunner(numReaders, items)
 	return nil
 }

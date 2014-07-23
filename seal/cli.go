@@ -61,6 +61,7 @@ func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Re
 	}
 }
 
+// TODO(st) implement verify properly !
 // func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 
 // 	// Yes, currently the post-verification is only implemented in the CLI ...
@@ -75,7 +76,7 @@ func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Re
 
 // 		// For each successful index, perform a verification
 // 		nReaders := 0
-// 		for _, rctrl := range cmd.pReaders {
+// 		for _, rctrl := range cmd.RootedReaders {
 // 			nReaders = rctrl.Streams()
 // 			break
 // 		}
@@ -139,19 +140,16 @@ func parseSources(items []string) (res []string, err error) {
 	return res, nil
 }
 
-func (s *SealCommand) NumChannels() int {
-	return utility.ReadChannelDeviceMapStreams(s.pReaders)
-}
-
 func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err error) {
-	// make sure it's not forgotten - it's not the simple'st function of them all
-	defer func() { s.pReaders = utility.NewReadChannelDeviceMap(numReaders, s.SourceTrees) }()
-
 	if s.mode == modeSeal {
 		if len(items) == 0 {
 			return errors.New("Please provide at least one source directory to work on")
 		}
-		s.SourceTrees, err = parseSources(items)
+		items, err = parseSources(items)
+		if err != nil {
+			return
+		}
+		s.InitBasicRunner(numReaders, items)
 	} else if s.mode == modeCopy {
 		// Parses [src, ...] => [dst, ...]
 		err = errors.New(usage)
@@ -167,9 +165,9 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 				if i == len(items)-1 {
 					return
 				}
-				s.SourceTrees, err = parseSources(items[:i])
+				sources, e := parseSources(items[:i])
 				if err != nil {
-					return
+					return e
 				}
 
 				var dtrees []string
@@ -179,13 +177,15 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 				}
 
 				// Make sure we don't copy onto ourselves
-				for _, stree := range s.SourceTrees {
+				for _, stree := range sources {
 					for _, dtree := range dtrees {
 						if strings.HasPrefix(dtree, stree) {
 							return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
 						}
 					}
 				}
+
+				s.InitBasicRunner(numReaders, sources)
 
 				// build the device map with all writer destinations
 				dm := utility.DeviceMap(dtrees)
@@ -207,7 +207,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 			}
 		} // for each item
 
-		// source-destinatio separator not found - prints usage
+		// source-destination separator not found - prints usage
 		return
 	} else {
 		panic(fmt.Sprintf("Unsupported mode: %s", s.mode))

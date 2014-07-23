@@ -1,6 +1,7 @@
 package utility
 
 import (
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -103,7 +104,8 @@ func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 // Create a new parallel reader with nprocs go-routines and return a channel to it.
 // Feed the channel with ChannelReader structures and listen on it's channel to read bytes until EOF, which
 // is when the channel will be closed by the reader
-func NewReadChannelController(nprocs int) ReadChannelController {
+// done will allow long reads to be interrupted by closing the channel
+func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelController {
 	if nprocs < 1 {
 		panic("nprocs must be >= 1")
 	}
@@ -115,6 +117,7 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 	infoHandler := func(info *ChannelReader) {
 		// in any case, close the results channel
 		defer close(info.results)
+
 		var err error
 		ourReader := false
 		if info.reader == nil {
@@ -128,17 +131,28 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 
 		// Now read until it's done
 		var nread int
+	readForever:
 		for {
-			// The buffer will be put back by the one reading from the channel (e.g. in WriteTo()) !
-			// wait until writer from previous iteration is done using the buffer
-			info.exclusive.Lock()
-			nread, err = info.reader.Read(info.buf[:])
-			info.exclusive.Unlock()
-			info.results <- readResult{info.buf[:nread], nread, err}
-			// we send all results, but abort if the reader is done for whichever reason
-			if err != nil {
-				break
-			}
+			select {
+			case <-done:
+				{
+					info.results <- readResult{err: errors.New("Cancelled by user")}
+					break readForever
+				}
+			default:
+				{
+					// The buffer will be put back by the one reading from the channel (e.g. in WriteTo()) !
+					// wait until writer from previous iteration is done using the buffer
+					info.exclusive.Lock()
+					nread, err = info.reader.Read(info.buf[:])
+					info.exclusive.Unlock()
+					info.results <- readResult{info.buf[:nread], nread, err}
+					// we send all results, but abort if the reader is done for whichever reason
+					if err != nil {
+						break readForever
+					}
+				}
+			} // end select
 		} // read loop
 
 		if ourReader {
@@ -161,12 +175,12 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 // NewReadChannelDeviceMap returns a mapping from each of the given trees to a controller which deals with the
 // device the tree is on. If all trees are on the same device, you will get a map with len(trees) length, each one
 // referring to the same controller
-func NewReadChannelDeviceMap(nprocs int, trees []string) map[string]*ReadChannelController {
+func NewReadChannelDeviceMap(nprocs int, trees []string, done <-chan bool) map[string]*ReadChannelController {
 	dm := DeviceMap(trees)
 	res := make(map[string]*ReadChannelController, len(dm))
 
 	for _, dirs := range dm {
-		rctrl := NewReadChannelController(nprocs)
+		rctrl := NewReadChannelController(nprocs, done)
 		for _, dir := range dirs {
 			res[dir] = &rctrl
 		}

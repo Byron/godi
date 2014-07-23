@@ -9,10 +9,10 @@ import (
 	"github.com/Byron/godi/api"
 )
 
-func (s *SealCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan godi.Result) {
+func (s *SealCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
 	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
-		for _, tree := range s.SourceTrees {
-			if !s.traverseFilesRecursively(files, results, done, tree, tree) {
+		for _, tree := range s.Items {
+			if !s.traverseFilesRecursively(files, results, s.Done, tree, tree) {
 				// interrupted usually, or there was an error
 				break
 			}
