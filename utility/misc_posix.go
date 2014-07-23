@@ -32,7 +32,7 @@ func DeviceMap(paths []string) [][]string {
 	}
 
 	res := make([][]string, len(m))
-	c = 0
+	c := 0
 	for _, trees := range m {
 		res[c] = trees
 		c += 1

@@ -67,7 +67,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 				wc.Close()
 				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
 				wfi := *f
-				wfi.Path = aw := wc.Writer().(*utility.LazyFileWriteCloser).Path
+				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path
 				// it doesn't matter here if there actually is an error, aggregator will handle it
 				results <- makeResult(&wfi, f, e)
 			} // for each write controller to write to
@@ -93,22 +93,24 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 
 			// Current writer id, absolute to this write operation
 			awid := 0
-			for rid, wctrl := range wctrls {
+			for _, wctrl := range wctrls {
 				// We just create one ChannelWriter per destination, and let the writers
 				// deal with the parallelization and blocking
+				fawid := awid // the first index
 				for x := 0; x < len(wctrl.Trees); x++ {
-					destPath := filepath.Join(wctrl.Trees[awid], f.RelaPath)
+					destPath := filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath)
 					pmw.SetWriterAtIndex(awid, &utility.LazyFileWriteCloser{Path: destPath})
 					awid += 1
 				}
+
+				// Finally, push all the writers into our parallel pipeline
+				wctrl.Ctrl.NewChannelWriters(pmw.Writers()[fawid:awid])
 			} // for each device's write controller
 
 			if awid != numDestinations {
 				panic("Mismatched writers")
 			}
 
-			// Finally, push all the writers into our parallel pipeline
-			wctrl.Ctrl.NewChannelWriters(pmw.Writers())
 		} // handle write mode preparations
 
 		// let the other end open the file and close it as well

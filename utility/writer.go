@@ -57,7 +57,7 @@ func (p *ParallelMultiWriter) SetWriterAtIndex(i int, w io.Writer) {
 }
 
 // Return  our slice of writers. It's length must not be changed, but you may alter its contents
-func (p *ParallelMultiWriter) Writers(i int, w io.Writer) []io.Writer {
+func (p *ParallelMultiWriter) Writers() []io.Writer {
 	return p.writers
 }
 
@@ -133,6 +133,7 @@ func (c *channelWriter) Close() error {
 	if w, ok := c.writer.(io.Closer); ok {
 		return w.Close()
 	}
+	close(c.writeRequests)
 	return nil
 }
 
@@ -189,20 +190,19 @@ type RootedWriteController struct {
 	Ctrl WriteChannelController
 }
 
-
 // Create a new controller which deals with writing all incoming requests with nprocs go-routines.
-// Use the channel capacity to assure less blocking will occur. A good value is depending heavily on your 
+// Use the channel capacity to assure less blocking will occur. A good value is depending heavily on your
 // algorithm's patterns. Should at least be nprocs, or larger.
 func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	ctrl := WriteChannelController{
 		make(chan *channelWriter, channelCap),
 	}
 
-	 for i := 0; i < nprocs; i++ {
+	for i := 0; i < nprocs; i++ {
 		go func() {
 			for cw := range ctrl.c {
 				// read all bytes as long as writer is not closed
-				for _ := range cw.writeRequests {
+				for _ = range cw.writeRequests {
 					cw.n, cw.e = cw.writer.Write(cw.b)
 					// protocol mandates the sender has to listen for our reply, channel must not be closed here ... .
 					cw.wg.Done()
@@ -222,13 +222,13 @@ func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 }
 
 // Return as many new ChannelWriters as fit into the given slice of outWriters
-// writers must be pre-filled with writers to use in a channel writer, the same slot will be 
+// writers must be pre-filled with writers to use in a channel writer, the same slot will be
 // re-used to carry the ChannelWriter. It's like c.w = w[x]; w[x] = c
 func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
 	// create one writer per
-	for i, wr := range writers {
-		cw := channelWriter {
-			writer: writer,
+	for _, wr := range writers {
+		cw := channelWriter{
+			writer:        wr,
 			writeRequests: make(chan bool),
 		}
 		// NOTE: This can block if there are more then numStreams writes in progress
@@ -237,13 +237,13 @@ func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
 }
 
 // Return amount of streams we handle in parallel
-func (w *WriteChannelController Streams() int {
+func (w *WriteChannelController) Streams() int {
 	return cap(w.c)
 }
 
 // Returns the amount of Trees/Destinations we can write to in total
 // TODO(st): objectify
-func WriteChannelDeviceMapTrees(wm map[uint64]RootedWriteController) (n int) {
+func WriteChannelDeviceMapTrees(wm []RootedWriteController) (n int) {
 	for _, rctrl := range wm {
 		n += len(rctrl.Trees)
 	}
