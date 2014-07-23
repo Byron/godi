@@ -63,18 +63,45 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 			// We have to take care of sending the read-result
 			results <- makeResult(f, nil, err)
 		} else {
-			// check each writer for errors and produce a result, one per non-hash writer
+			// Now we are unpacking the writer data structure to pull out it's results.
+			// Each parallel writer has it's own result, but MultiWriters have serial/stacked
+			// LazyWriters, where the first error prevents any of the following Lazy's to be called.
+			// Therefore, the first error of serial lazy's will be duplicate to all following lazys.
+			// This algorithm is blunt as it does extra work (we konw the data structure after all), but
+			// it is safe as well as it makes no assumptions.
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
 			for i := 0; i < numParallelWriters; i++ {
 				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
-				var wfi FileInfo = *f
 				w, e := pmw.WriterAtIndex(i)
+				// We always have a ChannelWriter here, which supports this interface
 				wc := w.(utility.WriteCloser)
 				wc.Close()
-				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path
 
-				// it doesn't matter here if there actually is an error, aggregator will handle it
-				results <- makeResult(&wfi, f, e)
+				// Now we have a Lazy, or a MutliWriter, in that order
+				switch aw := wc.Writer().(type) {
+				case *utility.LazyFileWriteCloser:
+					{
+						wfi := *f
+						wfi.Path = aw.Path
+						// it doesn't matter here if there actually is an error, aggregator will handle it
+						results <- makeResult(&wfi, f, e)
+					}
+				case *utility.MultiWriter:
+					{
+						for _, w := range aw.Writers {
+							// one copy per writer please
+							wfi := *f
+							// This must be a multi-writer
+							wfi.Path = w.(*utility.LazyFileWriteCloser).Path
+							// Well, we can't tell anymore if this error truly originated here ...
+							// BUG(st) We don't hold what we promise, see l66 comment for details.
+							results <- makeResult(&wfi, f, e)
+						}
+					}
+				default:
+					panic(fmt.Sprintf("Unexpected writer type: %T", aw))
+				} // end type switch
+
 			} // for each write controller to write to
 		} // handle write mode
 	} // sendResults

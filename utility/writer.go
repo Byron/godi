@@ -26,6 +26,16 @@ func (t *MultiWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// Close all writers if they support the closer interface, return the last seen error
+func (t *MultiWriter) Close() (err error) {
+	for _, w := range t.Writers {
+		if wc, ok := w.(io.Closer); ok {
+			err = wc.Close()
+		}
+	}
+	return
+}
+
 // Similar to MultiWriter, but assumes writes never fail, and provides the same buffer
 // to all writers in parallel. However, it will return only when all writes are finished
 type uncheckedParallelMultiWriter struct {
@@ -244,6 +254,7 @@ func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
 			ctrl:   wr,
 			writer: writer,
 		}
+		// NOTE: This can block if there are more then numStreams writes in progress
 		w.c <- &cw
 	}
 }
