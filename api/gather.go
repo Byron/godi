@@ -70,10 +70,10 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 		} // handle write mode
 	} // sendResults
 
-	// This MUST be a copy of f here, otherwise we will be in trouble thanks to the user of defer in handleHash
-	// we will get f overwritten by the next iteration variable ... it's kind of special, might
-	// be intersting for the mailing list.
-	handleHash := func(f FileInfo) {
+	for fo := range files {
+		// Make a copy - we pass this on as pointer, therefore we need to assure it's not the same
+		// thing after all. Range writes the same memory block all over again.
+		var f FileInfo = fo
 		rctrl, hasRCtrlForRoot := rctrls[f.Root()]
 		if !hasRCtrlForRoot {
 			panic(fmt.Sprintf("Couldn't find read controller for directory at '%s'", f.Root()))
@@ -118,15 +118,5 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 		// all good
 
 		sendResults(&f, nil)
-
-	} // func() handleHash
-
-	for f := range files {
-		select {
-		case <-done:
-			return
-		default:
-			handleHash(f)
-		}
 	}
 }

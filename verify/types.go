@@ -64,15 +64,26 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 
 			indexDir := filepath.Dir(index)
 			if err == nil {
+			fileInfoLoop:
 				for _, fi := range fileInfos {
-					// Figure out the path to use - for now we use the relative one
-					// NOTE: We need to use the relative one as our read-controller device map is based on that.
-					// If it was the absolute file path we use here, it could possibly point to a file far away,
-					// in any case our read controller map will not yield the expected result unless we set it
-					// up here, which is dangerous as it is async ! So let's not use the absolute path, ever !
-					fi.Path = filepath.Join(indexDir, fi.RelaPath)
-					files <- fi
-				}
+					// Have to be able to abort early. One must know that even though we may read super fast,
+					// we will block until the gather threads have done the work.
+					// Therefore it makes sense to check and abort here
+					select {
+					case <-done:
+						break fileInfoLoop
+					default:
+						{
+							// Figure out the path to use - for now we use the relative one
+							// NOTE: We need to use the relative one as our read-controller device map is based on that.
+							// If it was the absolute file path we use here, it could possibly point to a file far away,
+							// in any case our read controller map will not yield the expected result unless we set it
+							// up here, which is dangerous as it is async ! So let's not use the absolute path, ever !
+							fi.Path = filepath.Join(indexDir, fi.RelaPath)
+							files <- fi
+						}
+					} // select
+				} // for each fileInfo
 			} else {
 				results <- &VerifyResult{
 					BasicResult: godi.BasicResult{Err: err},
@@ -82,7 +93,7 @@ func (s *VerifyCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan
 		} // for each index
 	}
 
-	return godi.Generate(done, generate)
+	return godi.Generate(generate)
 }
 
 func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup, done <-chan bool) {

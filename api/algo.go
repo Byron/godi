@@ -7,7 +7,6 @@ import (
 
 // Generate does all boilerplate required to be a valid generator
 func Generate(
-	done <-chan bool,
 	generate func(chan<- FileInfo, chan<- Result)) (<-chan FileInfo, <-chan Result) {
 	files := make(chan FileInfo)
 	results := make(chan Result)

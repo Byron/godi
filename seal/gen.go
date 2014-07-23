@@ -19,7 +19,7 @@ func (s *SealCommand) Generate(done <-chan bool) (<-chan godi.FileInfo, <-chan g
 		}
 	}
 
-	return godi.Generate(done, generate)
+	return godi.Generate(generate)
 }
 
 // Traverse recursively, return false if the caller should stop traversing due to an error
