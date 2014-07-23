@@ -25,9 +25,6 @@ type SealCommand struct {
 	// The type of seal operation we are supposed to perform
 	mode string
 
-	// If set, we will run a verification step after all indices have been written
-	Verify bool
-
 	// parallel reader
 	pReaders map[string]*utility.ReadChannelController
 

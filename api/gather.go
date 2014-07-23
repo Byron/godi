@@ -114,10 +114,11 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, do
 			err = fmt.Errorf("Filesize of '%s' reported as %d, yet only %d bytes were hashed", f.Path, f.Size, written)
 			sendResults(&f, err)
 			return
-		} else {
-			// all good
-			sendResults(&f, nil)
 		}
+		// all good
+
+		sendResults(&f, nil)
+
 	} // func() handleHash
 
 	for f := range files {

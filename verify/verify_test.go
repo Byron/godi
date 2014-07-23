@@ -17,37 +17,24 @@ func TestVerify(t *testing.T) {
 	resHandler := testlib.ResultHandler(t)
 
 	// keeps track of created indices
-	var index string
-	aggHandler := func(res godi.Result) {
-		resHandler(res)
-		if res == nil || res.FileInformation() == nil {
-			return
-		}
-		if res.FileInformation().Size < 0 {
-			if len(index) > 0 {
-				t.Fatal("Can only keep one index right now")
-			}
-			index = res.FileInformation().Path
-		}
-	}
-
-	err := godi.StartEngine(&sealcmd, resHandler, aggHandler)
+	var indices []string
+	err := godi.StartEngine(&sealcmd, resHandler, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler))
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(index) == 0 {
+	if len(indices) == 0 {
 		t.Fatal("Didn't parse a single index")
 	}
 
-	verifycmd, _ := verify.NewCommand([]string{index}, 1)
+	verifycmd, _ := verify.NewCommand([]string{indices[0]}, 1)
 
 	err = godi.StartEngine(&verifycmd, resHandler, resHandler)
 	if err != nil {
 		t.Error(err)
 	}
 
-	// Alter File
+	// TODO(st): Alter File
 
-	// Remove File
+	// TODO(st): Remove File
 }

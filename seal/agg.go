@@ -9,8 +9,6 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
-	"github.com/Byron/godi/logging"
-	"github.com/Byron/godi/verify"
 )
 
 // Must be kept in sync with IndexPath generator
@@ -129,24 +127,6 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result, done <-chan bool) <-
 				accumResult <- &godi.BasicResult{
 					&godi.FileInfo{Path: index, Size: -1},
 					fmt.Sprintf("Wrote seal at '%s'", index), err, godi.Info,
-				}
-			}
-
-			if s.Verify {
-				// For each successful index, perform a verification
-				nReaders := 0
-				for _, rctrl := range s.pReaders {
-					nReaders = rctrl.Streams()
-					break
-				}
-
-				// For now, we just ASSUME we can use this logger
-				// BUG(st): - store logging handlers with the command and reuse these ... this doesn't work
-				// in testing for instance, which uses different loggers for good reason
-				vcmd, err := verify.NewCommand(indices, nReaders)
-				if err == nil {
-					// ignore error, it was already reported anyway.
-					godi.StartEngine(&vcmd, logging.CLILogger, logging.CLILogger)
 				}
 			}
 		}

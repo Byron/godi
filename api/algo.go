@@ -14,6 +14,7 @@ func Generate(
 
 	go func() {
 		defer close(files)
+		defer close(results)
 		generate(files, results)
 	}()
 

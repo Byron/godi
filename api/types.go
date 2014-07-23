@@ -139,35 +139,23 @@ func StartEngine(runner Runner,
 	}()
 	accumResult := runner.Aggregate(results, done)
 
-	// Return true if we should break the loop
-	resHandler := func(handler func(Result), res Result) bool {
-		if res == nil {
-			// channel closed, have to get out
-			return true
+	// Let's not hot-loop over anything, instead just process asynchronously
+	rwg := sync.WaitGroup{}
+	rwg.Add(1)
+	go func() {
+		for r := range generateResult {
+			generateHandler(r)
 		}
-		handler(res)
-		return false
-	} // end resHandler
+		rwg.Done()
+	}()
+	rwg.Add(1)
+	go func() {
+		for r := range accumResult {
+			aggregateHandler(r)
+		}
+		rwg.Done()
+	}()
 
-infinity:
-	for {
-		select {
-		case r := <-generateResult:
-			{
-				if resHandler(generateHandler, r) {
-					break infinity
-				}
-				err = r.Error()
-			}
-		case r := <-accumResult:
-			{
-				if resHandler(aggregateHandler, r) {
-					break infinity
-				}
-				err = r.Error()
-			}
-		} // select
-	} // infinty
-
+	rwg.Wait()
 	return
 }

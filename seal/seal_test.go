@@ -10,6 +10,7 @@ import (
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/seal"
 	"github.com/Byron/godi/testlib"
+	"github.com/Byron/godi/verify"
 )
 
 func TestSeal(t *testing.T) {
@@ -91,9 +92,21 @@ func TestSeal(t *testing.T) {
 	}
 
 	// Finally, perform the operation
-	// And verify as well ...
-	cmd.Verify = true
-	if err := godi.StartEngine(&cmd, resHandler, resHandler); err != nil {
+	var indices []string
+	if err := godi.StartEngine(&cmd, resHandler, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler)); err != nil {
 		t.Fatal(err)
+	}
+
+	if len(indices) != 2 {
+		t.Fatal("Should have parsed 2 indices")
+	}
+
+	verifycmd, err := verify.NewCommand(indices, maxProcs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := godi.StartEngine(&verifycmd, resHandler, resHandler); err != nil {
+		t.Fatal("Coulnd't verify files that were just written")
 	}
 }

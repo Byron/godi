@@ -89,11 +89,13 @@ func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 		if res.n > 0 {
 			written, err = w.Write(res.buf)
 			n += int64(written)
-			p.wg.Done()
 		}
-
-		// I could think of plenty of assertion here ... but there is no such thing
-	}
+		// in any case, claim we are done with the result !
+		p.wg.Done()
+		if res.n == 0 && res.err == nil {
+			panic("If 0 bytes have been read, there should at least be an EOF (in case of empty files)")
+		}
+	} // for each read result
 
 	// whatever is held in n, err, we return
 	return
@@ -121,6 +123,7 @@ func NewReadChannelController(nprocs int) ReadChannelController {
 					if err != nil {
 						info.wg.Add(1)
 						info.results <- readResult{nil, 0, err}
+						close(info.results)
 						continue
 					}
 				}

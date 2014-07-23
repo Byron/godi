@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/utility"
 
@@ -46,15 +47,44 @@ func SubCommands() []gcli.Command {
 	}
 }
 
-func checkSealedCopyArgs(cmd *SealCommand, c *gcli.Context) error {
-	err := cli.CheckCommonArgs(cmd, c)
-	if err != nil {
-		return err
+// Returns a handler which will track seal/index files, and call the given handler aftrewards, writing the
+// into the provided slice
+func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Result)) func(r godi.Result) {
+	return func(r godi.Result) {
+		handler(r)
+		if r == nil || r.FileInformation() == nil {
+			return
+		}
+		if r.FileInformation().Size < 0 {
+			*indices = append(*indices, r.FileInformation().Path)
+		}
 	}
-
-	cmd.Verify = c.Bool(verifyAfterCopy)
-	return nil
 }
+
+// func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
+
+// 	// Yes, currently the post-verification is only implemented in the CLI ...
+// 	// Testing needs to do similar things to set it up ...
+// 	if c.Bool(verifyAfterCopy) {
+// 		indices := make([]string)
+// 		aggHandler := IndexTrackingResultHandlerAdapter(&indices, cli.LogHandler)
+// 		// pass handler !
+// 		err := cli.RunAction(cmd, c, aggHandler)
+
+// 		// have to run it ourselves, and track indices
+
+// 		// For each successful index, perform a verification
+// 		nReaders := 0
+// 		for _, rctrl := range cmd.pReaders {
+// 			nReaders = rctrl.Streams()
+// 			break
+// 		}
+
+// 	} else {
+// 		// copy without verify
+// 		cli.RunAction(cmd, c, nil)
+// 	}
+// }
 
 // Parse all valid source items from the given list.
 // May either be files or directories. The returned list may be shorter, as contained paths are

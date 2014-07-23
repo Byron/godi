@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/Byron/godi/api"
-	"github.com/Byron/godi/logging"
 
 	"github.com/codegangsta/cli"
 )
@@ -14,11 +13,20 @@ const (
 	NumStreamsPerDeviceFlagName = "streams-per-device"
 )
 
+func LogHandler(r godi.Result) {
+	if r.Error() != nil {
+		fmt.Fprintln(os.Stderr, r.Error())
+	} else {
+		info, _ := r.Info()
+		fmt.Fprintln(os.Stdout, info)
+	}
+}
+
 // Runs a standard runner from within the cli, dealing with errors accoringly
+// Both handlers may be nil to use a default one
 func RunAction(cmd godi.Runner, c *cli.Context) {
 	// checkArgs must have initialized the seal command, so we can just run it
-
-	err := godi.StartEngine(cmd, logging.CLILogger, logging.CLILogger)
+	err := godi.StartEngine(cmd, LogHandler, LogHandler)
 	if err != nil {
 		os.Exit(1)
 	}
