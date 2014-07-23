@@ -59,6 +59,10 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
 			for i := 0; i < numDestinations; i++ {
 				w, e := pmw.WriterAtIndex(i)
+				// If the reader had an error, no write may succeed. We just don't overwrite write errors
+				if e == nil && err != nil {
+					e = err
+				}
 				wc := w.(utility.WriteCloser)
 				wc.Close()
 				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
