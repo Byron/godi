@@ -21,7 +21,7 @@ import (
 func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrls map[string]*utility.ReadChannelController,
-	wctrls map[uint64]utility.RootedWriteController) {
+	wctrls []utility.RootedWriteController) {
 	if len(rctrls) == 0 || wg == nil {
 		panic("ReadChannelController and WaitGroup must be set")
 	}
@@ -51,10 +51,8 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 
 		// pre-allocated writers structure
 		writersPerCtrl = make([][]io.Writer, len(wctrls))
-		rid = 0
-		for _, wctrl := range wctrls {
+		for rid, wctrl := range wctrls {
 			writersPerCtrl[rid] = make([]io.Writer, len(wctrl.Trees))
-			rid += 1
 		}
 	} else {
 		multiWriter = utility.NewUncheckedParallelMultiWriter(sha1gen, md5gen)
@@ -97,36 +95,65 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 			// in write mode, there are as many results as we have destinations
 			// therefore, result handlling is done once per writer.
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
-			nChannelsCreated := 0
-			rid := 0
-			for _, wctrl := range wctrls {
+			// Current writer id, absolute to this write operation
+			awid := 0
+			for rid, wctrl := range wctrls {
 				// per device, we can handle X streams in parallel, while having to stream to NT trees.
 				// We have one lazywriter per stream S<NS-1, whereas the last stream will be a MultiWriter with
 				// NT-(NS-1) sequential streams.
 				// If NS is 3 and NT is 6, X0 and X1 will have one destination each, and X2 has 4 done sequentially.
 				ns := wctrl.ClientStreams()
+				if ns > len(wctrl.Trees) {
+					panic("This can't work if there are more Channels than Trees, wctrl type has a bug")
+				}
+
+				// Amount of parallel writers to reserve
+				// If the number matches the amount of trees though, there is no special handling
+				reserve := 1
+				if ns == len(wctrl.Trees) {
+					reserve = 0
+				}
 
 				// This method assures our WriterChannels are created in order, so they are not interleaved
 				// with channels currently created by another go-routine. It's important, as we
 				// might deadlock otherwise.
+				// The writers have to be pre-filled with the actual writers,
 				writers := writersPerCtrl[rid]
-				wctrl.Ctrl.NewChannelWriter(rctrl.Trees, writers)
-				rid += 1
 
-				// Create highly parallel writers
-				for x := 0; x < ns-1; x++ {
-					nChannelsCreated += 1
+				// Create lazi's for highly parallel operation
+				for x := 0; x < ns-reserve; x++ {
+					destPath := filepath.Join(wctrl.Trees[x], f.RelaPath)
+					writers[awid] = &utility.LazyFileWriteCloser{Path: destPath}
+
+					awid += 1
 				}
 
-				// get destination path
-				destPath := filepath.Join(wctrl.Tree, f.RelaPath)
-				cw := wctrl.Ctrl.NewChannelWriter(&utility.LazyFileWriteCloser{Path: destPath})
-				pmw.SetWriterAtIndex(i, cw)
-			}
-			if nChannelsCreated != numParallelWriters {
+				// Now let's do the remaining Trees, but we put them all into one writer
+				if reserve != 0 {
+					remainingTrees := len(wctrl.Trees) - (ns - reserve)
+					mw := utility.MultiWriter{Writers: make([]io.Writer, remainingTrees)}
+					// This loop pepares the sequential wrtiers, writing one after another
+					for x := 0; x < remainingTrees; x++ {
+						destPath := filepath.Join(wctrl.Trees[ns-reserve+x], f.RelaPath)
+						mw.Writers[x] = &utility.LazyFileWriteCloser{Path: destPath}
+					}
+					//
+					writers[awid] = &mw
+					awid += 1
+				}
+
+				// Finally, push all the writers into our parallel pipeline
+				wctrl.Ctrl.NewChannelWriters(writers)
+				// writers have been replaced by channel writers
+				for cid, cw := range writers {
+					pmw.SetWriterAtIndex(cid, cw)
+				}
+			} // for each device's write controller
+
+			if awid != numParallelWriters {
 				panic("Mismatched writers")
 			}
-		}
+		} // handle write mode preparations
 
 		// let the other end open the file and close it as well
 		reader := rctrl.NewChannelReaderFromPath(f.Path)

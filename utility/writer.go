@@ -7,6 +7,25 @@ import (
 	"sync"
 )
 
+// Copied from io, but allows us to deal with the Writers array ourselves
+type MultiWriter struct {
+	Writers []io.Writer
+}
+
+func (t *MultiWriter) Write(p []byte) (n int, err error) {
+	for _, w := range t.Writers {
+		n, err = w.Write(p)
+		if err != nil {
+			return
+		}
+		if n != len(p) {
+			err = io.ErrShortWrite
+			return
+		}
+	}
+	return len(p), nil
+}
+
 // Similar to MultiWriter, but assumes writes never fail, and provides the same buffer
 // to all writers in parallel. However, it will return only when all writes are finished
 type uncheckedParallelMultiWriter struct {
@@ -174,8 +193,7 @@ type WriteChannelController struct {
 	// As the channelWriter is keeping all information, we serves as request right away
 	c chan *channelWriter
 
-	// NOTE: at some point we could hold a pool of large buffers for in-memory write caching
-	// However, large buffers could be beneficial for the hashing already as we do less small hash calls
+	l sync.Mutex
 }
 
 // A utility structure to associate a tree with a writer.
@@ -213,13 +231,21 @@ func NewWriteChannelController(nprocs int) WriteChannelController {
 	return ctrl
 }
 
-// Return a new channel writer, which will write asynchronously to the given writer
-func (w *WriteChannelController) NewChannelWriter(writer io.Writer) io.Writer {
-	cw := channelWriter{
-		ctrl:   w,
-		writer: writer,
+// Return as many new ChannelWriters as fit into the given slice of outWriters
+// writers must be pre-filled with writers to use in a channel writer, the same slot will be 
+// re-used to carry the ChannelWriter. It's like c.w = w[x]; w[x] = c
+func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
+	w.l.Lock()
+	defer w.l.Unlock()
+
+	// create one writer per
+	for i, wr := range writers {
+		cw := channelWriter {
+			ctrl:   wr,
+			writer: writer,
+		}
+		w.c <- &cw
 	}
-	return &cw
 }
 
 // Return amount of streams we handle in parallel
