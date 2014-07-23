@@ -27,7 +27,7 @@ type SealCommand struct {
 
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
-	pWriters []utility.RootedWriteController
+	rootedWriters map[uint64]utility.RootedWriteController
 }
 
 // A result which is also able to hold information about the source of a file
@@ -65,5 +65,5 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 		return &res
 	}
 
-	godi.Gather(files, results, wg, makeResult, s.RootedReaders, s.pWriters)
+	godi.Gather(files, results, wg, makeResult, s.RootedReaders, s.rootedWriters)
 }

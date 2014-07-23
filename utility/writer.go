@@ -181,11 +181,18 @@ type WriteChannelController struct {
 // A utility structure to associate a tree with a writer.
 // That way, writers can be more easily associated with a device which hosts Tree
 type RootedWriteController struct {
-	// The tree the controller should write to
-	Tree string
+	// The trees the controller should write to
+	Trees []string
 
 	// A possibly shared controller which may write to the given tree
-	Ctrl *WriteChannelController
+	Ctrl WriteChannelController
+}
+
+func (r *RootedWriteController) ClientStreams() int {
+	if r.Ctrl.Streams() > len(r.Trees) {
+		return len(r.Trees)
+	}
+	return r.Ctrl.Streams()
 }
 
 // Create a new controller which deals with writing all incoming requests with nprocs go-routines
@@ -213,4 +220,20 @@ func (w *WriteChannelController) NewChannelWriter(writer io.Writer) io.Writer {
 		writer: writer,
 	}
 	return &cw
+}
+
+// Return amount of streams we handle in parallel
+func (w *WriteChannelController Streams() int {
+	return cap(w.c)
+}
+
+// Returns the amount of total parallel writes the given object can do.
+// NOTE: We normalize the amount of parallel streams per client to the amount of roots per device,
+// therefore a controller with two streams an done root will only have one stream, not two.
+// TODO(st): objectify
+func WriteChannelDeviceMapStreams(wm map[uint64]RootedWriteController) (n int) {
+	for _, rctrl := range wm {
+		n += rctrl.ClientStreams()
+	}
+	return
 }

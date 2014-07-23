@@ -21,7 +21,7 @@ import (
 func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrls map[string]*utility.ReadChannelController,
-	wctrls []utility.RootedWriteController) {
+	wctrls map[uint64]utility.RootedWriteController) {
 	if len(rctrls) == 0 || wg == nil {
 		panic("ReadChannelController and WaitGroup must be set")
 	}
@@ -31,12 +31,16 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	md5gen := md5.New()
 	const nHashes = 2
 	isWriteMode := len(wctrls) > 0
+	numParallelWriters := utility.WriteChannelDeviceMapStreams(wctrls)
+	// Pre-allocated memory to keep writer allocations
+	var writersPerCtrl [][]io.Writer
 
 	var multiWriter io.Writer
 
 	// Build the multi-writer which will dispatch all writes to a write controller
 	if isWriteMode {
-		writers := make([]io.Writer, len(wctrls)+nHashes)
+		// We have one controller per device, each as a number of streams
+		writers := make([]io.Writer, numParallelWriters+nHashes)
 
 		// Writer with full checking enabled - it will never show anything for the hashes, but might
 		// report errrs for the real writers
@@ -44,6 +48,14 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		writers[len(writers)-1] = sha1gen
 		writers[len(writers)-2] = md5gen
 		multiWriter = utility.NewParallelMultiWriter(writers)
+
+		// pre-allocated writers structure
+		writersPerCtrl = make([][]io.Writer, len(wctrls))
+		rid = 0
+		for _, wctrl := range wctrls {
+			writersPerCtrl[rid] = make([]io.Writer, len(wctrl.Trees))
+			rid += 1
+		}
 	} else {
 		multiWriter = utility.NewUncheckedParallelMultiWriter(sha1gen, md5gen)
 	}
@@ -53,9 +65,9 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 			// We have to take care of sending the read-result
 			results <- makeResult(f, nil, err)
 		} else {
-			// check each writer for errors and return produce a result, one per  non-hash writer
+			// check each writer for errors and produce a result, one per non-hash writer
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
-			for i := 0; i < len(wctrls); i++ {
+			for i := 0; i < numParallelWriters; i++ {
 				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
 				var wfi FileInfo = *f
 				w, e := pmw.WriterAtIndex(i)
@@ -83,13 +95,36 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		var err error
 		if isWriteMode {
 			// in write mode, there are as many results as we have destinations
-			// therefore, result handlling is needs to be done once per writer.
+			// therefore, result handlling is done once per writer.
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
-			for i, wctrl := range wctrls {
+			nChannelsCreated := 0
+			rid := 0
+			for _, wctrl := range wctrls {
+				// per device, we can handle X streams in parallel, while having to stream to NT trees.
+				// We have one lazywriter per stream S<NS-1, whereas the last stream will be a MultiWriter with
+				// NT-(NS-1) sequential streams.
+				// If NS is 3 and NT is 6, X0 and X1 will have one destination each, and X2 has 4 done sequentially.
+				ns := wctrl.ClientStreams()
+
+				// This method assures our WriterChannels are created in order, so they are not interleaved
+				// with channels currently created by another go-routine. It's important, as we
+				// might deadlock otherwise.
+				writers := writersPerCtrl[rid]
+				wctrl.Ctrl.NewChannelWriter(rctrl.Trees, writers)
+				rid += 1
+
+				// Create highly parallel writers
+				for x := 0; x < ns-1; x++ {
+					nChannelsCreated += 1
+				}
+
 				// get destination path
 				destPath := filepath.Join(wctrl.Tree, f.RelaPath)
 				cw := wctrl.Ctrl.NewChannelWriter(&utility.LazyFileWriteCloser{Path: destPath})
 				pmw.SetWriterAtIndex(i, cw)
+			}
+			if nChannelsCreated != numParallelWriters {
+				panic("Mismatched writers")
 			}
 		}
 
