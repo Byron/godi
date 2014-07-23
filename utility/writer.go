@@ -7,35 +7,6 @@ import (
 	"sync"
 )
 
-// Copied from io, but allows us to deal with the Writers array ourselves
-type MultiWriter struct {
-	Writers []io.Writer
-}
-
-func (t *MultiWriter) Write(p []byte) (n int, err error) {
-	for _, w := range t.Writers {
-		n, err = w.Write(p)
-		if err != nil {
-			return
-		}
-		if n != len(p) {
-			err = io.ErrShortWrite
-			return
-		}
-	}
-	return len(p), nil
-}
-
-// Close all writers if they support the closer interface, return the last seen error
-func (t *MultiWriter) Close() (err error) {
-	for _, w := range t.Writers {
-		if wc, ok := w.(io.Closer); ok {
-			err = wc.Close()
-		}
-	}
-	return
-}
-
 // Similar to MultiWriter, but assumes writes never fail, and provides the same buffer
 // to all writers in parallel. However, it will return only when all writes are finished
 type uncheckedParallelMultiWriter struct {
@@ -83,6 +54,11 @@ func NewParallelMultiWriter(writers []io.Writer) *ParallelMultiWriter {
 func (p *ParallelMultiWriter) SetWriterAtIndex(i int, w io.Writer) {
 	p.writers[i] = w
 	p.results[i] = nil
+}
+
+// Return  our slice of writers. It's length must not be changed, but you may alter its contents
+func (p *ParallelMultiWriter) Writers(i int, w io.Writer) []io.Writer {
+	return p.writers
 }
 
 // Return the writer at the given index, and the first error it might have caused when writing
@@ -202,8 +178,6 @@ type WriteChannelController struct {
 	// Keeps all write requests, which contain all information we could possibly want to write something.
 	// As the channelWriter is keeping all information, we serves as request right away
 	c chan *channelWriter
-
-	l sync.Mutex
 }
 
 // A utility structure to associate a tree with a writer.
@@ -216,17 +190,13 @@ type RootedWriteController struct {
 	Ctrl WriteChannelController
 }
 
-func (r *RootedWriteController) ClientStreams() int {
-	if r.Ctrl.Streams() > len(r.Trees) {
-		return len(r.Trees)
-	}
-	return r.Ctrl.Streams()
-}
 
-// Create a new controller which deals with writing all incoming requests with nprocs go-routines
-func NewWriteChannelController(nprocs int) WriteChannelController {
+// Create a new controller which deals with writing all incoming requests with nprocs go-routines.
+// Use the channel capacity to assure less blocking will occur. A good value is depending heavily on your 
+// algorithm's patterns. Should at least be nprocs, or larger
+func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	ctrl := WriteChannelController{
-		make(chan *channelWriter, nprocs),
+		make(chan *channelWriter, channelCap),
 	}
 
 	for i := 0; i < nprocs; i++ {
@@ -245,9 +215,6 @@ func NewWriteChannelController(nprocs int) WriteChannelController {
 // writers must be pre-filled with writers to use in a channel writer, the same slot will be 
 // re-used to carry the ChannelWriter. It's like c.w = w[x]; w[x] = c
 func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
-	w.l.Lock()
-	defer w.l.Unlock()
-
 	// create one writer per
 	for i, wr := range writers {
 		cw := channelWriter {
@@ -264,13 +231,11 @@ func (w *WriteChannelController Streams() int {
 	return cap(w.c)
 }
 
-// Returns the amount of total parallel writes the given object can do.
-// NOTE: We normalize the amount of parallel streams per client to the amount of roots per device,
-// therefore a controller with two streams an done root will only have one stream, not two.
+// Returns the amount of Trees/Destinations we can write to in total
 // TODO(st): objectify
-func WriteChannelDeviceMapStreams(wm map[uint64]RootedWriteController) (n int) {
+func WriteChannelDeviceMapTrees(wm map[uint64]RootedWriteController) (n int) {
 	for _, rctrl := range wm {
-		n += rctrl.ClientStreams()
+		n += len(rctrl.Trees)
 	}
 	return
 }

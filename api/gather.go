@@ -30,17 +30,15 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	sha1gen := sha1.New()
 	md5gen := md5.New()
 	const nHashes = 2
-	isWriteMode := len(wctrls) > 0
-	numParallelWriters := utility.WriteChannelDeviceMapStreams(wctrls)
-	// Pre-allocated memory to keep writer allocations
-	var writersPerCtrl [][]io.Writer
+	isWriting := len(wctrls) > 0
+	numDestinations := utility.WriteChannelDeviceMapTrees(wctrls)
 
 	var multiWriter io.Writer
 
 	// Build the multi-writer which will dispatch all writes to a write controller
-	if isWriteMode {
+	if isWriting {
 		// We have one controller per device, each as a number of streams
-		writers := make([]io.Writer, numParallelWriters+nHashes)
+		writers := make([]io.Writer, numDestinations+nHashes)
 
 		// Writer with full checking enabled - it will never show anything for the hashes, but might
 		// report errrs for the real writers
@@ -48,60 +46,26 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		writers[len(writers)-1] = sha1gen
 		writers[len(writers)-2] = md5gen
 		multiWriter = utility.NewParallelMultiWriter(writers)
-
-		// pre-allocated writers structure
-		writersPerCtrl = make([][]io.Writer, len(wctrls))
-		for rid, wctrl := range wctrls {
-			writersPerCtrl[rid] = make([]io.Writer, len(wctrl.Trees))
-		}
 	} else {
 		multiWriter = utility.NewUncheckedParallelMultiWriter(sha1gen, md5gen)
 	}
 
 	sendResults := func(f *FileInfo, err error) {
-		if !isWriteMode {
+		if !isWriting {
 			// We have to take care of sending the read-result
 			results <- makeResult(f, nil, err)
 		} else {
-			// Now we are unpacking the writer data structure to pull out it's results.
-			// Each parallel writer has it's own result, but MultiWriters have serial/stacked
-			// LazyWriters, where the first error prevents any of the following Lazy's to be called.
-			// Therefore, the first error of serial lazy's will be duplicate to all following lazys.
-			// This algorithm is blunt as it does extra work (we konw the data structure after all), but
-			// it is safe as well as it makes no assumptions.
+			// Each parallel writer has it's own result, we just send it off
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
-			for i := 0; i < numParallelWriters; i++ {
-				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
+			for i := 0; i < numDestinations; i++ {
 				w, e := pmw.WriterAtIndex(i)
-				// We always have a ChannelWriter here, which supports this interface
 				wc := w.(utility.WriteCloser)
 				wc.Close()
-
-				// Now we have a Lazy, or a MutliWriter, in that order
-				switch aw := wc.Writer().(type) {
-				case *utility.LazyFileWriteCloser:
-					{
-						wfi := *f
-						wfi.Path = aw.Path
-						// it doesn't matter here if there actually is an error, aggregator will handle it
-						results <- makeResult(&wfi, f, e)
-					}
-				case *utility.MultiWriter:
-					{
-						for _, w := range aw.Writers {
-							// one copy per writer please
-							wfi := *f
-							// This must be a multi-writer
-							wfi.Path = w.(*utility.LazyFileWriteCloser).Path
-							// Well, we can't tell anymore if this error truly originated here ...
-							// BUG(st) We don't hold what we promise, see l66 comment for details.
-							results <- makeResult(&wfi, f, e)
-						}
-					}
-				default:
-					panic(fmt.Sprintf("Unexpected writer type: %T", aw))
-				} // end type switch
-
+				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
+				wfi := *f
+				wfi.Path = aw := wc.Writer().(*utility.LazyFileWriteCloser).Path
+				// it doesn't matter here if there actually is an error, aggregator will handle it
+				results <- makeResult(&wfi, f, e)
 			} // for each write controller to write to
 		} // handle write mode
 	} // sendResults
@@ -118,68 +82,29 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 
 		// In hash-only mode, there is only one result
 		var err error
-		if isWriteMode {
+		if isWriting {
 			// in write mode, there are as many results as we have destinations
 			// therefore, result handlling is done once per writer.
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
+
 			// Current writer id, absolute to this write operation
 			awid := 0
 			for rid, wctrl := range wctrls {
-				// per device, we can handle X streams in parallel, while having to stream to NT trees.
-				// We have one lazywriter per stream S<NS-1, whereas the last stream will be a MultiWriter with
-				// NT-(NS-1) sequential streams.
-				// If NS is 3 and NT is 6, X0 and X1 will have one destination each, and X2 has 4 done sequentially.
-				ns := wctrl.ClientStreams()
-				if ns > len(wctrl.Trees) {
-					panic("This can't work if there are more Channels than Trees, wctrl type has a bug")
-				}
-
-				// Amount of parallel writers to reserve
-				// If the number matches the amount of trees though, there is no special handling
-				reserve := 1
-				if ns == len(wctrl.Trees) {
-					reserve = 0
-				}
-
-				// This method assures our WriterChannels are created in order, so they are not interleaved
-				// with channels currently created by another go-routine. It's important, as we
-				// might deadlock otherwise.
-				// The writers have to be pre-filled with the actual writers,
-				writers := writersPerCtrl[rid]
-
-				// Create lazi's for highly parallel operation
-				for x := 0; x < ns-reserve; x++ {
-					destPath := filepath.Join(wctrl.Trees[x], f.RelaPath)
-					writers[awid] = &utility.LazyFileWriteCloser{Path: destPath}
-
+				// We just create one ChannelWriter per destination, and let the writers
+				// deal with the parallelization and blocking
+				for x := 0; x < len(wctrl.Trees); x++ {
+					destPath := filepath.Join(wctrl.Trees[awid], f.RelaPath)
+					pmw.SetWriterAtIndex(awid, &utility.LazyFileWriteCloser{Path: destPath})
 					awid += 1
-				}
-
-				// Now let's do the remaining Trees, but we put them all into one writer
-				if reserve != 0 {
-					remainingTrees := len(wctrl.Trees) - (ns - reserve)
-					mw := utility.MultiWriter{Writers: make([]io.Writer, remainingTrees)}
-					// This loop pepares the sequential wrtiers, writing one after another
-					for x := 0; x < remainingTrees; x++ {
-						destPath := filepath.Join(wctrl.Trees[ns-reserve+x], f.RelaPath)
-						mw.Writers[x] = &utility.LazyFileWriteCloser{Path: destPath}
-					}
-					//
-					writers[awid] = &mw
-					awid += 1
-				}
-
-				// Finally, push all the writers into our parallel pipeline
-				wctrl.Ctrl.NewChannelWriters(writers)
-				// writers have been replaced by channel writers
-				for cid, cw := range writers {
-					pmw.SetWriterAtIndex(cid, cw)
 				}
 			} // for each device's write controller
 
-			if awid != numParallelWriters {
+			if awid != numDestinations {
 				panic("Mismatched writers")
 			}
+
+			// Finally, push all the writers into our parallel pipeline
+			wctrl.Ctrl.NewChannelWriters(pmw.Writers())
 		} // handle write mode preparations
 
 		// let the other end open the file and close it as well
