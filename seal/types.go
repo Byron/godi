@@ -22,6 +22,9 @@ type SealCommand struct {
 	// The type of seal operation we are supposed to perform
 	mode string
 
+	// If set, we are supposed to run in verify mode
+	verify bool
+
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
 	pWriters []utility.RootedWriteController

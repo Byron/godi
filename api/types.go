@@ -179,6 +179,17 @@ func StartEngine(runner Runner,
 	}()
 	accumResult := runner.Aggregate(results)
 
+	mkErrPicker := func(handler func(r Result)) func(r Result) {
+		return func(r Result) {
+			if r.Error() != nil {
+				err = r.Error()
+			}
+			handler(r)
+		}
+	}
+	generateHandler = mkErrPicker(generateHandler)
+	aggregateHandler = mkErrPicker(aggregateHandler)
+
 	// Let's not hot-loop over anything, instead just process asynchronously
 	rwg := sync.WaitGroup{}
 	rwg.Add(1)

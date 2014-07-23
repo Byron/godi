@@ -11,6 +11,7 @@ import (
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/verify"
 
 	gcli "github.com/codegangsta/cli"
 )
@@ -38,8 +39,8 @@ func SubCommands() []gcli.Command {
 			Name:      modeCopy,
 			ShortName: "",
 			Usage:     "Generate a seal for one ore more directories and copy their contents to a destination directory",
-			Action:    func(c *gcli.Context) { cli.RunAction(&cmdcopy, c) },
-			Before:    func(c *gcli.Context) error { return cli.CheckCommonArgs(&cmdcopy, c) },
+			Action:    func(c *gcli.Context) { startSealedCopy(&cmdcopy, c) },
+			Before:    func(c *gcli.Context) error { return checkSealedCopy(&cmdcopy, c) },
 			Flags: []gcli.Flag{
 				gcli.BoolFlag{verifyAfterCopy, "Run `godi verify` on all produced seals when copy is finished"},
 			},
@@ -61,31 +62,51 @@ func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Re
 	}
 }
 
-// TODO(st) implement verify properly !
-// func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
+func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
+	cmd.verify = c.Bool(verifyAfterCopy)
+	return cli.CheckCommonArgs(cmd, c)
+}
 
-// 	// Yes, currently the post-verification is only implemented in the CLI ...
-// 	// Testing needs to do similar things to set it up ...
-// 	if c.Bool(verifyAfterCopy) {
-// 		indices := make([]string)
-// 		aggHandler := IndexTrackingResultHandlerAdapter(&indices, cli.LogHandler)
-// 		// pass handler !
-// 		err := cli.RunAction(cmd, c, aggHandler)
+func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 
-// 		// have to run it ourselves, and track indices
+	// Yes, currently the post-verification is only implemented in the CLI ...
+	// Testing needs to do similar things to set it up ...
+	if cmd.verify {
+		// Setup a aggregation result handler which tracks produced indices
+		var indices []string
+		aggHandler := IndexTrackingResultHandlerAdapter(&indices, cli.LogHandler)
 
-// 		// For each successful index, perform a verification
-// 		nReaders := 0
-// 		for _, rctrl := range cmd.RootedReaders {
-// 			nReaders = rctrl.Streams()
-// 			break
-// 		}
+		// and run ourselves
+		err := godi.StartEngine(cmd, cli.LogHandler, aggHandler)
 
-// 	} else {
-// 		// copy without verify
-// 		cli.RunAction(cmd, c, nil)
-// 	}
-// }
+		if err == nil && len(indices) == 0 {
+			panic("Unexpectedly I didn't see a single seal index without error")
+		} else if len(indices) > 0 {
+			// no matter whether we have an error, try to verify what's there, but only if the error
+			// wasn't generated from a cancel action
+			select {
+			case <-cmd.Done:
+				// this does nothing, most importantly, it doesn't run verify
+			default:
+				{
+					// prepare and run a verify command
+					verifcmd, err := verify.NewCommand(indices, c.GlobalInt(cli.NumStreamsPerDeviceFlagName))
+					if err == nil {
+						err = godi.StartEngine(&verifcmd, cli.LogHandler, cli.LogHandler)
+					}
+				}
+			}
+		}
+
+		// Finally, exit with appropriate error code
+		if err != nil {
+			os.Exit(1)
+		}
+	} else {
+		// copy without verify
+		cli.RunAction(cmd, c)
+	}
+}
 
 // Parse all valid source items from the given list.
 // May either be files or directories. The returned list may be shorter, as contained paths are
