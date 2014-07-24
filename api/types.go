@@ -31,17 +31,6 @@ func (f *FileInfo) Root() string {
 	return f.Path[:len(f.Path)-len(f.RelaPath)-1]
 }
 
-// HasError returns True if we the dataset is incomplete (and we didn't compute any Hash)
-func (f *FileInfo) HasError() bool {
-	return len(f.Sha1) == 0 && len(f.MD5) == 0
-}
-
-// MarkError will assure HasError() is True
-func (f *FileInfo) MarkError() {
-	f.Sha1 = nil
-	f.MD5 = nil
-}
-
 type Priority uint8
 
 const (

@@ -6,6 +6,14 @@ import (
 	"github.com/Byron/godi/api"
 )
 
+type SerializableFileInfo struct {
+	godi.FileInfo
+
+	// The error associated with the file, usually read errors
+	// This can be expected to be unset if the structure should be written
+	Err error
+}
+
 // Represents a codec's standard capabilities.
 // A codec is a specialized implementation able to read and write indices of file hash information
 // NOTE: Even though it would be more idiomatic to have two interfaces for read and write respectively,
@@ -13,7 +21,7 @@ import (
 type Codec interface {
 	// Write the given FileInfo structure to the given writer.
 	// The codec must protect the written data against modification, usually by hashing the contained information
-	Serialize(paths map[string]godi.FileInfo, writer io.Writer) (err error)
+	Serialize(paths []SerializableFileInfo, writer io.Writer) (err error)
 
 	// Read a FileInfo slice from the given reader. The fileinfo Paths must be relative to the index file
 	// An error must be returned if the data read could not be verified.
