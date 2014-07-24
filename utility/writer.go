@@ -98,7 +98,7 @@ type channelWriter struct {
 	// error of previous write operation
 	e error
 
-	// Sends ourselves as write-request
+	// Triggers the reader to wait for us to have set the buffer to write
 	writeRequests chan bool
 
 	// will let us know when reomte is done
@@ -226,13 +226,14 @@ func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 // re-used to carry the ChannelWriter. It's like c.w = w[x]; w[x] = c
 func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
 	// create one writer per
-	for _, wr := range writers {
+	for i, wr := range writers {
 		cw := channelWriter{
 			writer:        wr,
 			writeRequests: make(chan bool),
 		}
 		// NOTE: This can block if there are more then numStreams writes in progress
 		w.c <- &cw
+		writers[i] = &cw
 	}
 }
 

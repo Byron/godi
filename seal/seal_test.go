@@ -93,6 +93,7 @@ func TestSeal(t *testing.T) {
 
 	// Finally, perform the operation
 	var indices []string
+	println("STARTING COPY")
 	if err := godi.StartEngine(&cmd, resHandler, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler)); err != nil {
 		t.Fatal(err)
 	}
@@ -106,6 +107,7 @@ func TestSeal(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	println("STARTING VERIFY")
 	if err := godi.StartEngine(&verifycmd, resHandler, resHandler); err != nil {
 		t.Fatal("Coulnd't verify files that were just written")
 	}
