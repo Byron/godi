@@ -117,14 +117,26 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 				// Remove all previously written files in this tree if we are in write mode
 				// TODO(st): use parallel per-ctrl writer to do that
 				if len(s.rootedWriters) > 0 {
+					accumResult <- &godi.BasicResult{
+						Msg:  fmt.Sprintf("Rolling back changes at copy destination '%s'", tree),
+						Prio: godi.Info,
+					}
 					for _, sfi := range pathInfos {
-						err := os.Remove(sfi.Path)
-
+						// We may only remove it if the error wasn't a 'Existed' one, or we kill a file
+						// that wasn't created in this run.
 						var msg string
 						prio := godi.Error
-						if err == nil {
-							msg = fmt.Sprintf("Removed '%s'", sfi.Path)
-							prio = godi.Error
+						err := sfi.Err
+						if err != nil && os.IsExist(err) {
+							msg = fmt.Sprintf("Won't remove existing file: '%s'", sfi.Path)
+							prio = godi.Info
+							err = nil
+						} else {
+							err = os.Remove(sfi.Path)
+							if err == nil {
+								msg = fmt.Sprintf("Removed '%s'", sfi.Path)
+								prio = godi.Info
+							}
 						}
 
 						accumResult <- &godi.BasicResult{
@@ -136,6 +148,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 					}
 				} // handle errors in write mode
 			} else if !st.WasCancelled {
+				// Only done if there are no errors below the current tree
 				// INDEX HANDLING
 				//////////////////
 				// Serialize all fileinfo structures
