@@ -1,6 +1,7 @@
 package utility
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -88,6 +89,8 @@ func (p *ParallelMultiWriter) Write(b []byte) (n int, err error) {
 // Used in conjunction with a WriteChannelController, serving as front-end communicating with
 // the actual writer that resides in a separate go-routine
 type channelWriter struct {
+	ctrl *WriteChannelController
+
 	// A writer to write to. Must be set if path is nil
 	writer io.Writer
 
@@ -97,9 +100,6 @@ type channelWriter struct {
 	n int
 	// error of previous write operation
 	e error
-
-	// Triggers the reader to wait for us to have set the buffer to write
-	writeRequests chan bool
 
 	// will let us know when reomte is done
 	// NOTE: Would a channel be faster ?
@@ -122,7 +122,7 @@ func (c *channelWriter) Writer() io.Writer {
 func (c *channelWriter) Write(b []byte) (n int, err error) {
 	c.b = b
 	c.wg.Add(1)
-	c.writeRequests <- true
+	c.ctrl.c <- c
 	c.wg.Wait()
 
 	// ... allowing us to return the actual result safely now
@@ -133,7 +133,6 @@ func (c *channelWriter) Close() error {
 	if w, ok := c.writer.(io.Closer); ok {
 		return w.Close()
 	}
-	close(c.writeRequests)
 	return nil
 }
 
@@ -197,22 +196,16 @@ func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	ctrl := WriteChannelController{
 		make(chan *channelWriter, channelCap),
 	}
+	if nprocs < 1 {
+		panic("Need at least one go routine to process work")
+	}
 
 	for i := 0; i < nprocs; i++ {
 		go func() {
 			for cw := range ctrl.c {
-				// read all bytes as long as writer is not closed
-				for _ = range cw.writeRequests {
-					cw.n, cw.e = cw.writer.Write(cw.b)
-					// protocol mandates the sender has to listen for our reply, channel must not be closed here ... .
-					cw.wg.Done()
-				} // while there are write requests
-
-				// signal the writer we are done, allowing it to cleanup
-				if wc, ok := cw.writer.(io.WriteCloser); ok {
-					// as ready channel is closed, we can't return any error value here ...
-					wc.Close()
-				}
+				cw.n, cw.e = cw.writer.Write(cw.b)
+				// protocol mandates the sender has to listen for our reply, channel must not be closed here ... .
+				cw.wg.Done()
 			} // for each channel writer
 		}()
 	} // for each routine to create
@@ -225,14 +218,15 @@ func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 // writers must be pre-filled with writers to use in a channel writer, the same slot will be
 // re-used to carry the ChannelWriter. It's like c.w = w[x]; w[x] = c
 func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
+	if w.c == nil {
+		panic(fmt.Sprintf("Attempt to use an uninitialized WriteChannelController: %v", w))
+	}
 	// create one writer per
 	for i, wr := range writers {
 		cw := channelWriter{
-			writer:        wr,
-			writeRequests: make(chan bool),
+			ctrl:   w,
+			writer: wr,
 		}
-		// NOTE: This can block if there are more then numStreams writes in progress
-		w.c <- &cw
 		writers[i] = &cw
 	}
 }
