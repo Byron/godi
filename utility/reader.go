@@ -191,6 +191,7 @@ func NewReadChannelDeviceMap(nprocs int, trees []string, done <-chan bool) map[s
 
 // NOTE: Can this be a custom type, with just a function ? I think so !
 // Return the number of streams being handled in parallel
+// TODO(st) objectify
 func ReadChannelDeviceMapStreams(rm map[string]*ReadChannelController) int {
 	if len(rm) == 0 {
 		panic("Input map was empty")

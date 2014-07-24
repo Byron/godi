@@ -1,6 +1,7 @@
 package utility
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -56,6 +57,11 @@ func (p *ParallelMultiWriter) SetWriterAtIndex(i int, w io.Writer) {
 	p.results[i] = nil
 }
 
+// Return  our slice of writers. It's length must not be changed, but you may alter its contents
+func (p *ParallelMultiWriter) Writers() []io.Writer {
+	return p.writers
+}
+
 // Return the writer at the given index, and the first error it might have caused when writing
 // to it. We perform no bounds checking
 func (p *ParallelMultiWriter) WriterAtIndex(i int) (io.Writer, error) {
@@ -83,22 +89,20 @@ func (p *ParallelMultiWriter) Write(b []byte) (n int, err error) {
 // Used in conjunction with a WriteChannelController, serving as front-end communicating with
 // the actual writer that resides in a separate go-routine
 type channelWriter struct {
-	// The controller owning us
 	ctrl *WriteChannelController
 
 	// A writer to write to. Must be set if path is nil
 	writer io.Writer
 
-	// Our shared write-information, similar to the buffer in the channelReader implementation
-	// bytes to write
+	// bytes to write - it's just a temporary
 	b []byte
 	// amount of bytes written
 	n int
 	// error of previous write operation
 	e error
 
-	// Helps us to wait until the destination writer is done with our bytes
-	// NOTE: Would it be faster to use a channel ?
+	// will let us know when reomte is done
+	// NOTE: Would a channel be faster ?
 	wg sync.WaitGroup
 }
 
@@ -173,44 +177,70 @@ type WriteChannelController struct {
 	// Keeps all write requests, which contain all information we could possibly want to write something.
 	// As the channelWriter is keeping all information, we serves as request right away
 	c chan *channelWriter
-
-	// NOTE: at some point we could hold a pool of large buffers for in-memory write caching
-	// However, large buffers could be beneficial for the hashing already as we do less small hash calls
 }
 
 // A utility structure to associate a tree with a writer.
 // That way, writers can be more easily associated with a device which hosts Tree
 type RootedWriteController struct {
-	// The tree the controller should write to
-	Tree string
+	// The trees the controller should write to
+	Trees []string
 
 	// A possibly shared controller which may write to the given tree
-	Ctrl *WriteChannelController
+	Ctrl WriteChannelController
 }
 
-// Create a new controller which deals with writing all incoming requests with nprocs go-routines
-func NewWriteChannelController(nprocs int) WriteChannelController {
+// Create a new controller which deals with writing all incoming requests with nprocs go-routines.
+// Use the channel capacity to assure less blocking will occur. A good value is depending heavily on your
+// algorithm's patterns. Should at least be nprocs, or larger.
+func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	ctrl := WriteChannelController{
-		make(chan *channelWriter, nprocs),
+		make(chan *channelWriter, channelCap),
+	}
+	if nprocs < 1 {
+		panic("Need at least one go routine to process work")
 	}
 
 	for i := 0; i < nprocs; i++ {
 		go func() {
 			for cw := range ctrl.c {
 				cw.n, cw.e = cw.writer.Write(cw.b)
+				// protocol mandates the sender has to listen for our reply, channel must not be closed here ... .
 				cw.wg.Done()
 			} // for each channel writer
 		}()
 	} // for each routine to create
+
 	// We will only really need this when we are copying data anyway ... .
 	return ctrl
 }
 
-// Return a new channel writer, which will write asynchronously to the given writer
-func (w *WriteChannelController) NewChannelWriter(writer io.Writer) io.Writer {
-	cw := channelWriter{
-		ctrl:   w,
-		writer: writer,
+// Return as many new ChannelWriters as fit into the given slice of outWriters
+// writers must be pre-filled with writers to use in a channel writer, the same slot will be
+// re-used to carry the ChannelWriter. It's like c.w = w[x]; w[x] = c
+func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
+	if w.c == nil {
+		panic(fmt.Sprintf("Attempt to use an uninitialized WriteChannelController: %v", w))
 	}
-	return &cw
+	// create one writer per
+	for i, wr := range writers {
+		cw := channelWriter{
+			ctrl:   w,
+			writer: wr,
+		}
+		writers[i] = &cw
+	}
+}
+
+// Return amount of streams we handle in parallel
+func (w *WriteChannelController) Streams() int {
+	return cap(w.c)
+}
+
+// Returns the amount of Trees/Destinations we can write to in total
+// TODO(st): objectify
+func WriteChannelDeviceMapTrees(wm []RootedWriteController) (n int) {
+	for _, rctrl := range wm {
+		n += len(rctrl.Trees)
+	}
+	return
 }

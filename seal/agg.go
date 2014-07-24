@@ -70,8 +70,11 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 		treePathmap[tree] = make(map[string]*godi.FileInfo)
 	}
 
-	for _, ctrl := range s.pWriters {
-		treePathmap[ctrl.Tree] = make(map[string]*godi.FileInfo)
+	// Fill the root-map with the write-roots, if available
+	for _, rctrl := range s.rootedWriters {
+		for _, tree := range rctrl.Trees {
+			treePathmap[tree] = make(map[string]*godi.FileInfo)
+		}
 	}
 
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {

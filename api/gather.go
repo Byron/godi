@@ -30,13 +30,15 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	sha1gen := sha1.New()
 	md5gen := md5.New()
 	const nHashes = 2
-	isWriteMode := len(wctrls) > 0
+	isWriting := len(wctrls) > 0
+	numDestinations := utility.WriteChannelDeviceMapTrees(wctrls)
 
 	var multiWriter io.Writer
 
 	// Build the multi-writer which will dispatch all writes to a write controller
-	if isWriteMode {
-		writers := make([]io.Writer, len(wctrls)+nHashes)
+	if isWriting {
+		// We have one controller per device, each as a number of streams
+		writers := make([]io.Writer, numDestinations+nHashes)
 
 		// Writer with full checking enabled - it will never show anything for the hashes, but might
 		// report errrs for the real writers
@@ -49,20 +51,23 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	}
 
 	sendResults := func(f *FileInfo, err error) {
-		if !isWriteMode {
+		if !isWriting {
 			// We have to take care of sending the read-result
 			results <- makeResult(f, nil, err)
 		} else {
-			// check each writer for errors and return produce a result, one per  non-hash writer
+			// Each parallel writer has it's own result, we just send it off
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
-			for i := 0; i < len(wctrls); i++ {
-				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
-				var wfi FileInfo = *f
+			for i := 0; i < numDestinations; i++ {
 				w, e := pmw.WriterAtIndex(i)
+				// If the reader had an error, no write may succeed. We just don't overwrite write errors
+				if e == nil && err != nil {
+					e = err
+				}
 				wc := w.(utility.WriteCloser)
 				wc.Close()
+				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
+				wfi := *f
 				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path
-
 				// it doesn't matter here if there actually is an error, aggregator will handle it
 				results <- makeResult(&wfi, f, e)
 			} // for each write controller to write to
@@ -81,17 +86,32 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 
 		// In hash-only mode, there is only one result
 		var err error
-		if isWriteMode {
+		if isWriting {
 			// in write mode, there are as many results as we have destinations
-			// therefore, result handlling is needs to be done once per writer.
+			// therefore, result handlling is done once per writer.
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
-			for i, wctrl := range wctrls {
-				// get destination path
-				destPath := filepath.Join(wctrl.Tree, f.RelaPath)
-				cw := wctrl.Ctrl.NewChannelWriter(&utility.LazyFileWriteCloser{Path: destPath})
-				pmw.SetWriterAtIndex(i, cw)
+
+			// Current writer id, absolute to this write operation
+			awid := 0
+			for _, wctrl := range wctrls {
+				// We just create one ChannelWriter per destination, and let the writers
+				// deal with the parallelization and blocking
+				fawid := awid // the first index
+				for x := 0; x < len(wctrl.Trees); x++ {
+					destPath := filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath)
+					pmw.SetWriterAtIndex(awid, &utility.LazyFileWriteCloser{Path: destPath})
+					awid += 1
+				}
+
+				// Finally, push all the writers into our parallel pipeline
+				wctrl.Ctrl.NewChannelWriters(pmw.Writers()[fawid:awid])
+			} // for each device's write controller
+
+			if awid != numDestinations {
+				panic("Mismatched writers")
 			}
-		}
+
+		} // handle write mode preparations
 
 		// let the other end open the file and close it as well
 		reader := rctrl.NewChannelReaderFromPath(f.Path)
