@@ -14,6 +14,13 @@ type SerializableFileInfo struct {
 	Err error
 }
 
+// Helper to sort by longest path, descending
+type ByLongestPathDescending []SerializableFileInfo
+
+func (a ByLongestPathDescending) Len() int           { return len(a) }
+func (a ByLongestPathDescending) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByLongestPathDescending) Less(i, j int) bool { return len(a[i].Path) > len(a[j].Path) }
+
 // Represents a codec's standard capabilities.
 // A codec is a specialized implementation able to read and write indices of file hash information
 // NOTE: Even though it would be more idiomatic to have two interfaces for read and write respectively,

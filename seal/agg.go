@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/Byron/godi/api"
@@ -121,6 +122,10 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 						Msg:  fmt.Sprintf("Rolling back changes at copy destination '%s'", tree),
 						Prio: godi.Info,
 					}
+
+					// For path deletion to work correctly, we need it sorted
+					sort.Sort(codec.ByLongestPathDescending(pathInfos))
+
 					for _, sfi := range pathInfos {
 						// We may only remove it if the error wasn't a 'Existed' one, or we kill a file
 						// that wasn't created in this run.
@@ -136,6 +141,14 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 							if err == nil {
 								msg = fmt.Sprintf("Removed '%s'", sfi.Path)
 								prio = godi.Info
+
+								// try to remove the directory - will fail if non-empty.
+								// only do that if we wouldn't remove the tree.
+								// Also crawl upwards
+								var derr error
+								for dir := filepath.Dir(sfi.Path); dir != tree && derr == nil; dir = filepath.Dir(dir) {
+									derr = os.Remove(dir)
+								}
 							}
 						}
 
