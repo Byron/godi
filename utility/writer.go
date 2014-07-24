@@ -1,7 +1,6 @@
 package utility
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -57,11 +56,6 @@ func (p *ParallelMultiWriter) SetWriterAtIndex(i int, w io.Writer) {
 	p.results[i] = nil
 }
 
-// Return  our slice of writers. It's length must not be changed, but you may alter its contents
-func (p *ParallelMultiWriter) Writers() []io.Writer {
-	return p.writers
-}
-
 // Return the writer at the given index, and the first error it might have caused when writing
 // to it. We perform no bounds checking
 func (p *ParallelMultiWriter) WriterAtIndex(i int) (io.Writer, error) {
@@ -88,7 +82,7 @@ func (p *ParallelMultiWriter) Write(b []byte) (n int, err error) {
 
 // Used in conjunction with a WriteChannelController, serving as front-end communicating with
 // the actual writer that resides in a separate go-routine
-type channelWriter struct {
+type ChannelWriter struct {
 	ctrl *WriteChannelController
 
 	// A writer to write to. Must be set if path is nil
@@ -114,12 +108,17 @@ type WriteCloser interface {
 	Writer() io.Writer
 }
 
-func (c *channelWriter) Writer() io.Writer {
+func (c *ChannelWriter) Writer() io.Writer {
 	return c.writer
 }
 
+// Set our writer to be the given one. Allows to reuse ChannelWriters
+func (c *ChannelWriter) SetWriter(w io.Writer) {
+	c.writer = w
+}
+
 // Send bytes down our channel and wait for the writer on the end to be done, retrieving the result.
-func (c *channelWriter) Write(b []byte) (n int, err error) {
+func (c *ChannelWriter) Write(b []byte) (n int, err error) {
 	c.b = b
 	c.wg.Add(1)
 	c.ctrl.c <- c
@@ -129,7 +128,7 @@ func (c *channelWriter) Write(b []byte) (n int, err error) {
 	return c.n, c.e
 }
 
-func (c *channelWriter) Close() error {
+func (c *ChannelWriter) Close() error {
 	if w, ok := c.writer.(io.Closer); ok {
 		return w.Close()
 	}
@@ -167,7 +166,9 @@ func (l *LazyFileWriteCloser) Write(b []byte) (n int, err error) {
 // beforehand
 func (l *LazyFileWriteCloser) Close() error {
 	if l.writer != nil {
-		return l.writer.Close()
+		err := l.writer.Close()
+		l.writer = nil
+		return err
 	}
 	return nil
 }
@@ -175,8 +176,8 @@ func (l *LazyFileWriteCloser) Close() error {
 // A utility to help control how parallel we try to write
 type WriteChannelController struct {
 	// Keeps all write requests, which contain all information we could possibly want to write something.
-	// As the channelWriter is keeping all information, we serves as request right away
-	c chan *channelWriter
+	// As the ChannelWriter is keeping all information, we serves as request right away
+	c chan *ChannelWriter
 }
 
 // A utility structure to associate a tree with a writer.
@@ -194,7 +195,7 @@ type RootedWriteController struct {
 // algorithm's patterns. Should at least be nprocs, or larger.
 func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	ctrl := WriteChannelController{
-		make(chan *channelWriter, channelCap),
+		make(chan *ChannelWriter, channelCap),
 	}
 	if nprocs < 1 {
 		panic("Need at least one go routine to process work")
@@ -214,20 +215,14 @@ func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	return ctrl
 }
 
-// Return as many new ChannelWriters as fit into the given slice of outWriters
-// writers must be pre-filled with writers to use in a channel writer, the same slot will be
-// re-used to carry the ChannelWriter. It's like c.w = w[x]; w[x] = c
-func (w *WriteChannelController) NewChannelWriters(writers []io.Writer) {
-	if w.c == nil {
-		panic(fmt.Sprintf("Attempt to use an uninitialized WriteChannelController: %v", w))
-	}
+// Initialize as many new ChannelWriters as fit into the given slice of writers
+// You will have to set it's writer before using it
+func (w *WriteChannelController) InitChannelWriters(out []ChannelWriter) {
 	// create one writer per
-	for i, wr := range writers {
-		cw := channelWriter{
-			ctrl:   w,
-			writer: wr,
+	for i := range out {
+		out[i] = ChannelWriter{
+			ctrl: w,
 		}
-		writers[i] = &cw
 	}
 }
 

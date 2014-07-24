@@ -34,6 +34,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	numDestinations := utility.WriteChannelDeviceMapTrees(wctrls)
 
 	var multiWriter io.Writer
+	var channelWriters []utility.ChannelWriter
 
 	// Build the multi-writer which will dispatch all writes to a write controller
 	if isWriting {
@@ -46,6 +47,21 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		writers[len(writers)-1] = sha1gen
 		writers[len(writers)-2] = md5gen
 		multiWriter = utility.NewParallelMultiWriter(writers)
+
+		// Keeps all Writers we are going to prepare per source file
+		channelWriters = make([]utility.ChannelWriter, numDestinations)
+
+		// Init them, per controller, and set them to be used by the multi-writer right away
+		// These never change, only their writer does
+		ofs := 0
+		for _, wctrl := range wctrls {
+			ofse := ofs + len(wctrl.Trees)
+			wctrl.Ctrl.InitChannelWriters(channelWriters[ofs:ofse])
+			for x := ofs; x < ofse; x++ {
+				multiWriter.(*utility.ParallelMultiWriter).SetWriterAtIndex(x, &channelWriters[x])
+			}
+			ofs = ofse
+		}
 	} else {
 		multiWriter = utility.NewUncheckedParallelMultiWriter(sha1gen, md5gen)
 	}
@@ -88,8 +104,8 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		var err error
 		if isWriting {
 			// in write mode, there are as many results as we have destinations
-			// therefore, result handlling is done once per writer.
-			pmw := multiWriter.(*utility.ParallelMultiWriter)
+			// All that's left to be done is to fill our ChannelWriters with new lazyFileWriters
+			// that write to the given paths
 
 			// Current writer id, absolute to this write operation
 			awid := 0
@@ -99,12 +115,9 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 				fawid := awid // the first index
 				for x := 0; x < len(wctrl.Trees); x++ {
 					destPath := filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath)
-					pmw.SetWriterAtIndex(awid, &utility.LazyFileWriteCloser{Path: destPath})
+					channelWriters[awid].SetWriter(&utility.LazyFileWriteCloser{Path: destPath})
 					awid += 1
 				}
-
-				// Finally, push all the writers into our parallel pipeline
-				wctrl.Ctrl.NewChannelWriters(pmw.Writers()[fawid:awid])
 			} // for each device's write controller
 
 			if awid != numDestinations {
