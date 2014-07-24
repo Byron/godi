@@ -75,6 +75,8 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		} else {
 			// Each parallel writer has it's own result, we just send it off
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
+			// Make sure we keep the source intact
+			forig := *f
 			for i := 0; i < numDestinations; i++ {
 				w, e := pmw.WriterAtIndex(i)
 				// If the reader had an error, no write may succeed. We just don't overwrite write errors
@@ -83,20 +85,17 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 				}
 				wc := w.(utility.WriteCloser)
 				wc.Close()
-				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
-				wfi := *f
-				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path()
+
+				// we may change the same instance, as it will be copied into the Result structure later on
+				f.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path()
 				// it doesn't matter here if there actually is an error, aggregator will handle it
-				results <- makeResult(&wfi, f, e)
+				results <- makeResult(f, &forig, e)
 			} // for each write controller to write to
 		} // handle write mode
 	} // sendResults
 
 	// NOTE: This loop must not return ! It must be finished !!
-	for fo := range files {
-		// Make a copy - we pass this on as pointer, therefore we need to assure it's not the same
-		// thing after all. Range writes the same memory block all over again.
-		var f FileInfo = fo
+	for f := range files {
 		rctrl, hasRCtrlForRoot := rctrls[f.Root()]
 		if !hasRCtrlForRoot {
 			panic(fmt.Sprintf("Couldn't find read controller for directory at '%s'", f.Root()))

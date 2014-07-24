@@ -23,8 +23,8 @@ type VerifyCommand struct {
 
 // Implements information about a verify operation
 type VerifyResult struct {
-	godi.BasicResult                // will contain the actual file information from the disk file
-	ifinfo           *godi.FileInfo // the file information we have seen in the index
+	godi.BasicResult               // will contain the actual file information from the disk file
+	ifinfo           godi.FileInfo // the file information we have seen in the index
 }
 
 // NewCommand returns an initialized verify command
@@ -88,14 +88,13 @@ func (s *VerifyCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
 
 func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup) {
 	makeResult := func(f, source *godi.FileInfo, err error) godi.Result {
-		fcpy := *f
 		res := VerifyResult{
 			BasicResult: godi.BasicResult{
-				Finfo: f,
+				Finfo: *f,
 				Prio:  godi.Progress,
 				Err:   err,
 			},
-			ifinfo: &fcpy,
+			ifinfo: *f,
 		}
 		return &res
 	}

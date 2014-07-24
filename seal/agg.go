@@ -31,7 +31,7 @@ func (s *SealCommand) IndexPath(tree string, extension string) string {
 // When called, we have seen no error in the given mapping of relativePaths to FileInfos
 // Returns error in case we failed to produce an index
 // It's up to the caller to remove existing files on error
-func (s *SealCommand) writeIndex(commonTree string, pathMap map[string]*godi.FileInfo) (string, error) {
+func (s *SealCommand) writeIndex(commonTree string, pathMap map[string]godi.FileInfo) (string, error) {
 	// Serialize all fileinfo structures
 	// NOTE: As the parallel writer will send results only when writing finished, we can just operate serially here ...
 	// For this there is also no need to optimize performance
@@ -61,16 +61,16 @@ func (s *SealCommand) writeIndex(commonTree string, pathMap map[string]*godi.Fil
 }
 
 func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
-	treePathmap := make(map[string]map[string]*godi.FileInfo)
+	treePathmap := make(map[string]map[string]godi.FileInfo)
 	// Presort all paths by their root
 	for _, tree := range s.Items {
-		treePathmap[tree] = make(map[string]*godi.FileInfo)
+		treePathmap[tree] = make(map[string]godi.FileInfo)
 	}
 
 	// Fill the root-map with the write-roots, if available
 	for _, rctrl := range s.rootedWriters {
 		for _, tree := range rctrl.Trees {
-			treePathmap[tree] = make(map[string]*godi.FileInfo)
+			treePathmap[tree] = make(map[string]godi.FileInfo)
 		}
 	}
 
@@ -165,7 +165,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 					accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}
 				} else {
 					accumResult <- &godi.BasicResult{
-						Finfo: &godi.FileInfo{Path: index, Size: -1},
+						Finfo: godi.FileInfo{Path: index, Size: -1},
 						Msg:   fmt.Sprintf("Wrote seal at '%s'", index),
 						Prio:  godi.Info,
 					}

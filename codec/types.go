@@ -13,7 +13,7 @@ import (
 type Codec interface {
 	// Write the given FileInfo structure to the given writer.
 	// The codec must protect the written data against modification, usually by hashing the contained information
-	Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err error)
+	Serialize(paths map[string]godi.FileInfo, writer io.Writer) (err error)
 
 	// Read a FileInfo slice from the given reader. The fileinfo Paths must be relative to the index file
 	// An error must be returned if the data read could not be verified.

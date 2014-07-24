@@ -56,7 +56,7 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 		}
 		res := SealResult{
 			BasicResult: godi.BasicResult{
-				Finfo: f,
+				Finfo: *f,
 				Prio:  godi.Progress,
 				Err:   err,
 			},

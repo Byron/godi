@@ -32,13 +32,19 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 			// read dir and, build file info, and recurse into subdirectories
 			f, err := os.Open(tree)
 			if err != nil {
-				results <- &godi.BasicResult{nil, "", err, godi.Error}
+				results <- &godi.BasicResult{
+					Err:  err,
+					Prio: godi.Error,
+				}
 				return false
 			}
 			dirInfos, err := f.Readdir(-1)
 			f.Close()
 			if err != nil {
-				results <- &godi.BasicResult{nil, "", err, godi.Error}
+				results <- &godi.BasicResult{
+					Err:  err,
+					Prio: godi.Error,
+				}
 				return false
 			}
 

@@ -66,7 +66,7 @@ type Result interface {
 // Implements information about any operation
 // It's the minimum we need to work
 type BasicResult struct {
-	Finfo *FileInfo
+	Finfo FileInfo
 	Msg   string
 	Err   error
 	Prio  Priority
@@ -84,7 +84,7 @@ func (s *BasicResult) Error() error {
 }
 
 func (s *BasicResult) FileInformation() *FileInfo {
-	return s.Finfo
+	return &s.Finfo
 }
 
 // A partial implementation of a runner, which can be shared between the various commands

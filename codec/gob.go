@@ -40,7 +40,7 @@ func hashInfo(sha1enc hash.Hash, relaPath string, finfo *godi.FileInfo) {
 	sha1enc.Write(finfo.MD5)
 }
 
-func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err error) {
+func (g *Gob) Serialize(paths map[string]godi.FileInfo, writer io.Writer) (err error) {
 	gzipWriter, _ := gzip.NewWriterLevel(writer, 9)
 	defer gzipWriter.Close()
 	encoder := gob.NewEncoder(gzipWriter)
@@ -57,7 +57,7 @@ func (g *Gob) Serialize(paths map[string]*godi.FileInfo, writer io.Writer) (err 
 
 	// NOTE: we re-encode to get rid of the map
 	for relaPath, finfo := range paths {
-		hashInfo(sha1enc, relaPath, finfo)
+		hashInfo(sha1enc, relaPath, &finfo)
 		if err = encoder.Encode(finfo); err != nil {
 			return
 		}
