@@ -60,7 +60,6 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 			ofse := ofs + len(wctrl.Trees)
 			wctrl.Ctrl.InitChannelWriters(channelWriters[ofs:ofse])
 			for x := ofs; x < ofse; x++ {
-				multiWriter.(*utility.ParallelMultiWriter).SetWriterAtIndex(x, &channelWriters[x])
 				channelWriters[x].SetWriter(&lazyWriters[x])
 			}
 			ofs = ofse
@@ -116,7 +115,11 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 				// We just create one ChannelWriter per destination, and let the writers
 				// deal with the parallelization and blocking
 				fawid := awid // the first index
+				pmw := multiWriter.(*utility.ParallelMultiWriter)
+
 				for x := 0; x < len(wctrl.Trees); x++ {
+					// reset previous errror by resetting the writer pointer
+					pmw.SetWriterAtIndex(awid, &channelWriters[awid])
 					lazyWriters[awid].SetPath(filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath))
 					awid += 1
 				}
