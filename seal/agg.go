@@ -99,6 +99,23 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 		accumResult chan<- godi.Result,
 		st *godi.AggregateFinalizerState) {
 
+		handleIndexAtTree := func(tree string, pathInfos []codec.SerializableFileInfo) error {
+			// Only done if there are no errors below the current tree
+			// Serialize all fileinfo structures
+			if index, err := s.writeIndex(tree, pathInfos); err != nil {
+				st.ErrCount += 1
+				accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}
+				return err
+			} else {
+				accumResult <- &godi.BasicResult{
+					Finfo: godi.FileInfo{Path: index, Size: -1},
+					Msg:   fmt.Sprintf("Wrote seal at '%s'", index),
+					Prio:  godi.Info,
+				}
+			} // handle index writing errors
+			return nil
+		}
+
 		// ROLLBACK HANDLING
 		/////////////////////
 		// Check each destination tree for errors. If there are some, and if we are in write mode,
@@ -108,109 +125,122 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 		// Pre-allocate a bunch of tree strings - it's at max the total amount of destinations, which might
 		// all be on one device
 		// We natually don't do anything in non-copy mode as we have no writers
-		ntreesWorstCase := utility.WriteChannelDeviceMapTrees(s.rootedWriters)
-		treesWithError := make([]string, ntreesWorstCase)
+		if len(s.rootedWriters) > 0 {
+			ntreesWorstCase := utility.WriteChannelDeviceMapTrees(s.rootedWriters)
+			treesWithError := make([]string, ntreesWorstCase)
 
-		nit := 0 // num invalid trees
-		var wg sync.WaitGroup
-		for _, wctrl := range s.rootedWriters {
-			init := nit // initial nit
+			nit := 0 // num invalid trees
+			var wg sync.WaitGroup
+			for _, wctrl := range s.rootedWriters {
+				init := nit // initial nit
 
-			for _, tree := range wctrl.Trees {
+				for _, tree := range wctrl.Trees {
+					foundError := false
+					pathInfos := treePathsmap[tree]
+					for _, sfi := range pathInfos {
+						if sfi.Err != nil {
+							foundError = true
+							treesWithError[nit] = tree
+							nit += 1
+							break
+						}
+					} // for each file-info below tree
+
+					// INDEX HANDLING
+					//////////////////
+					// Writing the index can still fail - if that happens, we have no seal which is similar
+					// to a failure - sealed-copy creates one or nothing.
+					// It must be bad luck if the disk is full now that the seal is written, but lets be precise !
+
+					// it's valid, so try to write the index. If that doesn't work, we will
+					// place it onto the invalid tree list right away
+					if !foundError && !st.WasCancelled {
+						// Only done if there are no errors below the current tree
+						// Serialize all fileinfo structures
+						if err := handleIndexAtTree(tree, pathInfos); err != nil {
+							treesWithError[nit] = tree
+							nit += 1
+						}
+					}
+				} // for each destination of write controller
+
+				// found some - shoot off go routine
+				if nit != init {
+					wg.Add(1)
+					go func(trees []string) {
+						for _, tree := range trees {
+							pathInfos := treePathsmap[tree]
+
+							// Remove all previously written files in this tree if we are in write mode
+							accumResult <- &godi.BasicResult{
+								Msg:  fmt.Sprintf("Rolling back changes at copy destination '%s'", tree),
+								Prio: godi.Info,
+							}
+
+							// For path deletion to work correctly, we need it sorted
+							sort.Sort(codec.ByLongestPathDescending(pathInfos))
+
+							for _, sfi := range pathInfos {
+								// We may only remove it if the error wasn't a 'Existed' one, or we kill a file
+								// that wasn't created in this run.
+								var msg string
+								prio := godi.Error
+								err := sfi.Err
+								if err != nil && os.IsExist(err) {
+									msg = fmt.Sprintf("Won't remove existing file: '%s'", sfi.Path)
+									prio = godi.Info
+									err = nil
+								} else {
+									err = os.Remove(sfi.Path)
+									if err == nil {
+										msg = fmt.Sprintf("Removed '%s'", sfi.Path)
+										prio = godi.Info
+
+										// try to remove the directory - will fail if non-empty.
+										// only do that if we wouldn't remove the tree.
+										// Also crawl upwards
+										var derr error
+										for dir := filepath.Dir(sfi.Path); dir != tree && derr == nil; dir = filepath.Dir(dir) {
+											derr = os.Remove(dir)
+										}
+									}
+								}
+
+								accumResult <- &godi.BasicResult{
+									Finfo: sfi.FileInfo,
+									Msg:   msg,
+									Err:   err,
+									Prio:  prio,
+								}
+							} // for each path info
+						} // for each tree to handle
+						wg.Done()
+					}(treesWithError[init:nit]) // go handle errors in write mode
+				} // if we have invalid trees on that device
+			} // for each write controller (per device)
+
+			// Wait for cleanup jobs
+			wg.Wait()
+		} else {
+			// Standard Seal handling
+			// Check each tree and if it doesn't have any Error in it, try to write the seal
+			// There is no kind of rollback needed or possible, and what is is handled by writeIndex.
+			for tree, pathInfos := range treePathsmap {
+				// all trees are source trees, and should have something in them. If not, writeIndex panics
+				// Lets risk it ... .
 				foundError := false
-				pathInfos := treePathsmap[tree]
 				for _, sfi := range pathInfos {
 					if sfi.Err != nil {
 						foundError = true
-						treesWithError[nit] = tree
-						nit += 1
 						break
 					}
-				} // for each file-info below tree
-
-				// INDEX HANDLING
-				//////////////////
-				// Writing the index can still fail - if that happens, we have no seal which is similar
-				// to a failure - sealed-copy creates one or nothing.
-				// It must be bad luck if the disk is full now that the seal is written, but lets be precise !
-
-				// it's valid, so try to write the index. If that doesn't work, we will
-				// place it onto the invalid tree list right away
-				if !foundError && !st.WasCancelled {
-					// Only done if there are no errors below the current tree
-					// Serialize all fileinfo structures
-					if index, err := s.writeIndex(tree, pathInfos); err != nil {
-						st.ErrCount += 1
-						accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}
-						treesWithError[nit] = tree
-						nit += 1
-					} else {
-						accumResult <- &godi.BasicResult{
-							Finfo: godi.FileInfo{Path: index, Size: -1},
-							Msg:   fmt.Sprintf("Wrote seal at '%s'", index),
-							Prio:  godi.Info,
-						}
-					} // handle index writing errors
 				}
-			} // for each destination of write controller
 
-			// found some - shoot off go routine
-			if nit != init {
-				wg.Add(1)
-				go func(trees []string) {
-					for _, tree := range trees {
-						pathInfos := treePathsmap[tree]
-
-						// Remove all previously written files in this tree if we are in write mode
-						accumResult <- &godi.BasicResult{
-							Msg:  fmt.Sprintf("Rolling back changes at copy destination '%s'", tree),
-							Prio: godi.Info,
-						}
-
-						// For path deletion to work correctly, we need it sorted
-						sort.Sort(codec.ByLongestPathDescending(pathInfos))
-
-						for _, sfi := range pathInfos {
-							// We may only remove it if the error wasn't a 'Existed' one, or we kill a file
-							// that wasn't created in this run.
-							var msg string
-							prio := godi.Error
-							err := sfi.Err
-							if err != nil && os.IsExist(err) {
-								msg = fmt.Sprintf("Won't remove existing file: '%s'", sfi.Path)
-								prio = godi.Info
-								err = nil
-							} else {
-								err = os.Remove(sfi.Path)
-								if err == nil {
-									msg = fmt.Sprintf("Removed '%s'", sfi.Path)
-									prio = godi.Info
-
-									// try to remove the directory - will fail if non-empty.
-									// only do that if we wouldn't remove the tree.
-									// Also crawl upwards
-									var derr error
-									for dir := filepath.Dir(sfi.Path); dir != tree && derr == nil; dir = filepath.Dir(dir) {
-										derr = os.Remove(dir)
-									}
-								}
-							}
-
-							accumResult <- &godi.BasicResult{
-								Finfo: sfi.FileInfo,
-								Msg:   msg,
-								Err:   err,
-								Prio:  prio,
-							}
-						} // for each path info
-					} // for each tree to handle
-					wg.Done()
-				}(treesWithError[init:nit]) // go handle errors in write mode
-			} // if we have invalid trees on that device
-		} // for each write controller (per device)
-
-		// Wait for cleanup jobs
-		wg.Wait()
+				if !foundError && !st.WasCancelled {
+					handleIndexAtTree(tree, pathInfos)
+				}
+			} // end for each tree/pathinfo tuple
+		} // end non-copy seal handling
 
 		accumResult <- &godi.BasicResult{
 			Msg: fmt.Sprintf(
