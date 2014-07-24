@@ -27,6 +27,7 @@ godi seal tree/
 * **Usability**
     + `godi` just works. `mhl` will fail (for some reason) if it finds a hidden file. `godi` will just ignore hidden files and symbolic links and otherwise process everything in its way.
     + `godi` comes with a state of the art commandline interface, allowing to learn the command by using it. No manual required.
+    + `mhl` seals are not protected against being altered. File corruption or intentional changes can't be detected, and will lead to invalid verification results.
 
 
 ## Limitations

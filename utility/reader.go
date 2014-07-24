@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"sync"
 )
 
 // Size for allocated buffers
@@ -37,7 +36,7 @@ type ChannelReader struct {
 	results chan readResult
 
 	// Protects the buffer from simulateous access
-	exclusive sync.Mutex
+	ready chan bool
 
 	// Our buffer
 	buf [bufSize]byte
@@ -56,6 +55,7 @@ func (r *ReadChannelController) NewChannelReaderFromPath(path string) *ChannelRe
 	cr := ChannelReader{
 		path:    path,
 		results: make(chan readResult, readChannelSize),
+		ready:   make(chan bool),
 	}
 
 	r.c <- &cr
@@ -66,6 +66,7 @@ func (r *ReadChannelController) NewChannelReaderFromReader(reader io.Reader) *Ch
 	cr := ChannelReader{
 		reader:  reader,
 		results: make(chan readResult, readChannelSize),
+		ready:   make(chan bool),
 	}
 
 	r.c <- &cr
@@ -82,16 +83,24 @@ func (r *ReadChannelController) NewChannelReaderFromReader(reader io.Reader) *Ch
 func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 	// We are just consuming, and assume the channel is closed when the reading is finished
 	var written int
+
+	// initial ready indicator - now remote reader produces result
+	p.ready <- true
+	// We will receive results until the other end is done reading
 	for res := range p.results {
 		// Write what's possible
 		if res.n > 0 {
-			p.exclusive.Lock()
 			written, err = w.Write(res.buf)
-			p.exclusive.Unlock()
 			n += int64(written)
 		}
-		// in any case, claim we are done with the result !
+		// now we are ready for the next one
 
+		// This would block as the remote will stop sending results on error
+		if res.err == nil {
+			p.ready <- true
+		}
+
+		// in any case, claim we are done with the result !
 		if res.n == 0 && res.err == nil {
 			panic("If 0 bytes have been read, there should at least be an EOF (in case of empty files)")
 		}
@@ -117,6 +126,7 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 	infoHandler := func(info *ChannelReader) {
 		// in any case, close the results channel
 		defer close(info.results)
+		defer close(info.ready)
 
 		var err error
 		ourReader := false
@@ -124,6 +134,8 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 			info.reader, err = os.Open(info.path)
 			if err != nil {
 				// Add one - the client reader will call Done after receiving our result
+				// We are always required to signal ready before we send
+				<-info.ready
 				info.results <- readResult{nil, 0, err}
 				return
 			}
@@ -131,8 +143,13 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 
 		// Now read until it's done
 		var nread int
+
 	readForever:
 		for {
+			// The buffer will be put back by the one reading from the channel (e.g. in WriteTo()) !
+			// wait until writer from previous iteration is done using the buffer
+			// Have to ask for it in any case - if we quit this loop, the receiver may stall otherwise
+			<-info.ready
 			select {
 			case <-done:
 				{
@@ -141,11 +158,7 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 				}
 			default:
 				{
-					// The buffer will be put back by the one reading from the channel (e.g. in WriteTo()) !
-					// wait until writer from previous iteration is done using the buffer
-					info.exclusive.Lock()
 					nread, err = info.reader.Read(info.buf[:])
-					info.exclusive.Unlock()
 					info.results <- readResult{info.buf[:nread], nread, err}
 					// we send all results, but abort if the reader is done for whichever reason
 					if err != nil {
@@ -153,7 +166,7 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 					}
 				}
 			} // end select
-		} // read loop
+		} // readForever
 
 		if ourReader {
 			info.reader.(*os.File).Close()
