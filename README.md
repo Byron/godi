@@ -17,7 +17,7 @@ godi seal tree/
     + `godi` is up to multiple times faster
     + Those inclined may maximize bandwidth by tuning parallelism
     + Will read in parallel from multiple devices, leveraging all device's maximum bandwidth.
-    + Can write to multiple devices at once, creating multiple duplicates of your data as fast as your slowest writer.
+    + Can write to multiple devices at once, creating multiple duplicates of your data as fast as your slowest writer. If one device fails, all other devices will still receive their duplicates, whereas the failed device will not have an intermediate result (see atomic operation).
 * **Copy or archive on the fly**
     + While hashing, you can also transfer the data, reading it only once in the process. With MHL, you need to copy first, and hash afterwards, which reads the data twice. `godi`s operation assumes the storage works correctly, however, there is a safe mode which verifies the copy nonetheless.
     + It will never overwrite existing files.
