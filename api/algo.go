@@ -67,12 +67,6 @@ func Aggregate(results <-chan Result, done <-chan bool,
 				// would not be pulled before closing
 			}
 
-			if r.Error() != nil {
-				s.ErrCount += 1
-				accumResult <- r
-				continue
-			}
-
 			if !resultHandler(r, accumResult) {
 				s.ErrCount += 1
 			} else {

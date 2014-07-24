@@ -2,6 +2,7 @@ package utility
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 )
@@ -98,6 +99,10 @@ func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 		// This would block as the remote will stop sending results on error
 		if res.err == nil {
 			p.ready <- true
+		} else {
+			if res.err != io.EOF {
+				err = res.err
+			}
 		}
 
 		// in any case, claim we are done with the result !
@@ -131,6 +136,7 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 		var err error
 		ourReader := false
 		if info.reader == nil {
+			ourReader = true
 			info.reader, err = os.Open(info.path)
 			if err != nil {
 				// Add one - the client reader will call Done after receiving our result
@@ -153,7 +159,13 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 			select {
 			case <-done:
 				{
-					info.results <- readResult{err: errors.New("Cancelled by user")}
+					var err error
+					if ourReader {
+						err = fmt.Errorf("Reading of '%s' cancelled", info.path)
+					} else {
+						err = errors.New("Reading cancelled by user")
+					}
+					info.results <- readResult{err: err}
 					break readForever
 				}
 			default:

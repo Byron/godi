@@ -78,6 +78,11 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 	}
 
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
+		if r.Error() != nil {
+			accumResult <- r
+			return false
+		}
+
 		sr := r.(*SealResult)
 
 		// find root

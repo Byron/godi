@@ -149,7 +149,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		f.Sha1 = sha1gen.Sum(nil)
 		f.MD5 = md5gen.Sum(nil)
 		if written != f.Size {
-			err = fmt.Errorf("Filesize of '%s' reported as %d, yet only %d bytes were hashed", f.Path, f.Size, written)
+			err = fmt.Errorf("Filesize of '%s' reported as %d, yet only %d bytes were read", f.Path, f.Size, written)
 			sendResults(&f, err)
 			continue
 		}

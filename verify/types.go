@@ -107,6 +107,11 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result
 
 	var signatureMismatches uint = 0
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
+		if r.Error() != nil {
+			accumResult <- r
+			return false
+		}
+
 		vr := r.(*VerifyResult)
 
 		hasError := false
