@@ -108,19 +108,50 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 		// Pre-allocate a bunch of tree strings - it's at max the total amount of destinations, which might
 		// all be on one device
 		// We natually don't do anything in non-copy mode as we have no writers
-		treesWithError := make([]string, utility.WriteChannelDeviceMapTrees(s.rootedWriters))
+		ntreesWorstCase := utility.WriteChannelDeviceMapTrees(s.rootedWriters)
+		treesWithError := make([]string, ntreesWorstCase)
+
 		nit := 0 // num invalid trees
 		var wg sync.WaitGroup
 		for _, wctrl := range s.rootedWriters {
 			init := nit // initial nit
+
 			for _, tree := range wctrl.Trees {
-				for _, sfi := range treePathsmap[tree] {
+				foundError := false
+				pathInfos := treePathsmap[tree]
+				for _, sfi := range pathInfos {
 					if sfi.Err != nil {
+						foundError = true
 						treesWithError[nit] = tree
 						nit += 1
 						break
 					}
 				} // for each file-info below tree
+
+				// INDEX HANDLING
+				//////////////////
+				// Writing the index can still fail - if that happens, we have no seal which is similar
+				// to a failure - sealed-copy creates one or nothing.
+				// It must be bad luck if the disk is full now that the seal is written, but lets be precise !
+
+				// it's valid, so try to write the index. If that doesn't work, we will
+				// place it onto the invalid tree list right away
+				if !foundError && !st.WasCancelled {
+					// Only done if there are no errors below the current tree
+					// Serialize all fileinfo structures
+					if index, err := s.writeIndex(tree, pathInfos); err != nil {
+						st.ErrCount += 1
+						accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}
+						treesWithError[nit] = tree
+						nit += 1
+					} else {
+						accumResult <- &godi.BasicResult{
+							Finfo: godi.FileInfo{Path: index, Size: -1},
+							Msg:   fmt.Sprintf("Wrote seal at '%s'", index),
+							Prio:  godi.Info,
+						}
+					} // handle index writing errors
+				}
 			} // for each destination of write controller
 
 			// found some - shoot off go routine
@@ -177,40 +208,6 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 				}(treesWithError[init:nit]) // go handle errors in write mode
 			} // if we have invalid trees on that device
 		} // for each write controller (per device)
-
-		// INDEX HANDLING
-		//////////////////
-		// The cool thing is, that cleanup happens in parallel !
-		for tree, pathInfos := range treePathsmap {
-			// Especially source path maps will be empty - the only results we see is the destination paths
-			if len(pathInfos) == 0 {
-				continue
-			}
-
-			// See if we have any error below this root
-			foundError := false
-			for _, invalidTree := range treesWithError[:nit] {
-				if tree == invalidTree {
-					foundError = true
-					break
-				}
-			}
-
-			if !foundError && !st.WasCancelled {
-				// Only done if there are no errors below the current tree
-				// Serialize all fileinfo structures
-				if index, err := s.writeIndex(tree, pathInfos); err != nil {
-					st.ErrCount += 1
-					accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}
-				} else {
-					accumResult <- &godi.BasicResult{
-						Finfo: godi.FileInfo{Path: index, Size: -1},
-						Msg:   fmt.Sprintf("Wrote seal at '%s'", index),
-						Prio:  godi.Info,
-					}
-				} // handle index writing errors
-			} // handle errors in tree
-		} // for each item in treePathMap
 
 		// Wait for cleanup jobs
 		wg.Wait()
