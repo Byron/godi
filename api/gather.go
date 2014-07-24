@@ -35,6 +35,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 
 	var multiWriter io.Writer
 	var channelWriters []utility.ChannelWriter
+	var lazyWriters []utility.LazyFileWriteCloser
 
 	// Build the multi-writer which will dispatch all writes to a write controller
 	if isWriting {
@@ -50,15 +51,17 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 
 		// Keeps all Writers we are going to prepare per source file
 		channelWriters = make([]utility.ChannelWriter, numDestinations)
+		lazyWriters = make([]utility.LazyFileWriteCloser, numDestinations)
 
 		// Init them, per controller, and set them to be used by the multi-writer right away
-		// These never change, only their writer does
+		// These never change, only their Destination path does
 		ofs := 0
 		for _, wctrl := range wctrls {
 			ofse := ofs + len(wctrl.Trees)
 			wctrl.Ctrl.InitChannelWriters(channelWriters[ofs:ofse])
 			for x := ofs; x < ofse; x++ {
 				multiWriter.(*utility.ParallelMultiWriter).SetWriterAtIndex(x, &channelWriters[x])
+				channelWriters[x].SetWriter(&lazyWriters[x])
 			}
 			ofs = ofse
 		}
@@ -83,7 +86,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 				wc.Close()
 				// copy f for adjusting it's absolute path - we send it though the channel as pointer, not value
 				wfi := *f
-				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path
+				wfi.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path()
 				// it doesn't matter here if there actually is an error, aggregator will handle it
 				results <- makeResult(&wfi, f, e)
 			} // for each write controller to write to
@@ -114,8 +117,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 				// deal with the parallelization and blocking
 				fawid := awid // the first index
 				for x := 0; x < len(wctrl.Trees); x++ {
-					destPath := filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath)
-					channelWriters[awid].SetWriter(&utility.LazyFileWriteCloser{Path: destPath})
+					lazyWriters[awid].SetPath(filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath))
 					awid += 1
 				}
 			} // for each device's write controller

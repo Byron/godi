@@ -140,20 +140,34 @@ func (c *ChannelWriter) Close() error {
 type LazyFileWriteCloser struct {
 
 	// The path we should open a writer to on first write. This will fail if the fail already exists.
-	Path string
+	path string
 
 	// A writer we are using to perform the write
 	writer *os.File
 }
 
+// Path returns the currently set path
+func (l *LazyFileWriteCloser) Path() string {
+	return l.path
+}
+
+// SetPath changes the path to the given one.
+// It's an error to set a new path while the previous writer wasn't closed yet
+func (l *LazyFileWriteCloser) SetPath(p string) {
+	if l.writer != nil {
+		panic("Previous writer wasn't close - can't set new path")
+	}
+	l.path = p
+}
+
 func (l *LazyFileWriteCloser) Write(b []byte) (n int, err error) {
 	if l.writer == nil {
 		// assure directory exists
-		err = os.MkdirAll(filepath.Dir(l.Path), 0777)
+		err = os.MkdirAll(filepath.Dir(l.path), 0777)
 		if err != nil {
 			return 0, err
 		}
-		l.writer, err = os.OpenFile(l.Path, os.O_EXCL|os.O_WRONLY|os.O_CREATE, 0666)
+		l.writer, err = os.OpenFile(l.path, os.O_EXCL|os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			return 0, err
 		}
