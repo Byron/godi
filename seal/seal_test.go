@@ -107,6 +107,6 @@ func TestSeal(t *testing.T) {
 	}
 
 	if err := godi.StartEngine(&verifycmd, resHandler, resHandler); err != nil {
-		t.Fatal("Coulnd't verify files that were just written")
+		t.Fatal("Couldn't verify files that were just written")
 	}
 }

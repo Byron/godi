@@ -62,6 +62,7 @@ func MakeDatasetOrPanic() (string, string, string) {
 // Panics if something is wrong
 // Will only do the work if we are not already in panic
 func RmTree(tree string) {
+	return
 	if len(tree) == 0 {
 		panic("Invalid tree given")
 	}

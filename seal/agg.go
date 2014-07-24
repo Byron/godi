@@ -85,6 +85,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 		relaPath := sr.Finfo.RelaPath
 		if r.Error() != nil {
 			pathmap[relaPath] = sr.Finfo
+			sr.Finfo.MarkError()
 			accumResult <- r
 			return false
 		}

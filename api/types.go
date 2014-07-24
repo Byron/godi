@@ -36,6 +36,12 @@ func (f *FileInfo) HasError() bool {
 	return len(f.Sha1) == 0 && len(f.MD5) == 0
 }
 
+// MarkError will assure HasError() is True
+func (f *FileInfo) MarkError() {
+	f.Sha1 = nil
+	f.MD5 = nil
+}
+
 type Priority uint8
 
 const (

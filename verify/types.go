@@ -106,8 +106,12 @@ func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.R
 func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 
 	var signatureMismatches uint = 0
+	var missingFiles uint = 0
 	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
 		if r.Error() != nil {
+			if os.IsNotExist(r.Error()) || os.IsPermission(r.Error()) {
+				missingFiles += 1
+			}
 			accumResult <- r
 			return false
 		}
@@ -131,7 +135,7 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result
 		accumResult chan<- godi.Result,
 		st *godi.AggregateFinalizerState) {
 
-		if signatureMismatches == 0 {
+		if signatureMismatches == 0 && missingFiles == 0 {
 			accumResult <- &VerifyResult{
 				BasicResult: godi.BasicResult{
 					Msg: fmt.Sprintf(
@@ -144,12 +148,14 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result
 			}
 		} else {
 			st.ErrCount -= signatureMismatches
+			st.ErrCount -= missingFiles
 			accumResult <- &VerifyResult{
 				BasicResult: godi.BasicResult{
 					Msg: fmt.Sprintf(
-						"%d of %d files have changed on disk after sealing (%v)",
+						"%d of %d files have changed on disk after sealing, %d are missing (%v)",
 						signatureMismatches,
 						st.FileCount,
+						missingFiles,
 						st,
 					),
 					Prio: godi.Info,

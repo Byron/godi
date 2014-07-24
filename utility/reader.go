@@ -89,11 +89,11 @@ func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 	p.ready <- true
 	// We will receive results until the other end is done reading
 	for res := range p.results {
-		// Write what's possible
-		if res.n > 0 {
-			written, err = w.Write(res.buf)
-			n += int64(written)
-		}
+		// Write what's possible - don't check for 0, as we also have to deal with empty files
+		// Without the write call, they wouldn't be created after all.
+		written, err = w.Write(res.buf)
+		n += int64(written)
+
 		// now we are ready for the next one
 
 		// This would block as the remote will stop sending results on error
