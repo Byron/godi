@@ -38,14 +38,15 @@ type SealResult struct {
 }
 
 // NewCommand returns an initialized seal command
-func NewCommand(trees []string, nReaders, nWriters int) (c SealCommand, err error) {
+func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
+	c := SealCommand{}
 	if nWriters == 0 {
 		c.mode = modeSeal
 	} else {
 		c.mode = modeCopy
 	}
-	err = c.Init(nReaders, nWriters, trees)
-	return
+	err := c.Init(nReaders, nWriters, trees)
+	return &c, err
 }
 
 func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup) {
@@ -65,5 +66,5 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		return &res
 	}
 
-	api.Gather(files, results, wg, &s.Stats, makeResult, s.RootedReaders, s.rootedWriters)
+	api.Gather(files, results, wg, s.Statistics(), makeResult, s.RootedReaders, s.rootedWriters)
 }

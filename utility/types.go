@@ -116,7 +116,7 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 	itf := atomic.LoadUint32(&s.TotalFilesRead)
 	ibr := atomic.LoadUint64(&s.BytesRead)
 
-	out := fmt.Sprintf("%s->IN #%d%s ⌰%s%s",
+	out := fmt.Sprintf("%s->READ #%d%s ⌰%s%s",
 		inOut(atomic.LoadUint32(&s.FilesBeingRead)),
 		itf,
 		intDelta(itf, d.TotalFilesRead),
@@ -137,7 +137,7 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 		otf := atomic.LoadUint32(&s.TotalFilesWritten)
 		obw := atomic.LoadUint64(&s.BytesWritten)
 
-		out += fmt.Sprintf("%s%sOUT->#%d%s ⌰%s%s",
+		out += fmt.Sprintf("%s%sWRITE #%d%s ⌰%s%s",
 			sep,
 			inOut(atomic.LoadUint32(&s.FilesBeingWritten)),
 			otf,

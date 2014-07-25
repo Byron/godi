@@ -29,9 +29,9 @@ type VerifyResult struct {
 }
 
 // NewCommand returns an initialized verify command
-func NewCommand(indices []string, nReaders int) (c VerifyCommand, err error) {
-	err = c.Init(nReaders, 0, indices)
-	return
+func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
+	c := VerifyCommand{}
+	return &c, c.Init(nReaders, 0, indices)
 }
 
 func (s *VerifyCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {

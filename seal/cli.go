@@ -109,9 +109,9 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 				{
 					// prepare and run a verify command
 					verifycmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
-					handler := cli.MakeStatisticalLogHandler(&verifycmd.Stats, cli.LogHandler, make(chan bool))
 					if err == nil {
-						err = api.StartEngine(&verifycmd, handler, handler)
+						handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, cli.LogHandler, make(chan bool))
+						err = api.StartEngine(verifycmd, handler, handler)
 					}
 				}
 			}
