@@ -87,10 +87,11 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 	if cmd.verify {
 		// Setup a aggregation result handler which tracks produced indices
 		var indices []string
-		aggHandler := IndexTrackingResultHandlerAdapter(&indices, cli.LogHandler)
+		handler := cli.MakeStatisticalLogHandler(&cmd.Stats, cli.LogHandler)
+		aggHandler := IndexTrackingResultHandlerAdapter(&indices, handler)
 
 		// and run ourselves
-		err := api.StartEngine(cmd, cli.LogHandler, aggHandler)
+		err := api.StartEngine(cmd, handler, aggHandler)
 
 		if err == nil && len(indices) == 0 {
 			panic("Unexpectedly I didn't see a single seal index without error")
@@ -105,7 +106,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 					// prepare and run a verify command
 					verifcmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
-						err = api.StartEngine(&verifcmd, cli.LogHandler, cli.LogHandler)
+						err = api.StartEngine(&verifcmd, handler, handler)
 					}
 				}
 			}

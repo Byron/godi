@@ -3,15 +3,47 @@ package cli
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/utility"
 
 	"github.com/codegangsta/cli"
 )
 
 const (
+	StatisticalLoggingInterval    = 1 * time.Second
 	StreamsPerInputDeviceFlagName = "streams-per-input-device"
 )
+
+// Wraps an Aggregator handler and tracks last time the handler was called.
+// If it was more than a certain amount of seconds ago, we will release a message about what's
+// currently going on based on the statistical information we are passed
+// NOTE: Even though it would be cleaner to just inject messages into the results channel, this way
+// we wouldn't know when the last message was emitted, possibly emitting too much
+func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result)) func(api.Result) {
+	lastLoggedAt := time.Now()
+
+	// An observer, printing out statistics as needed
+	// We check a bit more often than the time after which to log some stats, to be more responsive
+	// Lets be late at max 1/4 of a second
+	ticker := time.Tick(StatisticalLoggingInterval / 4)
+	go func() {
+		for now := range ticker {
+			if now.Sub(lastLoggedAt) < StatisticalLoggingInterval {
+				continue
+			}
+			// Otherwise, prepare statistics
+			fmt.Println(stats)
+			lastLoggedAt = now
+		}
+	}()
+
+	return func(r api.Result) {
+		lastLoggedAt = time.Now()
+		handler(r)
+	}
+}
 
 func LogHandler(r api.Result) {
 	if r.Error() != nil {
@@ -26,7 +58,8 @@ func LogHandler(r api.Result) {
 // Both handlers may be nil to use a default one
 func RunAction(cmd api.Runner, c *cli.Context) {
 	// checkArgs must have initialized the seal command, so we can just run it
-	err := api.StartEngine(cmd, LogHandler, LogHandler)
+	handler := MakeStatisticalLogHandler(cmd.Statistics(), LogHandler)
+	err := api.StartEngine(cmd, handler, handler)
 	if err != nil {
 		os.Exit(1)
 	}
