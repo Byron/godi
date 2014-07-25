@@ -85,6 +85,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		// we store only relative paths in the map - this is all we want to serialize
 		hasError := false
 
+		sr.Prio = api.Info
 		if len(sr.source) == 0 {
 			sr.Msg = fmt.Sprintf("DONE ...%s", relaPath)
 		} else {

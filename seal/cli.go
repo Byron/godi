@@ -90,7 +90,11 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 		var indices []string
 		cmdDone := make(chan bool)
 		logHandler := cli.MakeLogHandler(cmd.Level)
-		handler := cli.MakeStatisticalLogHandler(&cmd.Stats, logHandler, cmdDone)
+
+		handler := logHandler
+		if cmd.Level.MayLog(api.Progress) {
+			handler = cli.MakeStatisticalLogHandler(&cmd.Stats, handler, cmdDone)
+		}
 		aggHandler := IndexTrackingResultHandlerAdapter(&indices, handler)
 
 		// and run ourselves
@@ -112,7 +116,10 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 					// prepare and run a verify command
 					verifycmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
-						handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, logHandler, make(chan bool))
+						handler = logHandler
+						if verifycmd.LogLevel().MayLog(api.Progress) {
+							handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, handler, make(chan bool))
+						}
 						err = api.StartEngine(verifycmd, handler, handler)
 					}
 				}

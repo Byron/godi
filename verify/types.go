@@ -119,6 +119,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		vr := r.(*VerifyResult)
 
 		hasError := false
+		vr.Prio = api.Info
 		if (len(vr.ifinfo.Sha1) > 0 && bytes.Compare(vr.ifinfo.Sha1, vr.Finfo.Sha1) != 0) ||
 			(len(vr.ifinfo.MD5) > 0 && bytes.Compare(vr.ifinfo.MD5, vr.Finfo.MD5) != 0) {
 			vr.Err = fmt.Errorf("HASH MISMATCH: %s", vr.Finfo.Path)
