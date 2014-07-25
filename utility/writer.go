@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 )
 
 // Similar to MultiWriter, but assumes writes never fail, and provides the same buffer
@@ -129,6 +130,7 @@ func (c *ChannelWriter) Write(b []byte) (n int, err error) {
 }
 
 func (c *ChannelWriter) Close() error {
+	atomic.AddUint32(&c.ctrl.stats.TotalFilesWritten, 1)
 	if w, ok := c.writer.(io.Closer); ok {
 		return w.Close()
 	}
@@ -192,6 +194,9 @@ type WriteChannelController struct {
 	// Keeps all write requests, which contain all information we could possibly want to write something.
 	// As the ChannelWriter is keeping all information, we serves as request right away
 	c chan *ChannelWriter
+
+	// Allows to track amount of written files
+	stats *Stats
 }
 
 // A utility structure to associate a tree with a writer.
@@ -207,9 +212,10 @@ type RootedWriteController struct {
 // Create a new controller which deals with writing all incoming requests with nprocs go-routines.
 // Use the channel capacity to assure less blocking will occur. A good value is depending heavily on your
 // algorithm's patterns. Should at least be nprocs, or larger.
-func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
+func NewWriteChannelController(nprocs, channelCap int, stats *Stats) WriteChannelController {
 	ctrl := WriteChannelController{
 		make(chan *ChannelWriter, channelCap),
+		stats,
 	}
 	if nprocs < 1 {
 		panic("Need at least one go routine to process work")
@@ -218,7 +224,10 @@ func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	for i := 0; i < nprocs; i++ {
 		go func() {
 			for cw := range ctrl.c {
+				atomic.AddUint32(&stats.FilesBeingWritten, 1)
 				cw.n, cw.e = cw.writer.Write(cw.b)
+				atomic.AddUint64(&stats.BytesWritten, uint64(cw.n))
+				atomic.AddUint32(&stats.FilesBeingWritten, ^uint32(0))
 				// protocol mandates the sender has to listen for our reply, channel must not be closed here ... .
 				cw.wg.Done()
 			} // for each channel writer

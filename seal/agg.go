@@ -63,10 +63,10 @@ func (s *SealCommand) writeIndex(commonTree string, paths []codec.SerializableFi
 	return fd.Name(), nil
 }
 
-func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
+func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	treePathsmap := make(map[string][]codec.SerializableFileInfo)
 
-	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
+	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
 		sr := r.(*SealResult)
 
 		// Keep the file-information, in any case
@@ -85,6 +85,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 		// we store only relative paths in the map - this is all we want to serialize
 		hasError := false
 
+		sr.Prio = api.Info
 		if len(sr.source) == 0 {
 			sr.Msg = fmt.Sprintf("DONE ...%s", relaPath)
 		} else {
@@ -96,21 +97,21 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 	} // end resultHandler()
 
 	finalizer := func(
-		accumResult chan<- godi.Result,
-		st *godi.AggregateFinalizerState) {
+		accumResult chan<- api.Result,
+		st *api.AggregateFinalizerState) {
 
 		handleIndexAtTree := func(tree string, pathInfos []codec.SerializableFileInfo) error {
 			// Only done if there are no errors below the current tree
 			// Serialize all fileinfo structures
 			if index, err := s.writeIndex(tree, pathInfos); err != nil {
 				st.ErrCount += 1
-				accumResult <- &godi.BasicResult{Err: err, Prio: godi.Error}
+				accumResult <- &api.BasicResult{Err: err, Prio: api.Error}
 				return err
 			} else {
-				accumResult <- &godi.BasicResult{
-					Finfo: godi.FileInfo{Path: index, Size: -1},
-					Msg:   fmt.Sprintf("Wrote seal at '%s'", index),
-					Prio:  godi.Info,
+				accumResult <- &api.BasicResult{
+					Finfo: api.FileInfo{Path: index, Size: -1},
+					Msg:   fmt.Sprintf("Wrote seal to '%s'", index),
+					Prio:  api.Info,
 				}
 			} // handle index writing errors
 			return nil
@@ -172,9 +173,9 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 							pathInfos := treePathsmap[tree]
 
 							// Remove all previously written files in this tree if we are in write mode
-							accumResult <- &godi.BasicResult{
+							accumResult <- &api.BasicResult{
 								Msg:  fmt.Sprintf("Rolling back changes at copy destination '%s'", tree),
-								Prio: godi.Info,
+								Prio: api.Info,
 							}
 
 							// For path deletion to work correctly, we need it sorted
@@ -184,17 +185,17 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 								// We may only remove it if the error wasn't a 'Existed' one, or we kill a file
 								// that wasn't created in this run.
 								var msg string
-								prio := godi.Error
+								prio := api.Error
 								err := sfi.Err
 								if err != nil && os.IsExist(err) {
 									msg = fmt.Sprintf("Won't remove existing file: '%s'", sfi.Path)
-									prio = godi.Info
+									prio = api.Info
 									err = nil
 								} else {
 									err = os.Remove(sfi.Path)
 									if err == nil {
 										msg = fmt.Sprintf("Removed '%s'", sfi.Path)
-										prio = godi.Info
+										prio = api.Info
 
 										// try to remove the directory - will fail if non-empty.
 										// only do that if we wouldn't remove the tree.
@@ -206,7 +207,7 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 									}
 								}
 
-								accumResult <- &godi.BasicResult{
+								accumResult <- &api.BasicResult{
 									Finfo: sfi.FileInfo,
 									Msg:   msg,
 									Err:   err,
@@ -242,15 +243,14 @@ func (s *SealCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
 			} // end for each tree/pathinfo tuple
 		} // end non-copy seal handling
 
-		accumResult <- &godi.BasicResult{
+		accumResult <- &api.BasicResult{
 			Msg: fmt.Sprintf(
-				"Sealed %d files (%v)",
-				st.FileCount,
-				st,
-			),
-			Prio: godi.Info,
+				"SEAL COMPLETE: %s",
+				s.Stats.DeltaString(&s.Stats, st.Elapsed, utility.StatsClientSep),
+			) + st.String(),
+			Prio: api.Info,
 		}
 	} // end finalizer()
 
-	return godi.Aggregate(results, s.Done, resultHandler, finalizer)
+	return api.Aggregate(results, s.Done, resultHandler, finalizer)
 }

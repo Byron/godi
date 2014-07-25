@@ -3,8 +3,10 @@ package verify
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/codec"
 
@@ -28,7 +30,7 @@ func SubCommands() []gcli.Command {
 	return out
 }
 
-func (s *VerifyCommand) Init(numReaders, numWriters int, items []string) error {
+func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority) error {
 	if len(items) == 0 {
 		return errors.New("Please provide at least one seal file")
 	}
@@ -38,10 +40,13 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string) error {
 		if codec := codec.NewByPath(index); codec == nil {
 			return fmt.Errorf("Unknown seal file format: '%s'", index)
 		}
+		if _, err := os.Stat(index); err != nil {
+			return fmt.Errorf("Cannot access seal file at '%s'", index)
+		}
 		indexDirs[i] = filepath.Dir(index)
 	}
 
-	s.InitBasicRunner(numReaders, indexDirs)
+	s.InitBasicRunner(numReaders, indexDirs, maxLogLevel)
 	s.Items = items
 	return nil
 }

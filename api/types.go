@@ -1,6 +1,7 @@
-package godi
+package api
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -38,7 +39,40 @@ const (
 	Info
 	Warn
 	Error
+	LogDisabled
 )
+
+// MayLog returns true if the given priority may be logged as seen from our log-level.
+func (p Priority) MayLog(op Priority) bool {
+	return op >= p
+}
+
+func (p Priority) String() string {
+	switch {
+	case p == Progress:
+		return "progress"
+	case p == Info:
+		return "info"
+	case p == Warn:
+		return "warn"
+	case p == Error:
+		return "error"
+	case p == LogDisabled:
+		return "off"
+	default:
+		panic("Unknown log level")
+	}
+}
+
+// Parse a priority from the given string. error will be set if this fails
+func PriorityFromString(p string) (Priority, error) {
+	for _, t := range []Priority{Progress, Info, Warn, Error, LogDisabled} {
+		if t.String() == p {
+			return t, nil
+		}
+	}
+	return LogDisabled, fmt.Errorf("Unknown verbosity level: '%s'", p)
+}
 
 type Result interface {
 	// Return a string indicating the result, which can can also state an error
@@ -84,6 +118,23 @@ type BasicRunner struct {
 	RootedReaders map[string]*utility.ReadChannelController
 	// A channel to let everyone know we should finish as soon as possible - this is done by closing the channel
 	Done chan bool
+
+	// our statistics instance
+	Stats utility.Stats
+
+	// The maximum log-level. We just keep this value here because the cli makes a difference between CHECK and RUN !
+	// This member shouldn't be needed as logging is not done by the runner anyway - it's all done by result handlers.
+	// Only they are concerned, which is a function of the CLI entirely
+	// TODO(st) Fork CLI and make the fix, use the fork from that point on ... .
+	Level Priority
+}
+
+func (b *BasicRunner) LogLevel() Priority {
+	return b.Level
+}
+
+func (b *BasicRunner) Statistics() *utility.Stats {
+	return &b.Stats
 }
 
 func (b *BasicRunner) NumChannels() int {
@@ -94,13 +145,14 @@ func (b *BasicRunner) NumChannels() int {
 }
 
 // Initialize our Readers and items with the given information, including our cannel
-func (b *BasicRunner) InitBasicRunner(numReaders int, items []string) {
+func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Priority) {
 	b.Items = items
 	b.Done = make(chan bool)
-	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, b.Done)
+	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, &b.Stats, b.Done)
 	if len(b.RootedReaders) == 0 {
 		panic("Didn't manage to build readers from input items")
 	}
+	b.Level = maxLogLevel
 }
 
 func (b *BasicRunner) CancelChannel() chan bool {
@@ -116,10 +168,17 @@ type Runner interface {
 	// can be assumed to be valid
 	// Sets the items we are supposed to be working on - must be checked by implementation, as they are
 	// very generic in nature
-	Init(numReaders, numWriters int, items []string) error
+	Init(numReaders, numWriters int, items []string, maxLogLevel Priority) error
 
 	// Return the amount of io-channels the runner may be using in parallel per device
 	NumChannels() int
+
+	// Return the minimum allowed level for logging
+	// TODO(st): get rid of this method !
+	LogLevel() Priority
+
+	// Statistics returns the commands shared statistics structure
+	Statistics() *utility.Stats
 
 	// CancelChannel returns the channel to close when the operation should stop prematurely
 	// NOTE: Only valid after Init was called, and it's an error to call it beforehand
@@ -151,8 +210,8 @@ type Runner interface {
 // The handlers receive a result of the respective stage and may perform whichever operation
 // Returns the last error we received in either generator or aggregation stage
 func StartEngine(runner Runner,
-	generateHandler func(Result),
-	aggregateHandler func(Result)) (err error) {
+	generateHandler func(Result) bool,
+	aggregateHandler func(Result) bool) (err error) {
 
 	nprocs := runner.NumChannels()
 	results := make(chan Result, nprocs)
@@ -179,12 +238,12 @@ func StartEngine(runner Runner,
 	}()
 	accumResult := runner.Aggregate(results)
 
-	mkErrPicker := func(handler func(r Result)) func(r Result) {
-		return func(r Result) {
+	mkErrPicker := func(handler func(r Result) bool) func(r Result) bool {
+		return func(r Result) bool {
 			if r.Error() != nil {
 				err = r.Error()
 			}
-			handler(r)
+			return handler(r)
 		}
 	}
 	generateHandler = mkErrPicker(generateHandler)

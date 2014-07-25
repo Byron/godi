@@ -18,7 +18,7 @@ func TestVerify(t *testing.T) {
 
 	// keeps track of created indices
 	var indices []string
-	err := godi.StartEngine(&sealcmd, resHandler, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler))
+	err := api.StartEngine(sealcmd, resHandler, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler))
 	if err != nil {
 		t.Error(err)
 	}
@@ -29,7 +29,7 @@ func TestVerify(t *testing.T) {
 
 	verifycmd, _ := verify.NewCommand([]string{indices[0]}, 1)
 
-	err = godi.StartEngine(&verifycmd, resHandler, resHandler)
+	err = api.StartEngine(verifycmd, resHandler, resHandler)
 	if err != nil {
 		t.Error(err)
 	}

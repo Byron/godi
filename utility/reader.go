@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 )
 
 // Size for allocated buffers
@@ -119,7 +120,7 @@ func (p *ChannelReader) WriteTo(w io.Writer) (n int64, err error) {
 // Feed the channel with ChannelReader structures and listen on it's channel to read bytes until EOF, which
 // is when the channel will be closed by the reader
 // done will allow long reads to be interrupted by closing the channel
-func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelController {
+func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadChannelController {
 	if nprocs < 1 {
 		panic("nprocs must be >= 1")
 	}
@@ -128,7 +129,7 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 		make(chan *ChannelReader, nprocs),
 	}
 
-	infoHandler := func(info *ChannelReader) {
+	reader := func(info *ChannelReader) {
 		// in any case, close the results channel
 		defer close(info.results)
 		defer close(info.ready)
@@ -171,6 +172,7 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 			default:
 				{
 					nread, err = info.reader.Read(info.buf[:])
+					atomic.AddUint64(&stats.BytesRead, uint64(nread))
 					info.results <- readResult{info.buf[:nread], nread, err}
 					// we send all results, but abort if the reader is done for whichever reason
 					if err != nil {
@@ -189,7 +191,10 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 	for i := 0; i < nprocs; i++ {
 		go func() {
 			for info := range ctrl.c {
-				infoHandler(info)
+				atomic.AddUint32(&stats.FilesBeingRead, uint32(1))
+				reader(info)
+				atomic.AddUint32(&stats.FilesBeingRead, ^uint32(0))
+				atomic.AddUint32(&stats.TotalFilesRead, uint32(1))
 			}
 		}()
 	}
@@ -200,12 +205,12 @@ func NewReadChannelController(nprocs int, done <-chan bool) ReadChannelControlle
 // NewReadChannelDeviceMap returns a mapping from each of the given trees to a controller which deals with the
 // device the tree is on. If all trees are on the same device, you will get a map with len(trees) length, each one
 // referring to the same controller
-func NewReadChannelDeviceMap(nprocs int, trees []string, done <-chan bool) map[string]*ReadChannelController {
+func NewReadChannelDeviceMap(nprocs int, trees []string, stats *Stats, done <-chan bool) map[string]*ReadChannelController {
 	dm := DeviceMap(trees)
 	res := make(map[string]*ReadChannelController, len(dm))
 
 	for _, dirs := range dm {
-		rctrl := NewReadChannelController(nprocs, done)
+		rctrl := NewReadChannelController(nprocs, stats, done)
 		for _, dir := range dirs {
 			res[dir] = &rctrl
 		}

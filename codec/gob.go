@@ -33,7 +33,7 @@ func (g *Gob) Extension() string {
 
 // Take hashes of input arguments in predefined order
 // NOTE: If order changes for some reason, we have to change the file version !
-func hashInfo(sha1enc hash.Hash, relaPath string, finfo *godi.FileInfo) {
+func hashInfo(sha1enc hash.Hash, relaPath string, finfo *api.FileInfo) {
 	sha1enc.Write([]byte(relaPath))
 	sha1enc.Write([]byte(finfo.Path))
 	sha1enc.Write(finfo.Sha1)
@@ -70,7 +70,7 @@ func (g *Gob) Serialize(paths []SerializableFileInfo, writer io.Writer) (err err
 	return
 }
 
-func (g *Gob) Deserialize(reader io.Reader) ([]godi.FileInfo, error) {
+func (g *Gob) Deserialize(reader io.Reader) ([]api.FileInfo, error) {
 	gzipReader, _ := gzip.NewReader(reader)
 	sha1enc := sha1.New()
 	d := gob.NewDecoder(gzipReader)
@@ -91,7 +91,7 @@ func (g *Gob) Deserialize(reader io.Reader) ([]godi.FileInfo, error) {
 		return nil, err
 	}
 
-	res := make([]godi.FileInfo, numValues)
+	res := make([]api.FileInfo, numValues)
 	for i := 0; i < numValues; i++ {
 		v := &res[i]
 		if err := d.Decode(v); err != nil {

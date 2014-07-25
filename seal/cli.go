@@ -52,22 +52,23 @@ func SubCommands() []gcli.Command {
 
 // Returns a handler whichasd will track seal/index files, and call the given handler aftrewards, writing the
 // into the provided slice
-func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Result)) func(r godi.Result) {
-	return func(r godi.Result) {
-		handler(r)
+func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Result) bool) func(r api.Result) bool {
+	return func(r api.Result) (res bool) {
+		res = handler(r)
 		if r == nil || r.FileInformation() == nil {
 			return
 		}
 		if r.FileInformation().Size < 0 {
 			*indices = append(*indices, r.FileInformation().Path)
 		}
+		return
 	}
 }
 
 func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
 	cmd.verify = c.Bool(verifyAfterCopy)
 	// have to do init ourselves as we set amount of writers
-	nr, err := cli.CheckCommonFlags(c)
+	nr, level, err := cli.CheckCommonFlags(c)
 	if err != nil {
 		return err
 	}
@@ -77,7 +78,7 @@ func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
 		return fmt.Errorf("--%v must not be smaller than 1", streamsPerOutputDevice)
 	}
 
-	return cmd.Init(nr, nw, c.Args())
+	return cmd.Init(nr, nw, c.Args(), level)
 }
 
 func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
@@ -87,25 +88,39 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 	if cmd.verify {
 		// Setup a aggregation result handler which tracks produced indices
 		var indices []string
-		aggHandler := IndexTrackingResultHandlerAdapter(&indices, cli.LogHandler)
+		cmdDone := make(chan bool)
+		logHandler := cli.MakeLogHandler(cmd.Level)
+
+		handler := logHandler
+		if cmd.Level.MayLog(api.Progress) {
+			handler = cli.MakeStatisticalLogHandler(&cmd.Stats, handler, cmdDone)
+		}
+		aggHandler := IndexTrackingResultHandlerAdapter(&indices, handler)
 
 		// and run ourselves
-		err := godi.StartEngine(cmd, cli.LogHandler, aggHandler)
+		err := api.StartEngine(cmd, handler, aggHandler)
+		// Make sure we don't keep logging while verification is going with its own handler
+		close(cmdDone)
 
 		if err == nil && len(indices) == 0 {
 			panic("Unexpectedly I didn't see a single seal index without error")
 		} else if len(indices) > 0 {
-			// no matter whether we have an error, try to verify what's there, but only if the error
-			// wasn't generated from a cancel action
+			// no matter whether we have an error, try to verify what's there
 			select {
 			case <-cmd.Done:
-				// this does nothing, most importantly, it doesn't run verify
+				// this does nothing, most importantly, it doesn't run verify, as we don't run it
+				// after cancellation. It's arguable whether we migth want to do that anyway
+				// as the index is valid !
 			default:
 				{
 					// prepare and run a verify command
-					verifcmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
+					verifycmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
-						err = godi.StartEngine(&verifcmd, cli.LogHandler, cli.LogHandler)
+						handler = logHandler
+						if verifycmd.LogLevel().MayLog(api.Progress) {
+							handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, handler, make(chan bool))
+						}
+						err = api.StartEngine(verifycmd, handler, handler)
 					}
 				}
 			}
@@ -174,7 +189,7 @@ func parseSources(items []string) (res []string, err error) {
 	return res, nil
 }
 
-func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err error) {
+func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority) (err error) {
 	if s.mode == modeSeal {
 		if len(items) == 0 {
 			return errors.New("Please provide at least one source directory to work on")
@@ -183,7 +198,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 		if err != nil {
 			return
 		}
-		s.InitBasicRunner(numReaders, items)
+		s.InitBasicRunner(numReaders, items, maxLogLevel)
 	} else if s.mode == modeCopy {
 		// Parses [src, ...] => [dst, ...]
 		err = errors.New(usage)
@@ -217,7 +232,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 						}
 					}
 				}
-				s.InitBasicRunner(numReaders, sources)
+				s.InitBasicRunner(numReaders, sources, maxLogLevel)
 
 				// build the device map with all writer destinations
 				dm := utility.DeviceMap(dtrees)
@@ -229,7 +244,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 					// each device as so and so many destinations. Each destination uses the same write controller
 					s.rootedWriters[did] = utility.RootedWriteController{
 						Trees: trees,
-						Ctrl:  utility.NewWriteChannelController(numWriters, numWriters*len(trees)),
+						Ctrl:  utility.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats),
 					}
 				} // for each tree set in deviceMap
 

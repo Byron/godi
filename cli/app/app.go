@@ -1,6 +1,9 @@
 package app
 
 import (
+	"fmt"
+
+	"github.com/Byron/godi/api"
 	gocli "github.com/Byron/godi/cli"
 	"github.com/Byron/godi/seal"
 	"github.com/Byron/godi/verify"
@@ -23,6 +26,10 @@ func NewGodiApp() *cli.App {
 	// general flags
 	app.Flags = []cli.Flag{
 		cli.IntFlag{gocli.StreamsPerInputDeviceFlagName + ", spid", 1, "Amount of parallel streams per input device"},
+		cli.StringFlag{gocli.LogLevelFlagName,
+			api.Progress.String(),
+			fmt.Sprintf("One of %s, %s, %s, %s, or '%s' to disable all output", api.Progress, api.Info, api.Warn, api.Error, api.LogDisabled),
+		},
 	}
 	app.Version = "v0.4.0"
 

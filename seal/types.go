@@ -17,7 +17,7 @@ const (
 
 // A type representing all arguments required to drive a Seal operation
 type SealCommand struct {
-	godi.BasicRunner
+	api.BasicRunner
 
 	// The type of seal operation we are supposed to perform
 	mode string
@@ -32,32 +32,33 @@ type SealCommand struct {
 
 // A result which is also able to hold information about the source of a file
 type SealResult struct {
-	godi.BasicResult
+	api.BasicResult
 	// source of a copy operation, may be unset
 	source string
 }
 
 // NewCommand returns an initialized seal command
-func NewCommand(trees []string, nReaders, nWriters int) (c SealCommand, err error) {
+func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
+	c := SealCommand{}
 	if nWriters == 0 {
 		c.mode = modeSeal
 	} else {
 		c.mode = modeCopy
 	}
-	err = c.Init(nReaders, nWriters, trees)
-	return
+	err := c.Init(nReaders, nWriters, trees, api.Progress)
+	return &c, err
 }
 
-func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup) {
-	makeResult := func(f, source *godi.FileInfo, err error) godi.Result {
+func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup) {
+	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		s := ""
 		if source != nil {
 			s = source.Path
 		}
 		res := SealResult{
-			BasicResult: godi.BasicResult{
+			BasicResult: api.BasicResult{
 				Finfo: *f,
-				Prio:  godi.Progress,
+				Prio:  api.Progress,
 				Err:   err,
 			},
 			source: s,
@@ -65,5 +66,5 @@ func (s *SealCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Res
 		return &res
 	}
 
-	godi.Gather(files, results, wg, makeResult, s.RootedReaders, s.rootedWriters)
+	api.Gather(files, results, wg, s.Statistics(), makeResult, s.RootedReaders, s.rootedWriters)
 }
