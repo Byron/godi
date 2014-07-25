@@ -22,16 +22,23 @@ const (
 // currently going on based on the statistical information we are passed
 // NOTE: Even though it would be cleaner to just inject messages into the results channel, this way
 // we wouldn't know when the last message was emitted, possibly emitting too much
-func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result)) func(api.Result) {
+// Done should be called to signal that we should stop
+func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result), done <-chan bool) func(api.Result) {
 	lastLoggedAt := time.Now()
 	lastStat := *stats
 
 	// An observer, printing out statistics as needed
 	// We check a bit more often than the time after which to log some stats, to be more responsive
 	// Lets be late at max 1/8 of a second
-	ticker := time.Tick(StatisticalLoggingInterval / 4)
+	ticker := time.NewTicker(StatisticalLoggingInterval / 4)
 	go func() {
-		for now := range ticker {
+		for now := range ticker.C {
+			select {
+			case <-done:
+				ticker.Stop()
+			default:
+			}
+
 			td := now.Sub(lastLoggedAt) // temporal distance
 			if td+TimeEpsilon < StatisticalLoggingInterval {
 				continue
@@ -62,7 +69,7 @@ func LogHandler(r api.Result) {
 // Both handlers may be nil to use a default one
 func RunAction(cmd api.Runner, c *cli.Context) {
 	// checkArgs must have initialized the seal command, so we can just run it
-	handler := MakeStatisticalLogHandler(cmd.Statistics(), LogHandler)
+	handler := MakeStatisticalLogHandler(cmd.Statistics(), LogHandler, make(chan bool))
 	err := api.StartEngine(cmd, handler, handler)
 	if err != nil {
 		os.Exit(1)

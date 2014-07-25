@@ -181,5 +181,8 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 		// all good
 
 		sendResults(&f, nil)
-	}
+	} // end for each file to process
+
+	// Keep the count valid ...
+	atomic.AddUint32(&stats.NumHashers, ^uint32(nHashes-1))
 }
