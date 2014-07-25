@@ -10,6 +10,7 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
+	"github.com/Byron/godi/utility"
 )
 
 const (
@@ -133,6 +134,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	finalizer := func(
 		accumResult chan<- api.Result,
 		st *api.AggregateFinalizerState) {
+		stats := s.Stats.DeltaString(&s.Stats, st.Elapsed, utility.StatsClientSep)
 
 		if signatureMismatches == 0 && missingFiles == 0 {
 			accumResult <- &VerifyResult{
@@ -140,7 +142,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 					Msg: fmt.Sprintf(
 						"VERIFY OK: None of %d file(s) changed after sealing [%s]",
 						s.Stats.MostFiles(),
-						s.Stats.DeltaString(&s.Stats, st.Elapsed),
+						stats,
 					) + st.String(),
 					Prio: api.Info,
 				},
@@ -155,7 +157,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 						signatureMismatches,
 						s.Stats.MostFiles(),
 						missingFiles,
-						s.Stats.DeltaString(&s.Stats, st.Elapsed),
+						stats,
 					) + st.String(),
 					Prio: api.Info,
 				},

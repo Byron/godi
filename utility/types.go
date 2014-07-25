@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+const (
+	StatsClientSep = " | "
+)
+
 // A structure to keep information about what is currently going on.
 // It is means to be used as shared resource, used by multiple threads, which is why
 // thread-safe counters are used.
@@ -71,29 +75,31 @@ func (b BytesVolume) String() string {
 
 // Prints itself as a single line full of useful information, including deltas of relevant metrics as compared
 // to theh last state d. You will also give the temporal distance which separates this stat from the previous one
-// If d didn't change in a particular field, we will produce deltas normalized to average per second
-func (s *Stats) DeltaString(d *Stats, td time.Duration) string {
+// If d didn't change in a particular field, we will assume the user wants to print the speed per second so far,
+// and td should have the respective value of the total program duration
+// Sep is the separator to use between fields
+func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 	intDelta := func(cur, prev uint32) string {
 		if prev == 0 {
 			prev = cur
 		}
 
-		if prev == cur {
-			// normalize to seconds
-			return fmt.Sprintf(" ⨏#Δ%d/s", uint64(float64(cur)/td.Seconds()))
+		val := cur
+		if prev != cur {
+			val = cur - prev
 		}
-		return fmt.Sprintf(" #Δ%+d ", cur-prev)
+		return fmt.Sprintf(" #Δ%d/s", uint64(float64(val)/td.Seconds()))
 	}
 
 	bytesDelta := func(cur, prev uint64) string {
 		if prev == 0 {
 			prev = cur
 		}
-		if prev == cur {
-			// normalize to seconds
-			return fmt.Sprintf(" ⨏Δ%s/s", BytesVolume(float64(cur)/td.Seconds()))
+		val := cur
+		if prev != cur {
+			val = cur - prev
 		}
-		return fmt.Sprintf(" Δ%s/%.2fs", BytesVolume(cur-prev), td.Seconds())
+		return fmt.Sprintf(" Δ%s/s", BytesVolume(float64(val)/td.Seconds()))
 	}
 
 	inOut := func(cur uint32) string {
@@ -103,10 +109,14 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration) string {
 		return fmt.Sprintf("%d ", cur)
 	}
 
+	if len(sep) == 0 {
+		sep = "\t"
+	}
+
 	itf := atomic.LoadUint32(&s.TotalFilesRead)
 	ibr := atomic.LoadUint64(&s.BytesRead)
 
-	out := fmt.Sprintf("%s->IN (#%d%s ⌰%s%s)",
+	out := fmt.Sprintf("%s->IN #%d%s ⌰%s%s",
 		inOut(atomic.LoadUint32(&s.FilesBeingRead)),
 		itf,
 		intDelta(itf, d.TotalFilesRead),
@@ -114,11 +124,21 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration) string {
 		bytesDelta(ibr, d.BytesRead),
 	)
 
-	if s.FilesBeingWritten > 0 {
+	bh := atomic.LoadUint64(&s.BytesHashed)
+
+	out += fmt.Sprintf("%s%sHASH ⌰%s%s",
+		sep,
+		inOut(atomic.LoadUint32(&s.NumHashers)),
+		BytesVolume(bh),
+		bytesDelta(bh, d.BytesHashed),
+	)
+
+	if s.TotalFilesWritten > 0 || s.FilesBeingWritten > 0 {
 		otf := atomic.LoadUint32(&s.TotalFilesWritten)
 		obw := atomic.LoadUint64(&s.BytesWritten)
 
-		out += fmt.Sprintf("\t%sOUT->(#%d%s ⌰%s%s)",
+		out += fmt.Sprintf("%s%sOUT->#%d%s ⌰%s%s",
+			sep,
 			inOut(atomic.LoadUint32(&s.FilesBeingWritten)),
 			otf,
 			intDelta(otf, d.TotalFilesWritten),
@@ -127,12 +147,5 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration) string {
 		)
 	}
 
-	bh := atomic.LoadUint64(&s.BytesHashed)
-
-	out += fmt.Sprintf("\t%sHASH (⌰%s%s)",
-		inOut(atomic.LoadUint32(&s.NumHashers)),
-		BytesVolume(bh),
-		bytesDelta(bh, d.BytesHashed),
-	)
 	return out
 }

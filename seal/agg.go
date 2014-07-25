@@ -109,7 +109,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			} else {
 				accumResult <- &api.BasicResult{
 					Finfo: api.FileInfo{Path: index, Size: -1},
-					Msg:   fmt.Sprintf("Wrote seal at '%s'", index),
+					Msg:   fmt.Sprintf("Wrote seal to '%s'", index),
 					Prio:  api.Info,
 				}
 			} // handle index writing errors
@@ -245,7 +245,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		accumResult <- &api.BasicResult{
 			Msg: fmt.Sprintf(
 				"SEAL COMPLETE: %s",
-				s.Stats.DeltaString(&s.Stats, st.Elapsed),
+				s.Stats.DeltaString(&s.Stats, st.Elapsed, utility.StatsClientSep),
 			) + st.String(),
 			Prio: api.Info,
 		}

@@ -96,17 +96,18 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 		if err == nil && len(indices) == 0 {
 			panic("Unexpectedly I didn't see a single seal index without error")
 		} else if len(indices) > 0 {
-			// no matter whether we have an error, try to verify what's there, but only if the error
-			// wasn't generated from a cancel action
+			// no matter whether we have an error, try to verify what's there
 			select {
 			case <-cmd.Done:
-				// this does nothing, most importantly, it doesn't run verify
+				// this does nothing, most importantly, it doesn't run verify, as we don't run it
+				// after cancellation. It's arguable whether we migth want to do that anyway
+				// as the index is valid !
 			default:
 				{
 					// prepare and run a verify command
-					verifcmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
+					verifycmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
-						err = api.StartEngine(&verifcmd, handler, handler)
+						err = api.StartEngine(&verifycmd, handler, handler)
 					}
 				}
 			}
