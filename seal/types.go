@@ -45,7 +45,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	} else {
 		c.mode = modeCopy
 	}
-	err := c.Init(nReaders, nWriters, trees)
+	err := c.Init(nReaders, nWriters, trees, api.Progress)
 	return &c, err
 }
 

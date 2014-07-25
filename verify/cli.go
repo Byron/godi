@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/codec"
 
@@ -29,7 +30,7 @@ func SubCommands() []gcli.Command {
 	return out
 }
 
-func (s *VerifyCommand) Init(numReaders, numWriters int, items []string) error {
+func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority) error {
 	if len(items) == 0 {
 		return errors.New("Please provide at least one seal file")
 	}
@@ -45,7 +46,7 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string) error {
 		indexDirs[i] = filepath.Dir(index)
 	}
 
-	s.InitBasicRunner(numReaders, indexDirs)
+	s.InitBasicRunner(numReaders, indexDirs, maxLogLevel)
 	s.Items = items
 	return nil
 }

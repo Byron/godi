@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -38,11 +39,39 @@ const (
 	Info
 	Warn
 	Error
+	LogDisabled
 )
 
 // MayLog returns true if the given priority may be logged as seen from our log-level.
 func (p Priority) MayLog(op Priority) bool {
 	return op >= p
+}
+
+func (p Priority) String() string {
+	switch {
+	case p == Progress:
+		return "progress"
+	case p == Info:
+		return "info"
+	case p == Warn:
+		return "warn"
+	case p == Error:
+		return "error"
+	case p == LogDisabled:
+		return "off"
+	default:
+		panic("Unknown log level")
+	}
+}
+
+// Parse a priority from the given string. error will be set if this fails
+func PriorityFromString(p string) (Priority, error) {
+	for _, t := range []Priority{Progress, Info, Warn, Error, LogDisabled} {
+		if t.String() == p {
+			return t, nil
+		}
+	}
+	return LogDisabled, fmt.Errorf("Unknown verbosity level: '%s'", p)
 }
 
 type Result interface {
@@ -94,6 +123,8 @@ type BasicRunner struct {
 	Stats utility.Stats
 
 	// The maximum log-level. We just keep this value here because the cli makes a difference between CHECK and RUN !
+	// This member shouldn't be needed as logging is not done by the runner anyway - it's all done by result handlers.
+	// Only they are concerned, which is a function of the CLI entirely
 	// TODO(st) Fork CLI and make the fix, use the fork from that point on ... .
 	Level Priority
 }
@@ -114,13 +145,14 @@ func (b *BasicRunner) NumChannels() int {
 }
 
 // Initialize our Readers and items with the given information, including our cannel
-func (b *BasicRunner) InitBasicRunner(numReaders int, items []string) {
+func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Priority) {
 	b.Items = items
 	b.Done = make(chan bool)
 	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, &b.Stats, b.Done)
 	if len(b.RootedReaders) == 0 {
 		panic("Didn't manage to build readers from input items")
 	}
+	b.Level = maxLogLevel
 }
 
 func (b *BasicRunner) CancelChannel() chan bool {
@@ -136,7 +168,7 @@ type Runner interface {
 	// can be assumed to be valid
 	// Sets the items we are supposed to be working on - must be checked by implementation, as they are
 	// very generic in nature
-	Init(numReaders, numWriters int, items []string) error
+	Init(numReaders, numWriters int, items []string, maxLogLevel Priority) error
 
 	// Return the amount of io-channels the runner may be using in parallel per device
 	NumChannels() int

@@ -31,7 +31,7 @@ type VerifyResult struct {
 // NewCommand returns an initialized verify command
 func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
 	c := VerifyCommand{}
-	return &c, c.Init(nReaders, 0, indices)
+	return &c, c.Init(nReaders, 0, indices, api.Progress)
 }
 
 func (s *VerifyCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
