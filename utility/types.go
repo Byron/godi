@@ -74,32 +74,32 @@ func (b BytesVolume) String() string {
 }
 
 // Prints itself as a single line full of useful information, including deltas of relevant metrics as compared
-// to theh last state d. You will also give the temporal distance which separates this stat from the previous one
-// If d didn't change in a particular field, we will assume the user wants to print the speed per second so far,
-// and td should have the respective value of the total program duration
+// to the last state d. You will also give the temporal distance which separates this stat from the previous one
+// If you pass s as d, this indicates a result mode, which assumes you want the overall average throughput
 // Sep is the separator to use between fields
 func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
-	intDelta := func(cur, prev uint32) string {
-		if prev == 0 {
-			prev = cur
-		}
+	resultMode := d == s
 
-		val := cur
-		if prev != cur {
-			val = cur - prev
+	intDelta := func(cur, prev uint32) string {
+		if prev == cur {
+			if resultMode {
+				prev = 0
+			} else {
+				return ""
+			}
 		}
-		return fmt.Sprintf(" #Δ%d/s", uint64(float64(val)/td.Seconds()))
+		return fmt.Sprintf(" #Δ%d/s", uint64(float64(cur-prev)/td.Seconds()))
 	}
 
 	bytesDelta := func(cur, prev uint64) string {
-		if prev == 0 {
-			prev = cur
+		if prev == cur {
+			if resultMode {
+				prev = 0
+			} else {
+				return ""
+			}
 		}
-		val := cur
-		if prev != cur {
-			val = cur - prev
-		}
-		return fmt.Sprintf(" Δ%s/s", BytesVolume(float64(val)/td.Seconds()))
+		return fmt.Sprintf(" Δ%s/s", BytesVolume(float64(cur-prev)/td.Seconds()))
 	}
 
 	inOut := func(cur uint32) string {

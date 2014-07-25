@@ -3,6 +3,7 @@ package verify
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/Byron/godi/cli"
@@ -37,6 +38,9 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string) error {
 	for i, index := range items {
 		if codec := codec.NewByPath(index); codec == nil {
 			return fmt.Errorf("Unknown seal file format: '%s'", index)
+		}
+		if _, err := os.Stat(index); err != nil {
+			return fmt.Errorf("Cannot access seal file at '%s'", index)
 		}
 		indexDirs[i] = filepath.Dir(index)
 	}
