@@ -18,13 +18,13 @@ const (
 
 // A type representing all arguments required to drive a Seal operation
 type VerifyCommand struct {
-	godi.BasicRunner
+	api.BasicRunner
 }
 
 // Implements information about a verify operation
 type VerifyResult struct {
-	godi.BasicResult               // will contain the actual file information from the disk file
-	ifinfo           godi.FileInfo // the file information we have seen in the index
+	api.BasicResult              // will contain the actual file information from the disk file
+	ifinfo          api.FileInfo // the file information we have seen in the index
 }
 
 // NewCommand returns an initialized verify command
@@ -33,8 +33,8 @@ func NewCommand(indices []string, nReaders int) (c VerifyCommand, err error) {
 	return
 }
 
-func (s *VerifyCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
-	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
+func (s *VerifyCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
+	generate := func(files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, index := range s.Items {
 			c := codec.NewByPath(index)
 			if c == nil {
@@ -44,7 +44,7 @@ func (s *VerifyCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
 			fd, err := os.Open(index)
 			if err != nil {
 				results <- &VerifyResult{
-					BasicResult: godi.BasicResult{Err: err},
+					BasicResult: api.BasicResult{Err: err},
 				}
 				continue
 			}
@@ -76,22 +76,22 @@ func (s *VerifyCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
 				} // for each fileInfo
 			} else {
 				results <- &VerifyResult{
-					BasicResult: godi.BasicResult{Err: err},
+					BasicResult: api.BasicResult{Err: err},
 				}
 				continue
 			}
 		} // for each index
 	}
 
-	return godi.Generate(generate)
+	return api.Generate(generate)
 }
 
-func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.Result, wg *sync.WaitGroup) {
-	makeResult := func(f, source *godi.FileInfo, err error) godi.Result {
+func (s *VerifyCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup) {
+	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		res := VerifyResult{
-			BasicResult: godi.BasicResult{
+			BasicResult: api.BasicResult{
 				Finfo: *f,
-				Prio:  godi.Progress,
+				Prio:  api.Progress,
 				Err:   err,
 			},
 			ifinfo: *f,
@@ -99,14 +99,14 @@ func (s *VerifyCommand) Gather(files <-chan godi.FileInfo, results chan<- godi.R
 		return &res
 	}
 
-	godi.Gather(files, results, wg, makeResult, s.RootedReaders, nil)
+	api.Gather(files, results, wg, makeResult, s.RootedReaders, nil)
 }
 
-func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result {
+func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 	var signatureMismatches uint = 0
 	var missingFiles uint = 0
-	resultHandler := func(r godi.Result, accumResult chan<- godi.Result) bool {
+	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
 		if r.Error() != nil {
 			if os.IsNotExist(r.Error()) || os.IsPermission(r.Error()) {
 				missingFiles += 1
@@ -131,25 +131,25 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result
 	}
 
 	finalizer := func(
-		accumResult chan<- godi.Result,
-		st *godi.AggregateFinalizerState) {
+		accumResult chan<- api.Result,
+		st *api.AggregateFinalizerState) {
 
 		if signatureMismatches == 0 && missingFiles == 0 {
 			accumResult <- &VerifyResult{
-				BasicResult: godi.BasicResult{
+				BasicResult: api.BasicResult{
 					Msg: fmt.Sprintf(
 						"All %d files did not change after sealing (%v)",
 						st.FileCount,
 						st,
 					),
-					Prio: godi.Info,
+					Prio: api.Info,
 				},
 			}
 		} else {
 			st.ErrCount -= signatureMismatches
 			st.ErrCount -= missingFiles
 			accumResult <- &VerifyResult{
-				BasicResult: godi.BasicResult{
+				BasicResult: api.BasicResult{
 					Msg: fmt.Sprintf(
 						"%d of %d files have changed on disk after sealing, %d are missing (%v)",
 						signatureMismatches,
@@ -157,11 +157,11 @@ func (s *VerifyCommand) Aggregate(results <-chan godi.Result) <-chan godi.Result
 						missingFiles,
 						st,
 					),
-					Prio: godi.Info,
+					Prio: api.Info,
 				},
 			}
 		}
 	}
 
-	return godi.Aggregate(results, s.Done, resultHandler, finalizer)
+	return api.Aggregate(results, s.Done, resultHandler, finalizer)
 }

@@ -1,4 +1,4 @@
-package godi
+package api
 
 import (
 	"fmt"

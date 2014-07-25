@@ -1,4 +1,4 @@
-package godi
+package api
 
 import (
 	"os"
@@ -84,6 +84,13 @@ type BasicRunner struct {
 	RootedReaders map[string]*utility.ReadChannelController
 	// A channel to let everyone know we should finish as soon as possible - this is done by closing the channel
 	Done chan bool
+
+	// our statistics instance
+	Stats utility.Stats
+}
+
+func (b *BasicRunner) Statistics() *utility.Stats {
+	return &b.Stats
 }
 
 func (b *BasicRunner) NumChannels() int {
@@ -97,7 +104,7 @@ func (b *BasicRunner) NumChannels() int {
 func (b *BasicRunner) InitBasicRunner(numReaders int, items []string) {
 	b.Items = items
 	b.Done = make(chan bool)
-	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, b.Done)
+	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, &b.Stats, b.Done)
 	if len(b.RootedReaders) == 0 {
 		panic("Didn't manage to build readers from input items")
 	}
@@ -120,6 +127,9 @@ type Runner interface {
 
 	// Return the amount of io-channels the runner may be using in parallel per device
 	NumChannels() int
+
+	// Statistics returns the commands shared statistics structure
+	Statistics() *utility.Stats
 
 	// CancelChannel returns the channel to close when the operation should stop prematurely
 	// NOTE: Only valid after Init was called, and it's an error to call it beforehand

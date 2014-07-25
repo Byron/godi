@@ -13,7 +13,7 @@ const (
 	StreamsPerInputDeviceFlagName = "streams-per-input-device"
 )
 
-func LogHandler(r godi.Result) {
+func LogHandler(r api.Result) {
 	if r.Error() != nil {
 		fmt.Fprintln(os.Stderr, r.Error())
 	} else {
@@ -24,9 +24,9 @@ func LogHandler(r godi.Result) {
 
 // Runs a standard runner from within the cli, dealing with errors accoringly
 // Both handlers may be nil to use a default one
-func RunAction(cmd godi.Runner, c *cli.Context) {
+func RunAction(cmd api.Runner, c *cli.Context) {
 	// checkArgs must have initialized the seal command, so we can just run it
-	err := godi.StartEngine(cmd, LogHandler, LogHandler)
+	err := api.StartEngine(cmd, LogHandler, LogHandler)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -45,7 +45,7 @@ func CheckCommonFlags(c *cli.Context) (nr int, err error) {
 
 // Check common args and init a command with them.
 // Further init and checking should be done in specialized function
-func CheckCommonFlagsAndInit(cmd godi.Runner, c *cli.Context) error {
+func CheckCommonFlagsAndInit(cmd api.Runner, c *cli.Context) error {
 	nr, err := CheckCommonFlags(c)
 	if err != nil {
 		return err

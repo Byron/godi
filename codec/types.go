@@ -7,7 +7,7 @@ import (
 )
 
 type SerializableFileInfo struct {
-	godi.FileInfo
+	api.FileInfo
 
 	// The error associated with the file, usually read errors
 	// This can be expected to be unset if the structure should be written
@@ -32,7 +32,7 @@ type Codec interface {
 
 	// Read a FileInfo slice from the given reader. The fileinfo Paths must be relative to the index file
 	// An error must be returned if the data read could not be verified.
-	Deserialize(reader io.Reader) ([]godi.FileInfo, error)
+	Deserialize(reader io.Reader) ([]api.FileInfo, error)
 
 	// Extension returns the file extension of the codec, without the '.' prefix
 	Extension() string

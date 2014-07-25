@@ -9,8 +9,8 @@ import (
 	"github.com/Byron/godi/api"
 )
 
-func (s *SealCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
-	generate := func(files chan<- godi.FileInfo, results chan<- godi.Result) {
+func (s *SealCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
+	generate := func(files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, tree := range s.Items {
 			if !s.traverseFilesRecursively(files, results, s.Done, tree, tree) {
 				// interrupted usually, or there was an error
@@ -19,11 +19,11 @@ func (s *SealCommand) Generate() (<-chan godi.FileInfo, <-chan godi.Result) {
 		}
 	}
 
-	return godi.Generate(generate)
+	return api.Generate(generate)
 }
 
 // Traverse recursively, return false if the caller should stop traversing due to an error
-func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, results chan<- godi.Result, done <-chan bool, tree string, root string) bool {
+func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, results chan<- api.Result, done <-chan bool, tree string, root string) bool {
 	select {
 	case <-done:
 		return false
@@ -32,18 +32,18 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 			// read dir and, build file info, and recurse into subdirectories
 			f, err := os.Open(tree)
 			if err != nil {
-				results <- &godi.BasicResult{
+				results <- &api.BasicResult{
 					Err:  err,
-					Prio: godi.Error,
+					Prio: api.Error,
 				}
 				return false
 			}
 			dirInfos, err := f.Readdir(-1)
 			f.Close()
 			if err != nil {
-				results <- &godi.BasicResult{
+				results <- &api.BasicResult{
 					Err:  err,
-					Prio: godi.Error,
+					Prio: api.Error,
 				}
 				return false
 			}
@@ -53,28 +53,28 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- godi.FileInfo, resul
 				if !fi.IsDir() {
 					path := filepath.Join(tree, fi.Name())
 					if !fi.Mode().IsRegular() {
-						results <- &godi.BasicResult{
+						results <- &api.BasicResult{
 							Msg:  fmt.Sprintf("Ignoring symbolic link: '%s'", path),
-							Prio: godi.Warn,
+							Prio: api.Warn,
 						}
 						continue
 					}
 					if fr, _ := utf8.DecodeRuneInString(fi.Name()); fr == '.' {
-						results <- &godi.BasicResult{
+						results <- &api.BasicResult{
 							Msg:  fmt.Sprintf("Ignoring hidden file: '%s'", path),
-							Prio: godi.Warn,
+							Prio: api.Warn,
 						}
 						continue
 					}
 					if reIsIndexPath.Match([]byte(fi.Name())) {
-						results <- &godi.BasicResult{
+						results <- &api.BasicResult{
 							Msg:  fmt.Sprintf("Ignoring godi index: '%s'", path),
-							Prio: godi.Warn,
+							Prio: api.Warn,
 						}
 						continue
 					}
 
-					files <- godi.FileInfo{
+					files <- api.FileInfo{
 						Path:     path,
 						RelaPath: path[len(root)+1:],
 						Size:     fi.Size(),

@@ -52,8 +52,8 @@ func SubCommands() []gcli.Command {
 
 // Returns a handler whichasd will track seal/index files, and call the given handler aftrewards, writing the
 // into the provided slice
-func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Result)) func(r godi.Result) {
-	return func(r godi.Result) {
+func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Result)) func(r api.Result) {
+	return func(r api.Result) {
 		handler(r)
 		if r == nil || r.FileInformation() == nil {
 			return
@@ -90,7 +90,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 		aggHandler := IndexTrackingResultHandlerAdapter(&indices, cli.LogHandler)
 
 		// and run ourselves
-		err := godi.StartEngine(cmd, cli.LogHandler, aggHandler)
+		err := api.StartEngine(cmd, cli.LogHandler, aggHandler)
 
 		if err == nil && len(indices) == 0 {
 			panic("Unexpectedly I didn't see a single seal index without error")
@@ -105,7 +105,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 					// prepare and run a verify command
 					verifcmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
-						err = godi.StartEngine(&verifcmd, cli.LogHandler, cli.LogHandler)
+						err = api.StartEngine(&verifcmd, cli.LogHandler, cli.LogHandler)
 					}
 				}
 			}
