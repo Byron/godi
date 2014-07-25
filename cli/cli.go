@@ -13,6 +13,7 @@ import (
 
 const (
 	StatisticalLoggingInterval    = 1 * time.Second
+	TimeEpsilon                   = 25 * time.Millisecond
 	StreamsPerInputDeviceFlagName = "streams-per-input-device"
 )
 
@@ -23,19 +24,22 @@ const (
 // we wouldn't know when the last message was emitted, possibly emitting too much
 func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result)) func(api.Result) {
 	lastLoggedAt := time.Now()
+	lastStat := *stats
 
 	// An observer, printing out statistics as needed
 	// We check a bit more often than the time after which to log some stats, to be more responsive
-	// Lets be late at max 1/4 of a second
-	ticker := time.Tick(StatisticalLoggingInterval / 4)
+	// Lets be late at max 1/8 of a second
+	ticker := time.Tick(StatisticalLoggingInterval / 8)
 	go func() {
 		for now := range ticker {
-			if now.Sub(lastLoggedAt) < StatisticalLoggingInterval {
+			td := now.Sub(lastLoggedAt) // temporal distance
+			if td+TimeEpsilon < StatisticalLoggingInterval {
 				continue
 			}
 			// Otherwise, prepare statistics
-			fmt.Println(stats)
+			fmt.Println(stats.DeltaString(&lastStat, td))
 			lastLoggedAt = now
+			stats.CopyTo(&lastStat)
 		}
 	}()
 
