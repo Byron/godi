@@ -10,6 +10,8 @@ import (
 // Implementations must keep these numbers up-to-date, while async processors will digest
 // and present the data in some form
 type Stats struct {
+	TotalFilesRead    uint32 // Amount of whole files we read so far
+	TotalFilesWritten uint32 // Amount of whole files we wrote so far
 	FilesBeingRead    uint32 // Amount of files currently being read
 	FilesBeingWritten uint32 // Amount of files currently being written
 	BytesRead         uint64 // Total of bytes read so far, counting all input streams
@@ -43,9 +45,12 @@ func (b BytesVolume) String() string {
 
 // Prints itself as a single line full of useful information
 func (s *Stats) String() string {
-	return fmt.Sprintf("%d IN(%s)\t%d OUT(%s)\t%d HASH(%s)",
-		s.FilesBeingRead, BytesVolume(s.BytesRead),
-		s.FilesBeingWritten, BytesVolume(s.BytesWritten),
-		s.NumHashers, BytesVolume(s.BytesHashed),
-	)
+	out := fmt.Sprintf("%d IN(#%d with %s)", s.FilesBeingRead, s.TotalFilesRead, BytesVolume(s.BytesRead))
+
+	if s.FilesBeingWritten > 0 {
+		out += fmt.Sprintf("\t%d OUT(#%d with %s)", s.FilesBeingWritten, s.TotalFilesWritten, BytesVolume(s.BytesWritten))
+	}
+
+	out += fmt.Sprintf("\t%d HASH(%s)", s.NumHashers, BytesVolume(s.BytesHashed))
+	return out
 }

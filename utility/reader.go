@@ -194,6 +194,7 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 				atomic.AddUint32(&stats.FilesBeingRead, uint32(1))
 				reader(info)
 				atomic.AddUint32(&stats.FilesBeingRead, ^uint32(0))
+				atomic.AddUint32(&stats.TotalFilesRead, uint32(1))
 			}
 		}()
 	}

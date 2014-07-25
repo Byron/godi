@@ -130,6 +130,7 @@ func (c *ChannelWriter) Write(b []byte) (n int, err error) {
 }
 
 func (c *ChannelWriter) Close() error {
+	atomic.AddUint32(&c.ctrl.stats.TotalFilesWritten, 1)
 	if w, ok := c.writer.(io.Closer); ok {
 		return w.Close()
 	}
@@ -193,6 +194,9 @@ type WriteChannelController struct {
 	// Keeps all write requests, which contain all information we could possibly want to write something.
 	// As the ChannelWriter is keeping all information, we serves as request right away
 	c chan *ChannelWriter
+
+	// Allows to track amount of written files
+	stats *Stats
 }
 
 // A utility structure to associate a tree with a writer.
@@ -211,6 +215,7 @@ type RootedWriteController struct {
 func NewWriteChannelController(nprocs, channelCap int, stats *Stats) WriteChannelController {
 	ctrl := WriteChannelController{
 		make(chan *ChannelWriter, channelCap),
+		stats,
 	}
 	if nprocs < 1 {
 		panic("Need at least one go routine to process work")
