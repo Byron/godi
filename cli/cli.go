@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	NumStreamsPerDeviceFlagName = "streams-per-device"
+	StreamsPerInputDeviceFlagName = "streams-per-input-device"
 )
 
 func LogHandler(r godi.Result) {
@@ -32,14 +32,24 @@ func RunAction(cmd godi.Runner, c *cli.Context) {
 	}
 }
 
-// Check common args and init a command with them.
-// Further init and checking should be done in specialized function
-func CheckCommonArgs(cmd godi.Runner, c *cli.Context) error {
+// As CheckCommonFlagsAndInit, but will return all parsed and verified common values, including an optional error
+func CheckCommonFlags(c *cli.Context) (nr int, err error) {
 	// Put parsed args in cmd and sanitize it
-	ns := c.GlobalInt(NumStreamsPerDeviceFlagName)
-	if ns < 1 {
-		return fmt.Errorf("--%v must not be smaller than 1", NumStreamsPerDeviceFlagName)
+	nr = c.GlobalInt(StreamsPerInputDeviceFlagName)
+	if nr < 1 {
+		return 0, fmt.Errorf("--%v must not be smaller than 1", StreamsPerInputDeviceFlagName)
 	}
 
-	return cmd.Init(ns, ns, c.Args())
+	return
+}
+
+// Check common args and init a command with them.
+// Further init and checking should be done in specialized function
+func CheckCommonFlagsAndInit(cmd godi.Runner, c *cli.Context) error {
+	nr, err := CheckCommonFlags(c)
+	if err != nil {
+		return err
+	}
+
+	return cmd.Init(nr, nr, c.Args())
 }

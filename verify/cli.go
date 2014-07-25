@@ -21,7 +21,7 @@ func SubCommands() []gcli.Command {
 		ShortName: "",
 		Usage:     "Compare stored data with seal to detect bit errors",
 		Action:    func(c *gcli.Context) { cli.RunAction(&cmd, c) },
-		Before:    func(c *gcli.Context) error { return cli.CheckCommonArgs(&cmd, c) },
+		Before:    func(c *gcli.Context) error { return cli.CheckCommonFlagsAndInit(&cmd, c) },
 	}
 
 	out[0] = verify

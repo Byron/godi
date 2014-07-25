@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	Sep             = "--"
-	usage           = "Please specify sealed copies like so: source/ -- destination/"
-	verifyAfterCopy = "verify"
+	Sep                    = "--"
+	usage                  = "Please specify sealed copies like so: source/ -- destination/"
+	verifyAfterCopy        = "verify"
+	streamsPerOutputDevice = "streams-per-output-device"
 )
 
 // return subcommands for our particular area of algorithms
@@ -33,7 +34,7 @@ func SubCommands() []gcli.Command {
 			ShortName: "",
 			Usage:     "Generate a seal for one ore more directories, which allows them to be verified later on",
 			Action:    func(c *gcli.Context) { cli.RunAction(&cmdseal, c) },
-			Before:    func(c *gcli.Context) error { return cli.CheckCommonArgs(&cmdseal, c) },
+			Before:    func(c *gcli.Context) error { return cli.CheckCommonFlagsAndInit(&cmdseal, c) },
 		},
 		gcli.Command{
 			Name:      modeCopy,
@@ -43,12 +44,13 @@ func SubCommands() []gcli.Command {
 			Before:    func(c *gcli.Context) error { return checkSealedCopy(&cmdcopy, c) },
 			Flags: []gcli.Flag{
 				gcli.BoolFlag{verifyAfterCopy, "Run `godi verify` on all produced seals when copy is finished"},
+				gcli.IntFlag{streamsPerOutputDevice + ", spod", 1, "Amount of parallel streams per output device"},
 			},
 		},
 	}
 }
 
-// Returns a handler which will track seal/index files, and call the given handler aftrewards, writing the
+// Returns a handler whichasd will track seal/index files, and call the given handler aftrewards, writing the
 // into the provided slice
 func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Result)) func(r godi.Result) {
 	return func(r godi.Result) {
@@ -64,7 +66,18 @@ func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r godi.Re
 
 func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
 	cmd.verify = c.Bool(verifyAfterCopy)
-	return cli.CheckCommonArgs(cmd, c)
+	// have to do init ourselves as we set amount of writers
+	nr, err := cli.CheckCommonFlags(c)
+	if err != nil {
+		return err
+	}
+
+	nw := c.Int(streamsPerOutputDevice)
+	if nw < 1 {
+		return fmt.Errorf("--%v must not be smaller than 1", streamsPerOutputDevice)
+	}
+
+	return cmd.Init(nr, nw, c.Args())
 }
 
 func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
@@ -90,7 +103,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 			default:
 				{
 					// prepare and run a verify command
-					verifcmd, err := verify.NewCommand(indices, c.GlobalInt(cli.NumStreamsPerDeviceFlagName))
+					verifcmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
 						err = godi.StartEngine(&verifcmd, cli.LogHandler, cli.LogHandler)
 					}

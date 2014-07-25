@@ -22,9 +22,9 @@ func NewGodiApp() *cli.App {
 
 	// general flags
 	app.Flags = []cli.Flag{
-		cli.IntFlag{gocli.NumStreamsPerDeviceFlagName + ", spd", 1, "Amount of parallel streams per input and output device"},
+		cli.IntFlag{gocli.StreamsPerInputDeviceFlagName + ", spid", 1, "Amount of parallel streams per input device"},
 	}
-	app.Version = "v0.3.0"
+	app.Version = "v0.4.0"
 
 	return app
 }
