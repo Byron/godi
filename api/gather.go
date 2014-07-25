@@ -4,12 +4,34 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"fmt"
+	"hash"
 	"io"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Byron/godi/utility"
 )
+
+// Intercepts Write calls and updates the stats accordingly. Implements only what we need, forwrading the calls as needed
+type HashStatAdapter struct {
+	hash  hash.Hash
+	stats *utility.Stats
+}
+
+func (h *HashStatAdapter) Write(b []byte) (int, error) {
+	n, err := h.hash.Write(b)
+	atomic.AddUint64(&h.stats.BytesHashed, uint64(n))
+	return n, err
+}
+
+func (h *HashStatAdapter) Reset() {
+	h.hash.Reset()
+}
+
+func (h *HashStatAdapter) Sum(b []byte) []byte {
+	return h.hash.Sum(b)
+}
 
 // Drains FileInfos from files channel, reads them using ctrl and generates hashes.
 // Creates a Result using makeResult() and sends it down the results channel.
@@ -18,7 +40,7 @@ import (
 // TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
 // Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
 // What we want is at max Y files being written continuously at a time
-func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
+func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, stats *utility.Stats,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrls map[string]*utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
@@ -27,9 +49,10 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 	}
 	defer wg.Done()
 
-	sha1gen := sha1.New()
-	md5gen := md5.New()
+	sha1gen := HashStatAdapter{sha1.New(), stats}
+	md5gen := HashStatAdapter{md5.New(), stats}
 	const nHashes = 2
+	atomic.AddUint32(&stats.NumHashers, uint32(nHashes))
 	isWriting := len(wctrls) > 0
 	numDestinations := utility.WriteChannelDeviceMapTrees(wctrls)
 
@@ -45,8 +68,8 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 		// Writer with full checking enabled - it will never show anything for the hashes, but might
 		// report errrs for the real writers
 		// We place the hashes last, as the writers will be changed in each iteration
-		writers[len(writers)-1] = sha1gen
-		writers[len(writers)-2] = md5gen
+		writers[len(writers)-1] = &sha1gen
+		writers[len(writers)-2] = &md5gen
 		multiWriter = utility.NewParallelMultiWriter(writers)
 
 		// Keeps all Writers we are going to prepare per source file
@@ -65,7 +88,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup,
 			ofs = ofse
 		}
 	} else {
-		multiWriter = utility.NewUncheckedParallelMultiWriter(sha1gen, md5gen)
+		multiWriter = utility.NewUncheckedParallelMultiWriter(&sha1gen, &md5gen)
 	}
 
 	sendResults := func(f *FileInfo, err error) {

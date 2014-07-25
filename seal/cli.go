@@ -229,7 +229,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string) (err erro
 					// each device as so and so many destinations. Each destination uses the same write controller
 					s.rootedWriters[did] = utility.RootedWriteController{
 						Trees: trees,
-						Ctrl:  utility.NewWriteChannelController(numWriters, numWriters*len(trees)),
+						Ctrl:  utility.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats),
 					}
 				} // for each tree set in deviceMap
 

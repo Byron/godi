@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 )
 
 // Size for allocated buffers
@@ -171,6 +172,7 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 			default:
 				{
 					nread, err = info.reader.Read(info.buf[:])
+					atomic.AddUint64(&stats.BytesRead, uint64(nread))
 					info.results <- readResult{info.buf[:nread], nread, err}
 					// we send all results, but abort if the reader is done for whichever reason
 					if err != nil {
@@ -189,7 +191,9 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 	for i := 0; i < nprocs; i++ {
 		go func() {
 			for info := range ctrl.c {
+				atomic.AddUint32(&stats.FilesBeingRead, uint32(1))
 				reader(info)
+				atomic.AddUint32(&stats.FilesBeingRead, ^uint32(0))
 			}
 		}()
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 )
 
 // Similar to MultiWriter, but assumes writes never fail, and provides the same buffer
@@ -207,7 +208,7 @@ type RootedWriteController struct {
 // Create a new controller which deals with writing all incoming requests with nprocs go-routines.
 // Use the channel capacity to assure less blocking will occur. A good value is depending heavily on your
 // algorithm's patterns. Should at least be nprocs, or larger.
-func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
+func NewWriteChannelController(nprocs, channelCap int, stats *Stats) WriteChannelController {
 	ctrl := WriteChannelController{
 		make(chan *ChannelWriter, channelCap),
 	}
@@ -218,7 +219,10 @@ func NewWriteChannelController(nprocs, channelCap int) WriteChannelController {
 	for i := 0; i < nprocs; i++ {
 		go func() {
 			for cw := range ctrl.c {
+				atomic.AddUint32(&stats.FilesBeingWritten, 1)
 				cw.n, cw.e = cw.writer.Write(cw.b)
+				atomic.AddUint64(&stats.BytesWritten, uint64(cw.n))
+				atomic.AddUint32(&stats.FilesBeingWritten, ^uint32(0))
 				// protocol mandates the sender has to listen for our reply, channel must not be closed here ... .
 				cw.wg.Done()
 			} // for each channel writer

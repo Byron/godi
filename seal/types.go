@@ -65,5 +65,5 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		return &res
 	}
 
-	api.Gather(files, results, wg, makeResult, s.RootedReaders, s.rootedWriters)
+	api.Gather(files, results, wg, &s.Stats, makeResult, s.RootedReaders, s.rootedWriters)
 }

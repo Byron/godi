@@ -99,7 +99,7 @@ func (s *VerifyCommand) Gather(files <-chan api.FileInfo, results chan<- api.Res
 		return &res
 	}
 
-	api.Gather(files, results, wg, makeResult, s.RootedReaders, nil)
+	api.Gather(files, results, wg, &s.Stats, makeResult, s.RootedReaders, nil)
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
