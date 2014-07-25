@@ -41,7 +41,7 @@ func (a *AggregateFinalizerState) String() (out string) {
 	}
 
 	if len(out) != 0 {
-		out = "(" + out + ")"
+		out = " (" + out + ")"
 	}
 
 	return

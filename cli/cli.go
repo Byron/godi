@@ -23,7 +23,7 @@ const (
 // NOTE: Even though it would be cleaner to just inject messages into the results channel, this way
 // we wouldn't know when the last message was emitted, possibly emitting too much
 // Done should be called to signal that we should stop
-func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result), done <-chan bool) func(api.Result) {
+func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result) bool, done <-chan bool) func(api.Result) bool {
 	lastLoggedAt := time.Now()
 	lastStat := *stats
 
@@ -44,24 +44,34 @@ func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result), d
 				continue
 			}
 			// Otherwise, prepare statistics
-			fmt.Println(stats.DeltaString(&lastStat, td, ""))
+			fmt.Println(stats.DeltaString(&lastStat, td, utility.StatsClientSep))
 			lastLoggedAt = now
 			stats.CopyTo(&lastStat)
 		}
 	}()
 
-	return func(r api.Result) {
-		lastLoggedAt = time.Now()
-		handler(r)
+	return func(r api.Result) bool {
+		hasLogged := handler(r)
+		if hasLogged {
+			lastLoggedAt = time.Now()
+		}
+		return hasLogged
 	}
 }
 
-func LogHandler(r api.Result) {
-	if r.Error() != nil {
-		fmt.Fprintln(os.Stderr, r.Error())
-	} else {
-		info, _ := r.Info()
-		fmt.Fprintln(os.Stdout, info)
+func MakeLogHandler(maxLogLevel api.Priority) func(r api.Result) bool {
+	return func(r api.Result) bool {
+		info, prio := r.Info()
+		if !maxLogLevel.MayLog(prio) {
+			return false
+		}
+
+		if r.Error() != nil {
+			fmt.Fprintln(os.Stderr, r.Error())
+		} else {
+			fmt.Fprintln(os.Stdout, info)
+		}
+		return true
 	}
 }
 
@@ -69,7 +79,7 @@ func LogHandler(r api.Result) {
 // Both handlers may be nil to use a default one
 func RunAction(cmd api.Runner, c *cli.Context) {
 	// checkArgs must have initialized the seal command, so we can just run it
-	handler := MakeStatisticalLogHandler(cmd.Statistics(), LogHandler, make(chan bool))
+	handler := MakeStatisticalLogHandler(cmd.Statistics(), MakeLogHandler(cmd.LogLevel()), make(chan bool))
 	err := api.StartEngine(cmd, handler, handler)
 	if err != nil {
 		os.Exit(1)

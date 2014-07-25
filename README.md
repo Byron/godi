@@ -40,6 +40,12 @@ godi seal tree/
 [![Build Status](https://travis-ci.org/Byron/godi.svg?branch=master)](https://travis-ci.org/Byron/godi)
 ![under construction](https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png)
 
+## Credits
+
+`godi` uses the following libraries:
+
+* [codegangsta/cli](https://github.com/codegangsta/cli)
+
 ### LICENSE
 
 This open source software is licensed under [GNU Lesser General Public License](https://github.com/Byron/godi/blob/master/LICENSE.md)

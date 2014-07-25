@@ -40,6 +40,11 @@ const (
 	Error
 )
 
+// MayLog returns true if the given priority may be logged as seen from our log-level.
+func (p Priority) MayLog(op Priority) bool {
+	return op >= p
+}
+
 type Result interface {
 	// Return a string indicating the result, which can can also state an error
 	// The priority show the kind of result messgae, allowing you to filter them effectively
@@ -87,6 +92,14 @@ type BasicRunner struct {
 
 	// our statistics instance
 	Stats utility.Stats
+
+	// The maximum log-level. We just keep this value here because the cli makes a difference between CHECK and RUN !
+	// TODO(st) Fork CLI and make the fix, use the fork from that point on ... .
+	Level Priority
+}
+
+func (b *BasicRunner) LogLevel() Priority {
+	return b.Level
 }
 
 func (b *BasicRunner) Statistics() *utility.Stats {
@@ -128,6 +141,10 @@ type Runner interface {
 	// Return the amount of io-channels the runner may be using in parallel per device
 	NumChannels() int
 
+	// Return the minimum allowed level for logging
+	// TODO(st): get rid of this method !
+	LogLevel() Priority
+
 	// Statistics returns the commands shared statistics structure
 	Statistics() *utility.Stats
 
@@ -161,8 +178,8 @@ type Runner interface {
 // The handlers receive a result of the respective stage and may perform whichever operation
 // Returns the last error we received in either generator or aggregation stage
 func StartEngine(runner Runner,
-	generateHandler func(Result),
-	aggregateHandler func(Result)) (err error) {
+	generateHandler func(Result) bool,
+	aggregateHandler func(Result) bool) (err error) {
 
 	nprocs := runner.NumChannels()
 	results := make(chan Result, nprocs)
@@ -189,12 +206,12 @@ func StartEngine(runner Runner,
 	}()
 	accumResult := runner.Aggregate(results)
 
-	mkErrPicker := func(handler func(r Result)) func(r Result) {
-		return func(r Result) {
+	mkErrPicker := func(handler func(r Result) bool) func(r Result) bool {
+		return func(r Result) bool {
 			if r.Error() != nil {
 				err = r.Error()
 			}
-			handler(r)
+			return handler(r)
 		}
 	}
 	generateHandler = mkErrPicker(generateHandler)

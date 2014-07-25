@@ -52,15 +52,16 @@ func SubCommands() []gcli.Command {
 
 // Returns a handler whichasd will track seal/index files, and call the given handler aftrewards, writing the
 // into the provided slice
-func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Result)) func(r api.Result) {
-	return func(r api.Result) {
-		handler(r)
+func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Result) bool) func(r api.Result) bool {
+	return func(r api.Result) (res bool) {
+		res = handler(r)
 		if r == nil || r.FileInformation() == nil {
 			return
 		}
 		if r.FileInformation().Size < 0 {
 			*indices = append(*indices, r.FileInformation().Path)
 		}
+		return
 	}
 }
 
@@ -88,7 +89,8 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 		// Setup a aggregation result handler which tracks produced indices
 		var indices []string
 		cmdDone := make(chan bool)
-		handler := cli.MakeStatisticalLogHandler(&cmd.Stats, cli.LogHandler, cmdDone)
+		logHandler := cli.MakeLogHandler(cmd.Level)
+		handler := cli.MakeStatisticalLogHandler(&cmd.Stats, logHandler, cmdDone)
 		aggHandler := IndexTrackingResultHandlerAdapter(&indices, handler)
 
 		// and run ourselves
@@ -110,7 +112,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 					// prepare and run a verify command
 					verifycmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
-						handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, cli.LogHandler, make(chan bool))
+						handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, logHandler, make(chan bool))
 						err = api.StartEngine(verifycmd, handler, handler)
 					}
 				}
