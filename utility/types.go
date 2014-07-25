@@ -38,6 +38,14 @@ func (s *Stats) CopyTo(d *Stats) {
 	d.NumHashers = atomic.LoadUint32(&s.NumHashers)
 }
 
+// MostFiles returns the greatest number of files, either the one that were read, or the ones that were written
+func (s *Stats) MostFiles() uint32 {
+	if s.TotalFilesRead > s.TotalFilesWritten {
+		return s.TotalFilesRead
+	}
+	return s.TotalFilesWritten
+}
+
 type BytesVolume uint64
 
 // Convert ourselves into a nice and human readable representation
@@ -63,45 +71,68 @@ func (b BytesVolume) String() string {
 
 // Prints itself as a single line full of useful information, including deltas of relevant metrics as compared
 // to theh last state d. You will also give the temporal distance which separates this stat from the previous one
+// If d didn't change in a particular field, we will produce deltas normalized to average per second
 func (s *Stats) DeltaString(d *Stats, td time.Duration) string {
+	intDelta := func(cur, prev uint32) string {
+		if prev == 0 {
+			prev = cur
+		}
+
+		if prev == cur {
+			// normalize to seconds
+			return fmt.Sprintf(" ⨏#Δ%d/s", uint64(float64(cur)/td.Seconds()))
+		}
+		return fmt.Sprintf(" #Δ%+d ", cur-prev)
+	}
+
+	bytesDelta := func(cur, prev uint64) string {
+		if prev == 0 {
+			prev = cur
+		}
+		if prev == cur {
+			// normalize to seconds
+			return fmt.Sprintf(" ⨏Δ%s/s", BytesVolume(float64(cur)/td.Seconds()))
+		}
+		return fmt.Sprintf(" Δ%s/%.2fs", BytesVolume(cur-prev), td.Seconds())
+	}
+
+	inOut := func(cur uint32) string {
+		if cur == 0 {
+			return ""
+		}
+		return fmt.Sprintf("%d ", cur)
+	}
+
 	itf := atomic.LoadUint32(&s.TotalFilesRead)
 	ibr := atomic.LoadUint64(&s.BytesRead)
-	itfd := itf - d.TotalFilesRead // difference of files
-	ibrd := ibr - d.BytesRead      // difference of bytes
 
-	out := fmt.Sprintf("%d->IN (#%d(%+d) ⌰%s Δ%s/%.2fs)",
-		atomic.LoadUint32(&s.FilesBeingRead),
+	out := fmt.Sprintf("%s->IN (#%d%s ⌰%s%s)",
+		inOut(atomic.LoadUint32(&s.FilesBeingRead)),
 		itf,
-		itfd,
+		intDelta(itf, d.TotalFilesRead),
 		BytesVolume(ibr),
-		BytesVolume(ibrd),
-		td.Seconds(),
+		bytesDelta(ibr, d.BytesRead),
 	)
 
 	if s.FilesBeingWritten > 0 {
 		otf := atomic.LoadUint32(&s.TotalFilesWritten)
 		obw := atomic.LoadUint64(&s.BytesWritten)
-		otfd := otf - d.TotalFilesWritten
-		obwd := obw - d.BytesWritten
 
-		out += fmt.Sprintf("\t%d OUT->(#%d(%+d) ⌰%s Δ%s/%.2fs)",
-			atomic.LoadUint32(&s.FilesBeingWritten),
+		out += fmt.Sprintf("\t%sOUT->(#%d%s ⌰%s%s)",
+			inOut(atomic.LoadUint32(&s.FilesBeingWritten)),
 			otf,
-			otfd,
+			intDelta(otf, d.TotalFilesWritten),
 			BytesVolume(obw),
-			BytesVolume(obwd),
-			td.Seconds(),
+			bytesDelta(obw, d.BytesWritten),
 		)
 	}
 
 	bh := atomic.LoadUint64(&s.BytesHashed)
-	bhd := bh - d.BytesHashed
 
-	out += fmt.Sprintf("\t%d HASH(⌰%s Δ%s/%.2fs)",
-		atomic.LoadUint32(&s.NumHashers),
+	out += fmt.Sprintf("\t%sHASH (⌰%s%s)",
+		inOut(atomic.LoadUint32(&s.NumHashers)),
 		BytesVolume(bh),
-		BytesVolume(bhd),
-		td.Seconds(),
+		bytesDelta(bh, d.BytesHashed),
 	)
 	return out
 }

@@ -138,10 +138,10 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			accumResult <- &VerifyResult{
 				BasicResult: api.BasicResult{
 					Msg: fmt.Sprintf(
-						"All %d files did not change after sealing (%v)",
-						st.FileCount,
-						st,
-					),
+						"VERIFY OK: None of %d file(s) changed after sealing [%s]",
+						s.Stats.MostFiles(),
+						s.Stats.DeltaString(&s.Stats, st.Elapsed),
+					) + st.String(),
 					Prio: api.Info,
 				},
 			}
@@ -151,12 +151,12 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			accumResult <- &VerifyResult{
 				BasicResult: api.BasicResult{
 					Msg: fmt.Sprintf(
-						"%d of %d files have changed on disk after sealing, %d are missing (%v)",
+						"VERIFY FAIL: %d of %d file(s) have changed on disk after sealing, %d are missing [%s]",
 						signatureMismatches,
-						st.FileCount,
+						s.Stats.MostFiles(),
 						missingFiles,
-						st,
-					),
+						s.Stats.DeltaString(&s.Stats, st.Elapsed),
+					) + st.String(),
 					Prio: api.Info,
 				},
 			}

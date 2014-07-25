@@ -244,10 +244,9 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 		accumResult <- &api.BasicResult{
 			Msg: fmt.Sprintf(
-				"Sealed %d files (%v)",
-				st.FileCount,
-				st,
-			),
+				"SEAL COMPLETE: %s",
+				s.Stats.DeltaString(&s.Stats, st.Elapsed),
+			) + st.String(),
 			Prio: api.Info,
 		}
 	} // end finalizer()

@@ -21,23 +21,30 @@ func Generate(
 }
 
 type AggregateFinalizerState struct {
-	WasCancelled        bool
-	FileCount, ErrCount uint
-	SizeBytes           uint64
-	Elapsed             float64
+	ErrCount     uint
+	WasCancelled bool
+	Elapsed      time.Duration
 }
 
 // String generates a string with performance information
-func (a *AggregateFinalizerState) String() string {
-	sizeMB := float32(a.SizeBytes) / (1024.0 * 1024.0)
-	return fmt.Sprintf(
-		"Processed %#vMB in %vs (%#v MB/s, %d errors, cancelled=%v",
-		sizeMB,
-		a.Elapsed,
-		float64(sizeMB)/a.Elapsed,
-		a.ErrCount,
-		a.WasCancelled,
-	)
+func (a *AggregateFinalizerState) String() (out string) {
+	if a.ErrCount > 0 {
+		out += fmt.Sprintf("%d errors", a.ErrCount)
+	}
+
+	if a.WasCancelled {
+		if len(out) == 0 {
+			out = "cancelled"
+		} else {
+			out += ", cancelled"
+		}
+	}
+
+	if len(out) != 0 {
+		out = "(" + out + ")"
+	}
+
+	return
 }
 
 // Aggregate is a general purpose implementation to gather fileInfo results
@@ -69,12 +76,9 @@ func Aggregate(results <-chan Result, done <-chan bool,
 
 			if !resultHandler(r, accumResult) {
 				s.ErrCount += 1
-			} else {
-				s.FileCount += 1
-				s.SizeBytes += uint64(r.FileInformation().Size)
 			}
 		} // range results
-		s.Elapsed = time.Now().Sub(st).Seconds()
+		s.Elapsed = time.Now().Sub(st)
 
 		finalizer(accumResult, &s)
 	}()
