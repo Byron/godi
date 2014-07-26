@@ -40,7 +40,7 @@ func (h *HashStatAdapter) Sum(b []byte) []byte {
 // TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
 // Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
 // What we want is at max Y files being written continuously at a time
-func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, stats *utility.Stats,
+func Gather(files <-chan FileInfo, results chan<- Result, feedback chan<- string, wg *sync.WaitGroup, stats *utility.Stats,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrls map[string]*utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
@@ -62,6 +62,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 
 	// We keep an index of failed destinations, skipping them in write mode after first failure
 	var isFailedDestination []bool
+	numFailedDestinations := 0
 
 	// Build the multi-writer which will dispatch all writes to a write controller
 	if isWriting {
@@ -96,18 +97,21 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 	}
 
 	sendResults := func(f *FileInfo, err error) {
+
 		if !isWriting {
-			// We have to take care of sending the read-result
+			// NOTE: in seal mode, we might want to communicate this ... after all, we don't get the seal done
 			results <- makeResult(f, nil, err)
 		} else {
 			// Each parallel writer has it's own result, we just send it off
 			pmw := multiWriter.(*utility.ParallelMultiWriter)
 			// Make sure we keep the source intact
 			forig := *f
+
 			for i := 0; i < numDestinations; i++ {
 				w, e := pmw.WriterAtIndex(i)
-				if e != nil {
+				if e != nil && !isFailedDestination[i] {
 					isFailedDestination[i] = true
+					numFailedDestinations += 1
 				}
 
 				// If the reader had an error, no write may succeed. We just don't overwrite write errors
@@ -123,6 +127,12 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 					results <- makeResult(f, &forig, e)
 				}
 			} // for each write controller to write to
+
+			// If all of our destinations are in fail state, let the gatherer know we can't do anything
+			if numFailedDestinations == numDestinations {
+				feedback <- forig.Root()
+			}
+
 		} // handle write mode
 	} // sendResults
 

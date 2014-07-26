@@ -201,14 +201,17 @@ type Runner interface {
 	// May report errrors or information about the progress through generateResult, which must NOT be closed when done. Return nothing
 	// if there is nothing to report
 	// Must listen on done and return asap
-	Generate() (files <-chan FileInfo, generateResult <-chan Result)
+	// The feedback channel is used by Gather to provide information about failing trees.
+	Generate(feedback <-chan string) (files <-chan FileInfo, generateResult <-chan Result)
 
 	// Will be launched as go routine and perform whichever operation on the FileInfo received from input channel
 	// Produces one result per input FileInfo and returns it in the given results channel
 	// Must listen for SIGTERM|SIGINT signals
-	// Use the wait group to mark when done
+	// Use the wait group to mark when done, which is when the results and feedback channels need to be closed.
 	// Must listen on done and return asap
-	Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup)
+	// Feedback channel must have a buffer big enough to hold one result per worker, otherwise
+	// a deadlock may occur. MUST be closed when all workers are done.
+	Gather(files <-chan FileInfo, results chan<- Result, feedback chan<- string, wg *sync.WaitGroup)
 
 	// Aggregate the result channel and produce whatever you have to produce from the result of the Gather steps
 	// When you are done, place a single result instance into accumResult and close the channel
@@ -226,6 +229,7 @@ func StartEngine(runner Runner,
 
 	nprocs := runner.NumChannels()
 	results := make(chan Result, nprocs)
+	feedback := make(chan string, nprocs)
 	done := runner.CancelChannel()
 
 	// assure we close our done channel on signal
@@ -236,16 +240,17 @@ func StartEngine(runner Runner,
 		close(done)
 	}()
 
-	files, generateResult := runner.Generate()
+	files, generateResult := runner.Generate(feedback)
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < nprocs; i++ {
 		wg.Add(1)
-		go runner.Gather(files, results, &wg)
+		go runner.Gather(files, results, feedback, &wg)
 	}
 	go func() {
 		wg.Wait()
 		close(results)
+		close(feedback)
 	}()
 	accumResult := runner.Aggregate(results)
 

@@ -147,7 +147,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 				for _, path := range treeInfo.writtenFiles {
 					deleteResultSafely(treeRoot, path)
 				}
-				// We are done and shouldn't try to process these again
+				// Clear it - next time we have to remove whatever happened so far
 				treeInfo.writtenFiles = nil
 			}
 		}
@@ -192,10 +192,16 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			accumResult <- &br
 		} // end for each tree/treeInfo tuple
 
+		prefix := "SEAL DONE"
+		if st.ErrCount > 0 {
+			prefix = "SEAL FAILED"
+		}
+
 		// Final seal result !
 		accumResult <- &api.BasicResult{
 			Msg: fmt.Sprintf(
-				"SEAL COMPLETE: %s",
+				"%s: %s",
+				prefix,
 				s.Stats.DeltaString(&s.Stats, st.Elapsed, utility.StatsClientSep),
 			) + st.String(),
 			Prio: api.Valuable,
