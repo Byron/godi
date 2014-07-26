@@ -116,7 +116,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		// In any case, remember the file we have written in some way (may be partial write)
 		// However, don't remember the file if we didn't actually write it in any way
 		// and failed to write because it existed
-		if !os.IsExist(sr.Err) {
+		if isWriting && !os.IsExist(sr.Err) {
 			treeInfo.writtenFiles = append(treeInfo.writtenFiles, sr.Finfo.Path)
 		}
 

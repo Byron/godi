@@ -27,11 +27,12 @@ const (
 func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result) bool, done <-chan bool) func(api.Result) bool {
 	lastLoggedAt := time.Now()
 	lastStat := *stats
+	minLogInterval := StatisticalLoggingInterval / 6
 
 	// An observer, printing out statistics as needed
 	// We check a bit more often than the time after which to log some stats, to be more responsive
 	// Lets be late at max 1/8 of a second
-	ticker := time.NewTicker(StatisticalLoggingInterval / 4)
+	ticker := time.NewTicker(minLogInterval)
 	go func() {
 		for now := range ticker.C {
 			select {
@@ -41,9 +42,12 @@ func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result) bo
 			}
 
 			td := now.Sub(lastLoggedAt) // temporal distance
-			if td+TimeEpsilon < StatisticalLoggingInterval {
+			if td+TimeEpsilon < minLogInterval {
 				continue
 			}
+			// The first time a log should be there faster to feel more responsive
+			// From that point on, messages can come in more slowly
+			minLogInterval = StatisticalLoggingInterval
 			// Otherwise, prepare statistics
 			fmt.Println(stats.DeltaString(&lastStat, td, utility.StatsClientSep))
 			lastLoggedAt = now
