@@ -85,7 +85,8 @@ func RunAction(cmd api.Runner, c *cli.Context) {
 		handler = MakeStatisticalLogHandler(cmd.Statistics(), handler, make(chan bool))
 	}
 	err := api.StartEngine(cmd, handler, handler)
-	if err != nil {
+	nerr := CliFinishApp(c)
+	if err != nil || nerr != nil {
 		os.Exit(1)
 	}
 }
@@ -99,7 +100,11 @@ func CheckCommonFlags(c *cli.Context) (nr int, level api.Priority, err error) {
 	}
 
 	level, err = api.PriorityFromString(c.GlobalString(LogLevelFlagName))
+	if err != nil {
+		return
+	}
 
+	err = parseAdditionalFlags(c)
 	return
 }
 

@@ -33,5 +33,7 @@ func NewGodiApp() *cli.App {
 	}
 	app.Version = "v0.4.0"
 
+	gocli.AddAdditinalFlags(app)
+
 	return app
 }
