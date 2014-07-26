@@ -39,11 +39,20 @@ const (
 	Info
 	Warn
 	Error
+	Valuable
 	LogDisabled
 )
 
 // MayLog returns true if the given priority may be logged as seen from our log-level.
+// Results may always be logged
 func (p Priority) MayLog(op Priority) bool {
+	if p == LogDisabled {
+		return false
+	}
+
+	if op == Valuable {
+		return true
+	}
 	return op >= p
 }
 
@@ -57,6 +66,8 @@ func (p Priority) String() string {
 		return "warn"
 	case p == Error:
 		return "error"
+	case p == Valuable:
+		return "result"
 	case p == LogDisabled:
 		return "off"
 	default:
@@ -66,7 +77,7 @@ func (p Priority) String() string {
 
 // Parse a priority from the given string. error will be set if this fails
 func PriorityFromString(p string) (Priority, error) {
-	for _, t := range []Priority{Progress, Info, Warn, Error, LogDisabled} {
+	for _, t := range [...]Priority{Progress, Info, Warn, Error, Valuable, LogDisabled} {
 		if t.String() == p {
 			return t, nil
 		}

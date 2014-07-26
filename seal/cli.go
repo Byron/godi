@@ -89,10 +89,10 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 		// Setup a aggregation result handler which tracks produced indices
 		var indices []string
 		cmdDone := make(chan bool)
-		logHandler := cli.MakeLogHandler(cmd.Level)
+		logHandler := cli.MakeLogHandler(cmd.LogLevel())
 
 		handler := logHandler
-		if cmd.Level.MayLog(api.Progress) {
+		if cmd.LogLevel() != api.LogDisabled {
 			handler = cli.MakeStatisticalLogHandler(&cmd.Stats, handler, cmdDone)
 		}
 		aggHandler := IndexTrackingResultHandlerAdapter(&indices, handler)
@@ -117,7 +117,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 					verifycmd, err := verify.NewCommand(indices, c.GlobalInt(cli.StreamsPerInputDeviceFlagName))
 					if err == nil {
 						handler = logHandler
-						if verifycmd.LogLevel().MayLog(api.Progress) {
+						if verifycmd.LogLevel() != api.LogDisabled {
 							handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, handler, make(chan bool))
 						}
 						err = api.StartEngine(verifycmd, handler, handler)

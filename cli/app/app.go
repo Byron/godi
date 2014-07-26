@@ -27,8 +27,8 @@ func NewGodiApp() *cli.App {
 	app.Flags = []cli.Flag{
 		cli.IntFlag{gocli.StreamsPerInputDeviceFlagName + ", spid", 1, "Amount of parallel streams per input device"},
 		cli.StringFlag{gocli.LogLevelFlagName,
-			api.Progress.String(),
-			fmt.Sprintf("One of %s, %s, %s, %s, or '%s' to disable all output", api.Progress, api.Info, api.Warn, api.Error, api.LogDisabled),
+			api.Error.String(),
+			fmt.Sprintf("One of %s, %s, or '%s' to disable all output", api.Info, api.Error, api.LogDisabled),
 		},
 	}
 	app.Version = "v0.4.0"

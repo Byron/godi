@@ -31,7 +31,7 @@ type VerifyResult struct {
 // NewCommand returns an initialized verify command
 func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
 	c := VerifyCommand{}
-	return &c, c.Init(nReaders, 0, indices, api.Progress)
+	return &c, c.Init(nReaders, 0, indices, api.Info)
 }
 
 func (s *VerifyCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
@@ -84,7 +84,7 @@ func (s *VerifyCommand) Gather(files <-chan api.FileInfo, results chan<- api.Res
 		res := VerifyResult{
 			BasicResult: api.BasicResult{
 				Finfo: *f,
-				Prio:  api.Progress,
+				Prio:  api.Info,
 				Err:   err,
 			},
 			ifinfo: *f,
@@ -117,6 +117,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			vr.Err = fmt.Errorf("HASH MISMATCH: %s", vr.Finfo.Path)
 			signatureMismatches += 1
 			hasError = true
+			vr.Prio = api.Error
 		} else {
 			vr.Msg = fmt.Sprintf("OK: %s", vr.Finfo.Path)
 		}
@@ -137,7 +138,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 						s.Stats.MostFiles(),
 						stats,
 					) + st.String(),
-					Prio: api.Info,
+					Prio: api.Valuable,
 				},
 			}
 		} else {
@@ -152,7 +153,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 						missingFiles,
 						stats,
 					) + st.String(),
-					Prio: api.Info,
+					Prio: api.Valuable,
 				},
 			}
 		}

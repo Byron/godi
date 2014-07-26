@@ -81,7 +81,7 @@ func MakeLogHandler(maxLogLevel api.Priority) func(r api.Result) bool {
 func RunAction(cmd api.Runner, c *cli.Context) {
 	// checkArgs must have initialized the seal command, so we can just run it
 	handler := MakeLogHandler(cmd.LogLevel())
-	if cmd.LogLevel().MayLog(api.Progress) {
+	if cmd.LogLevel() != api.LogDisabled {
 		handler = MakeStatisticalLogHandler(cmd.Statistics(), handler, make(chan bool))
 	}
 	err := api.StartEngine(cmd, handler, handler)

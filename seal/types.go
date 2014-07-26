@@ -15,6 +15,36 @@ const (
 	modeCopy = "sealed-copy"
 )
 
+type indexWriterResult struct {
+	path string // path to the seal file
+	err  error  // possible error during the seal operation
+}
+
+// Some information we store per root of files we seal
+type aggregationTreeInfo struct {
+	// Paths to files we have written so far - only used in sealed-copy mode
+	// TODO(st): don't track these files in memory, but re-read them from the written seal file !
+	// That way, we don't rely on any limited resource except for disk space
+	writtenFiles []string
+
+	// A channel to send file-infos to the attached seal serializer. Close it to finish the seal operation
+	sealFInfos chan<- api.FileInfo
+
+	// Contains the error code of the seal operation for the tree we are associated with, and the produced seal file
+	// Will only yield a result one, and be closed afterwards
+	sealResult <-chan indexWriterResult
+
+	// if true, the entire tree is considered faulty, and further results won't be recorded or accepted
+	hasError bool
+}
+
+// Helper to sort by longest path, descending
+type byLongestPathDescending []string
+
+func (a byLongestPathDescending) Len() int           { return len(a) }
+func (a byLongestPathDescending) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byLongestPathDescending) Less(i, j int) bool { return len(a[i]) > len(a[j]) }
+
 // A type representing all arguments required to drive a Seal operation
 type SealCommand struct {
 	api.BasicRunner
@@ -45,7 +75,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	} else {
 		c.mode = modeCopy
 	}
-	err := c.Init(nReaders, nWriters, trees, api.Progress)
+	err := c.Init(nReaders, nWriters, trees, api.Info)
 	return &c, err
 }
 
@@ -58,7 +88,7 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		res := SealResult{
 			BasicResult: api.BasicResult{
 				Finfo: *f,
-				Prio:  api.Progress,
+				Prio:  api.Info,
 				Err:   err,
 			},
 			source: s,

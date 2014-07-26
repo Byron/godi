@@ -1,12 +1,12 @@
 package seal
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/Byron/godi/api"
@@ -14,11 +14,11 @@ import (
 	"github.com/Byron/godi/utility"
 )
 
-// Must be kept in sync with IndexPath generator
+// Must be kept in sync with indexPath generator
 var reIsIndexPath = regexp.MustCompile(fmt.Sprintf(`%s_\d{4}-\d{2}-\d{2}_\d{2}\d{2}\d{2}\.%s`, IndexBaseName, codec.GobExtension))
 
 // return a path to an index file residing at tree
-func (s *SealCommand) IndexPath(tree string, extension string) string {
+func indexPath(tree string, extension string) string {
 	n := time.Now()
 	return filepath.Join(tree, fmt.Sprintf("%s_%04d-%02d-%02d_%02d%02d%02d.%s",
 		IndexBaseName,
@@ -31,68 +31,124 @@ func (s *SealCommand) IndexPath(tree string, extension string) string {
 		extension))
 }
 
-// When called, we have seen no error in the given mapping of relativePaths to FileInfos
-// Returns error in case we failed to produce an index
-// It's up to the caller to remove existing files on error
-func (s *SealCommand) writeIndex(commonTree string, paths []codec.SerializableFileInfo) (string, error) {
-	// Serialize all fileinfo structures
-	// NOTE: As the parallel writer will send results only when writing finished, we can just operate serially here ...
-	// For this there is also no need to optimize performance
-	// However, we could use a parallel writer if we are so inclined
-	// For now, we do only gob
-	encoder := codec.Gob{}
+// Will setup a go-routine which writes a seal for the given tree, continuously as new files come in
+func setupIndexWriter(commonTree string) (chan<- api.FileInfo, <-chan indexWriterResult) {
 
-	// It's currently possible to have no paths as we pre-allocate these and don't care if we are in copy mode
-	if len(paths) == 0 {
-		return "", fmt.Errorf("No paths provided - cannot write seal for nothing")
-	}
+	sealFiles := make(chan api.FileInfo)
+	// we may always put in one item, which allows this go-routine to go down without having to wait
+	results := make(chan indexWriterResult, 1)
 
-	// This will and should fail if the file already exists
-	fd, err := os.OpenFile(s.IndexPath(commonTree, encoder.Extension()), os.O_EXCL|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		return "", err
-	}
+	go func() {
+		defer close(results)
 
-	err = encoder.Serialize(paths, fd)
-	fd.Close()
-	if err != nil {
-		// remove possibly half-written file
-		os.Remove(fd.Name())
-		return "", err
-	}
-	return fd.Name(), nil
+		// Serialize all fileinfo structures
+		// For now, we just use a standard writer, without using our parallel writers, which would at least
+		// assure we don't write with more streams than defined.
+		// Reason is that // we want this to be as fast as possible without blocking, which is also why it is cached
+		// reasonably well, allowing it to only write on larger chunks.
+		encoder := codec.Gob{}
+
+		// This will and should fail if the file already exists
+		indexPath := indexPath(commonTree, encoder.Extension())
+		fd, err := os.OpenFile(indexPath, os.O_EXCL|os.O_CREATE|os.O_WRONLY, 0666)
+		if err == nil {
+			bfd := bufio.NewWriterSize(fd, 512*1024)
+			err = encoder.Serialize(sealFiles, fd)
+			bfd.Flush()
+			fd.Close()
+			if err != nil {
+				// Remove intermediate results
+				os.Remove(indexPath)
+			}
+		}
+
+		results <- indexWriterResult{path: indexPath, err: err}
+	}()
+
+	return sealFiles, results
 }
 
 func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
-	treePathsmap := make(map[string][]codec.SerializableFileInfo)
+	treeInfoMap := make(map[string]*aggregationTreeInfo)
+	isWriting := len(s.rootedWriters) > 0
 
 	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
 		sr := r.(*SealResult)
 
+		deleteResultSafely := func(tree, path string) {
+			if !isWriting {
+				panic("Shouldn't ever try to delete a file we have not written ... ")
+			}
+
+			br := api.BasicResult{Prio: api.Info}
+			br.Err = os.Remove(path)
+			if br.Err == nil {
+				br.Msg = fmt.Sprintf("Removed '%s'", path)
+
+				// try to remove the directory - will fail if non-empty.
+				// only do that if we wouldn't remove the tree.
+				// Also crawl upwards
+				var derr error
+				for dir := filepath.Dir(path); dir != tree && derr == nil; dir = filepath.Dir(dir) {
+					derr = os.Remove(dir)
+				}
+			}
+
+			accumResult <- &br
+		}
+
 		// Keep the file-information, in any case
-		pathInfos := treePathsmap[sr.Finfo.Root()]
-		pathInfos = append(pathInfos, codec.SerializableFileInfo{sr.Finfo, r.Error()})
-		treePathsmap[sr.Finfo.Root()] = pathInfos
+		treeRoot := sr.Finfo.Root()
+		treeInfo, didExist := treeInfoMap[treeRoot]
+		if !didExist {
+			// Initialize this root
+			// Create a new go-routine which will take care of streaming file-information straight to file
+			treeInfo = &aggregationTreeInfo{}
+			treeInfo.sealFInfos, treeInfo.sealResult = setupIndexWriter(treeRoot)
+			treeInfoMap[treeRoot] = treeInfo
+		}
 
 		// We will keep track of the file even if it reported an error.
 		// That way, we can later determine what to cleanup
-		relaPath := sr.Finfo.RelaPath
-		if r.Error() != nil {
-			accumResult <- r
-			return false
+		hasError := r.Error() != nil || treeInfo.hasError
+
+		// In any case, remember the file we have written in some way (may be partial write)
+		// However, don't remember the file if we didn't actually write it in any way
+		// and failed to write because it existed
+		if !os.IsExist(sr.Err) {
+			treeInfo.writtenFiles = append(treeInfo.writtenFiles, sr.Finfo.Path)
 		}
 
-		// we store only relative paths in the map - this is all we want to serialize
-		hasError := false
+		if !hasError {
+			// Provide some informational logging
+			sr.Prio = api.Info
+			if len(sr.source) == 0 {
+				sr.Msg = fmt.Sprintf("# %s", sr.Finfo.Path)
+			} else {
+				sr.Msg = fmt.Sprintf("CP %s -> %s", sr.source, sr.Finfo.Path)
+			}
 
-		sr.Prio = api.Info
-		if len(sr.source) == 0 {
-			sr.Msg = fmt.Sprintf("DONE ...%s", relaPath)
-		} else {
-			sr.Msg = fmt.Sprintf("DONE CP %s -> %s", sr.source, sr.Finfo.Path)
+			// Send the valid file to the sealer
+			treeInfo.sealFInfos <- sr.Finfo
 		}
 
+		// Send previous error first, before error handling
 		accumResult <- sr
+
+		if hasError {
+			// mark the entire tree as having errors
+			treeInfo.hasError = true
+			hasError = true
+
+			if isWriting {
+				// Remove all files we have created so far
+				sort.Sort(byLongestPathDescending(treeInfo.writtenFiles))
+				for _, path := range treeInfo.writtenFiles {
+					deleteResultSafely(treeRoot, path)
+				}
+			}
+		}
+
 		return !hasError
 	} // end resultHandler()
 
@@ -100,156 +156,44 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		accumResult chan<- api.Result,
 		st *api.AggregateFinalizerState) {
 
-		handleIndexAtTree := func(tree string, pathInfos []codec.SerializableFileInfo) error {
-			// Only done if there are no errors below the current tree
-			// Serialize all fileinfo structures
-			if index, err := s.writeIndex(tree, pathInfos); err != nil {
-				st.ErrCount += 1
-				accumResult <- &api.BasicResult{Err: err, Prio: api.Error}
-				return err
+		// All we have to do is to stop the sealers and gather their result, possibly deleting
+		// incomplete seals (created because there was some error on the way)
+		for tree, treeInfo := range treeInfoMap {
+			close(treeInfo.sealFInfos)
+			sres := <-treeInfo.sealResult
+
+			br := api.BasicResult{}
+
+			if treeInfo.hasError {
+				os.Remove(sres.path)
+				br.Msg = fmt.Sprintf("Did not write seal for '%s' due to preceeding errors", tree)
+				br.Prio = api.Error
 			} else {
-				accumResult <- &api.BasicResult{
-					Finfo: api.FileInfo{Path: index, Size: -1},
-					Msg:   fmt.Sprintf("Wrote seal to '%s'", index),
-					Prio:  api.Info,
+				if sres.err == nil {
+					br.Msg = fmt.Sprintf("Wrote seal file to '%s'", sres.path)
+					// special marker, to allow others to easily retrieve seal files from the result
+					// No normal file has a size of -1
+					br.Finfo = api.FileInfo{Path: sres.path, Size: -1}
+					br.Prio = api.Valuable
+				} else {
+					// Just forward the error, hoping it is informative enough
+					st.ErrCount += 1
+					br.Err = sres.err
 				}
-			} // handle index writing errors
-			return nil
-		}
+			}
 
-		// ROLLBACK HANDLING
-		/////////////////////
-		// Check each destination tree for errors. If there are some, and if we are in write mode,
-		// remove files we have written so far. Otherwise, create an index file
-		// We will do one delete operation per write-device, in parallel. Each device worker will
-		// operate on all trees on that device in order
-		// Pre-allocate a bunch of tree strings - it's at max the total amount of destinations, which might
-		// all be on one device
-		// We natually don't do anything in non-copy mode as we have no writers
-		if len(s.rootedWriters) > 0 {
-			ntreesWorstCase := utility.WriteChannelDeviceMapTrees(s.rootedWriters)
-			treesWithError := make([]string, ntreesWorstCase)
+			accumResult <- &br
+		} // end for each tree/treeInfo tuple
 
-			nit := 0 // num invalid trees
-			var wg sync.WaitGroup
-			for _, wctrl := range s.rootedWriters {
-				init := nit // initial nit
-
-				for _, tree := range wctrl.Trees {
-					foundError := false
-					pathInfos := treePathsmap[tree]
-					for _, sfi := range pathInfos {
-						if sfi.Err != nil {
-							foundError = true
-							treesWithError[nit] = tree
-							nit += 1
-							break
-						}
-					} // for each file-info below tree
-
-					// INDEX HANDLING
-					//////////////////
-					// Writing the index can still fail - if that happens, we have no seal which is similar
-					// to a failure - sealed-copy creates one or nothing.
-					// It must be bad luck if the disk is full now that the seal is written, but lets be precise !
-
-					// it's valid, so try to write the index. If that doesn't work, we will
-					// place it onto the invalid tree list right away
-					if !foundError && !st.WasCancelled {
-						// Only done if there are no errors below the current tree
-						// Serialize all fileinfo structures
-						if err := handleIndexAtTree(tree, pathInfos); err != nil {
-							treesWithError[nit] = tree
-							nit += 1
-						}
-					}
-				} // for each destination of write controller
-
-				// found some - shoot off go routine
-				if nit != init {
-					wg.Add(1)
-					go func(trees []string) {
-						for _, tree := range trees {
-							pathInfos := treePathsmap[tree]
-
-							// Remove all previously written files in this tree if we are in write mode
-							accumResult <- &api.BasicResult{
-								Msg:  fmt.Sprintf("Rolling back changes at copy destination '%s'", tree),
-								Prio: api.Info,
-							}
-
-							// For path deletion to work correctly, we need it sorted
-							sort.Sort(codec.ByLongestPathDescending(pathInfos))
-
-							for _, sfi := range pathInfos {
-								// We may only remove it if the error wasn't a 'Existed' one, or we kill a file
-								// that wasn't created in this run.
-								var msg string
-								prio := api.Error
-								err := sfi.Err
-								if err != nil && os.IsExist(err) {
-									msg = fmt.Sprintf("Won't remove existing file: '%s'", sfi.Path)
-									prio = api.Info
-									err = nil
-								} else {
-									err = os.Remove(sfi.Path)
-									if err == nil {
-										msg = fmt.Sprintf("Removed '%s'", sfi.Path)
-										prio = api.Info
-
-										// try to remove the directory - will fail if non-empty.
-										// only do that if we wouldn't remove the tree.
-										// Also crawl upwards
-										var derr error
-										for dir := filepath.Dir(sfi.Path); dir != tree && derr == nil; dir = filepath.Dir(dir) {
-											derr = os.Remove(dir)
-										}
-									}
-								}
-
-								accumResult <- &api.BasicResult{
-									Finfo: sfi.FileInfo,
-									Msg:   msg,
-									Err:   err,
-									Prio:  prio,
-								}
-							} // for each path info
-						} // for each tree to handle
-						wg.Done()
-					}(treesWithError[init:nit]) // go handle errors in write mode
-				} // if we have invalid trees on that device
-			} // for each write controller (per device)
-
-			// Wait for cleanup jobs
-			wg.Wait()
-		} else {
-			// Standard Seal handling
-			// Check each tree and if it doesn't have any Error in it, try to write the seal
-			// There is no kind of rollback needed or possible, and what is is handled by writeIndex.
-			for tree, pathInfos := range treePathsmap {
-				// all trees are source trees, and should have something in them. If not, writeIndex panics
-				// Lets risk it ... .
-				foundError := false
-				for _, sfi := range pathInfos {
-					if sfi.Err != nil {
-						foundError = true
-						break
-					}
-				}
-
-				if !foundError && !st.WasCancelled {
-					handleIndexAtTree(tree, pathInfos)
-				}
-			} // end for each tree/pathinfo tuple
-		} // end non-copy seal handling
-
+		// Final seal result !
 		accumResult <- &api.BasicResult{
 			Msg: fmt.Sprintf(
 				"SEAL COMPLETE: %s",
 				s.Stats.DeltaString(&s.Stats, st.Elapsed, utility.StatsClientSep),
 			) + st.String(),
-			Prio: api.Info,
+			Prio: api.Valuable,
 		}
+
 	} // end finalizer()
 
 	return api.Aggregate(results, s.Done, resultHandler, finalizer)

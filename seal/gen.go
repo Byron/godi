@@ -55,21 +55,21 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 					if !fi.Mode().IsRegular() {
 						results <- &api.BasicResult{
 							Msg:  fmt.Sprintf("Ignoring symbolic link: '%s'", path),
-							Prio: api.Warn,
+							Prio: api.Info,
 						}
 						continue
 					}
 					if fr, _ := utf8.DecodeRuneInString(fi.Name()); fr == '.' {
 						results <- &api.BasicResult{
 							Msg:  fmt.Sprintf("Ignoring hidden file: '%s'", path),
-							Prio: api.Warn,
+							Prio: api.Info,
 						}
 						continue
 					}
 					if reIsIndexPath.Match([]byte(fi.Name())) {
 						results <- &api.BasicResult{
 							Msg:  fmt.Sprintf("Ignoring godi index: '%s'", path),
-							Prio: api.Warn,
+							Prio: api.Info,
 						}
 						continue
 					}
