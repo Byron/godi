@@ -173,7 +173,7 @@ func parseSources(items []string) (res []string, err error) {
 		validTrees := make([]string, 0, len(res))
 		for i, ltree := range res {
 			for x, rtree := range res {
-				if i == x || strings.HasPrefix(ltree, rtree) {
+				if i == x || strings.HasPrefix(ltree, rtree+string(os.PathSeparator)) {
 					continue
 				}
 				validTrees = append(validTrees, ltree)
@@ -227,7 +227,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 				// Make sure we don't copy onto ourselves
 				for _, stree := range sources {
 					for _, dtree := range dtrees {
-						if strings.HasPrefix(dtree, stree) {
+						if strings.HasPrefix(dtree, stree+string(os.PathSeparator)) {
 							return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
 						}
 					}
