@@ -60,6 +60,9 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 	var channelWriters []utility.ChannelWriter
 	var lazyWriters []utility.LazyFileWriteCloser
 
+	// We keep an index of failed destinations, skipping them in write mode after first failure
+	var isFailedDestination []bool
+
 	// Build the multi-writer which will dispatch all writes to a write controller
 	if isWriting {
 		// We have one controller per device, each as a number of streams
@@ -75,6 +78,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 		// Keeps all Writers we are going to prepare per source file
 		channelWriters = make([]utility.ChannelWriter, numDestinations)
 		lazyWriters = make([]utility.LazyFileWriteCloser, numDestinations)
+		isFailedDestination = make([]bool, numDestinations)
 
 		// Init them, per controller, and set them to be used by the multi-writer right away
 		// These never change, only their Destination path does
@@ -102,17 +106,22 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 			forig := *f
 			for i := 0; i < numDestinations; i++ {
 				w, e := pmw.WriterAtIndex(i)
+				if e != nil {
+					isFailedDestination[i] = true
+				}
+
 				// If the reader had an error, no write may succeed. We just don't overwrite write errors
 				if e == nil && err != nil {
 					e = err
 				}
-				wc := w.(utility.WriteCloser)
-				wc.Close()
-
-				// we may change the same instance, as it will be copied into the Result structure later on
-				f.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path()
-				// it doesn't matter here if there actually is an error, aggregator will handle it
-				results <- makeResult(f, &forig, e)
+				// Could be a previously unset writer
+				if wc, ok := w.(utility.WriteCloser); ok {
+					wc.Close()
+					// we may change the same instance, as it will be copied into the Result structure later on
+					f.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path()
+					// it doesn't matter here if there actually is an error, aggregator will handle it
+					results <- makeResult(f, &forig, e)
+				}
 			} // for each write controller to write to
 		} // handle write mode
 	} // sendResults
@@ -141,7 +150,12 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 
 				for x := 0; x < len(wctrl.Trees); x++ {
 					// reset previous errror by resetting the writer pointer
-					pmw.SetWriterAtIndex(awid, &channelWriters[awid])
+					// If the destination is known to have an error, disable its writer
+					if isFailedDestination[awid] {
+						pmw.SetWriterAtIndex(awid, nil)
+					} else {
+						pmw.SetWriterAtIndex(awid, &channelWriters[awid])
+					}
 					lazyWriters[awid].SetPath(filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath))
 					awid += 1
 				}
