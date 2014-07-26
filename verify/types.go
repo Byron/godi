@@ -35,7 +35,7 @@ func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
 }
 
 func (s *VerifyCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
-	generate := func(files chan<- api.FileInfo, results chan<- api.Result) {
+	return api.Generate(func(files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, index := range s.Items {
 			c := codec.NewByPath(index)
 			if c == nil {
@@ -50,41 +50,33 @@ func (s *VerifyCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
 				continue
 			}
 
-			fileInfos, err := c.Deserialize(fd)
+			// Figure out the path to use - for now we use the relative one
+			// NOTE: We need to use the relative one as our read-controller device map is based on that.
+			// If it was the absolute file path we use here, it could possibly point to a file far away,
+			// in any case our read controller map will not yield the expected result unless we set it
+			// up here, which is dangerous as it is async ! So let's not use the absolute path, ever !
+			indexDir := filepath.Dir(index)
+			err = c.Deserialize(fd, files, func(v *api.FileInfo) bool {
+				select {
+				case <-s.Done:
+					return false
+				default:
+					{
+						v.Path = filepath.Join(indexDir, v.RelaPath)
+						return true
+					}
+				}
+			})
 			fd.Close()
 
-			indexDir := filepath.Dir(index)
-			if err == nil {
-			forEachFileInfo:
-				for _, fi := range fileInfos {
-					// Have to be able to abort early. One must know that even though we may read super fast,
-					// we will block until the gather threads have done the work.
-					// Therefore it makes sense to check and abort here
-					select {
-					case <-s.Done:
-						break forEachFileInfo
-					default:
-						{
-							// Figure out the path to use - for now we use the relative one
-							// NOTE: We need to use the relative one as our read-controller device map is based on that.
-							// If it was the absolute file path we use here, it could possibly point to a file far away,
-							// in any case our read controller map will not yield the expected result unless we set it
-							// up here, which is dangerous as it is async ! So let's not use the absolute path, ever !
-							fi.Path = filepath.Join(indexDir, fi.RelaPath)
-							files <- fi
-						}
-					} // select
-				} // for each fileInfo
-			} else {
+			if err != nil {
 				results <- &VerifyResult{
 					BasicResult: api.BasicResult{Err: err},
 				}
 				continue
 			}
 		} // for each index
-	}
-
-	return api.Generate(generate)
+	})
 }
 
 func (s *VerifyCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup) {

@@ -30,9 +30,13 @@ type Codec interface {
 	// The codec must protect the written data against modification, usually by hashing the contained information
 	Serialize(paths []SerializableFileInfo, writer io.Writer) (err error)
 
-	// Read a FileInfo slice from the given reader. The fileinfo Paths must be relative to the index file
+	// Stream a FileInfo obtained from the given reader.
 	// An error must be returned if the data read could not be verified.
-	Deserialize(reader io.Reader) ([]api.FileInfo, error)
+	// You must pass each read fileinfo structure to the given predicate - it might modify it before
+	// sending it down the channel. It returns false in case you should stop reading and return without error
+	// Check the done-channel and cancel the operation
+	//This function doesn't close the stream
+	Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate func(*api.FileInfo) bool) error
 
 	// Extension returns the file extension of the codec, without the '.' prefix
 	Extension() string

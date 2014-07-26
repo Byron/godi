@@ -70,7 +70,7 @@ func (g *Gob) Serialize(paths []SerializableFileInfo, writer io.Writer) (err err
 	return
 }
 
-func (g *Gob) Deserialize(reader io.Reader) ([]api.FileInfo, error) {
+func (g *Gob) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate func(*api.FileInfo) bool) error {
 	gzipReader, _ := gzip.NewReader(reader)
 	sha1enc := sha1.New()
 	d := gob.NewDecoder(gzipReader)
@@ -78,38 +78,44 @@ func (g *Gob) Deserialize(reader io.Reader) ([]api.FileInfo, error) {
 	// Lets make the fields clear, and not reuse variables even if we could
 	fileVersion := 0
 	if err := d.Decode(&fileVersion); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Of course we would implement reading other formats too
 	if fileVersion != Version {
-		return nil, fmt.Errorf("Cannot handle index file: invalid header version: %d", fileVersion)
+		return fmt.Errorf("Cannot handle index file: invalid header version: %d", fileVersion)
 	}
 
 	numValues := 0
 	if err := d.Decode(&numValues); err != nil {
-		return nil, err
+		return err
 	}
 
-	res := make([]api.FileInfo, numValues)
 	for i := 0; i < numValues; i++ {
-		v := &res[i]
-		if err := d.Decode(v); err != nil {
-			return nil, err
+		// Yes - we need a fresh one every loop iteration ! Gob doesn't set fields which have the nil value
+		v := api.FileInfo{}
+		if err := d.Decode(&v); err != nil {
+			return err
 		}
 
-		hashInfo(sha1enc, v.RelaPath, v)
+		// Have to hash it before we hand it to the predicate, as it might alter the data
+		hashInfo(sha1enc, v.RelaPath, &v)
+
+		if !predicate(&v) {
+			return nil
+		}
+		out <- v
 	}
 
 	var signature []byte
 	if err := d.Decode(&signature); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Finally, compare signature of seal with the one we made ...
 	if bytes.Compare(signature, sha1enc.Sum(nil)) != 0 {
-		return nil, errors.New("Signature mismatch")
+		return errors.New("Signature mismatch")
 	}
 
-	return res, nil
+	return nil
 }

@@ -25,6 +25,12 @@ func AddAdditinalFlags(a *cli.App) {
 func CliFinishApp(c *cli.Context) error {
 	mpf := c.GlobalString(memProfileFlagName)
 
+	// CPU Profile
+	///////////////
+	if len(c.GlobalString(cpuProfileFlagName)) > 0 {
+		pprof.StopCPUProfile()
+	}
+
 	// MEM PROFILE
 	/////////////////
 	if len(mpf) > 0 {
@@ -36,11 +42,6 @@ func CliFinishApp(c *cli.Context) error {
 		f.Close()
 	}
 
-	// CPU Profile
-	///////////////
-	if len(c.GlobalString(cpuProfileFlagName)) > 0 {
-		pprof.StopCPUProfile()
-	}
 	return nil
 }
 
