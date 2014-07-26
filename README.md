@@ -34,6 +34,7 @@ godi seal tree/
 
 * Multi-device optimizations [don't currently apply](https://github.com/Byron/godi/issues/13) on windows
 * Sealed copy ignores executable bits and permissions in general. Files are created with mode `0666`, directories with `0777`
+* `godi` is very careful about memory consumption, yet atomicity comes at the cost of keeping a list of files already copied for undo purposes. That list grows over time, and consumed ~200MB for 765895 files. It might be worth providing a flag to turn undo off.
 
 ## Development Status
 

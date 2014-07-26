@@ -81,9 +81,12 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			}
 
 			br := api.BasicResult{Prio: api.Info}
-			br.Err = os.Remove(path)
-			if br.Err == nil {
+
+			// If the file doesn't exist anymore, we don't care either
+			err := os.Remove(path)
+			if err == nil {
 				br.Msg = fmt.Sprintf("Removed '%s'", path)
+				accumResult <- &br
 
 				// try to remove the directory - will fail if non-empty.
 				// only do that if we wouldn't remove the tree.
@@ -93,8 +96,6 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 					derr = os.Remove(dir)
 				}
 			}
-
-			accumResult <- &br
 		}
 
 		// Keep the file-information, in any case
@@ -146,6 +147,8 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 				for _, path := range treeInfo.writtenFiles {
 					deleteResultSafely(treeRoot, path)
 				}
+				// We are done and shouldn't try to process these again
+				treeInfo.writtenFiles = nil
 			}
 		}
 
@@ -161,6 +164,10 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		for tree, treeInfo := range treeInfoMap {
 			close(treeInfo.sealFInfos)
 			sres := <-treeInfo.sealResult
+
+			// Free now unused memory, just in case we do a verify or something else afterwards.
+			// Of course, the gc will decide when to actually free it.
+			treeInfo.writtenFiles = nil
 
 			br := api.BasicResult{}
 
