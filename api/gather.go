@@ -13,6 +13,16 @@ import (
 	"github.com/Byron/godi/utility"
 )
 
+// Thrown if the filesize we read didn't match with the filesize we were supposed to read
+type FileSizeMismatch struct {
+	Path      string
+	Want, Got int64
+}
+
+func (f *FileSizeMismatch) Error() string {
+	return fmt.Sprintf("Filesize of '%s' reported as %d, yet only %d bytes were read", f.Path, f.Want, f.Got)
+}
+
 // Intercepts Write calls and updates the stats accordingly. Implements only what we need, forwrading the calls as needed
 type HashStatAdapter struct {
 	hash  hash.Hash
@@ -193,14 +203,15 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 			continue
 		}
 
+		// Always keep the hash as far as we have it - it's a value to preserve
+		f.Sha1 = sha1gen.Sum(nil)
+		f.MD5 = md5gen.Sum(nil)
+
 		if written != f.Size {
-			err = fmt.Errorf("Filesize of '%s' reported as %d, yet only %d bytes were read", f.Path, f.Size, written)
+			err = &FileSizeMismatch{f.Path, f.Size, written}
 			sendResults(&f, err)
 			continue
 		}
-
-		f.Sha1 = sha1gen.Sum(nil)
-		f.MD5 = md5gen.Sum(nil)
 
 		// all good
 

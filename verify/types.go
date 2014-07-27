@@ -100,15 +100,23 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	var signatureMismatches uint = 0
 	var missingFiles uint = 0
 	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
+		vr := r.(*VerifyResult)
+
 		if r.Error() != nil {
 			if os.IsNotExist(r.Error()) || os.IsPermission(r.Error()) {
 				missingFiles += 1
+			} else if serr, isFileSizeType := r.Error().(*api.FileSizeMismatch); isFileSizeType {
+				// The file-size changed, thus the hashes will be different to. Say it accordingly.
+				signatureMismatches += 1
+				vr.Err = fmt.Errorf("SIZE MISMATCH: %s sealed with size %dB, got size %dB", serr.Path, serr.Want, serr.Got)
+				accumResult <- vr
+				return false
+			} else {
+				// It's some other error - just push it forward
+				accumResult <- vr
+				return false
 			}
-			accumResult <- r
-			return false
 		}
-
-		vr := r.(*VerifyResult)
 
 		hasError := false
 		vr.Prio = api.Info
