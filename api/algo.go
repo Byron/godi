@@ -1,8 +1,7 @@
 package api
 
 import (
-	"fmt"
-	"time"
+	"github.com/Byron/godi/utility"
 )
 
 // Generate does all boilerplate required to be a valid generator
@@ -20,44 +19,15 @@ func Generate(
 	return files, results
 }
 
-type AggregateFinalizerState struct {
-	ErrCount     uint
-	WasCancelled bool
-	Elapsed      time.Duration
-}
-
-// String generates a string with performance information
-func (a *AggregateFinalizerState) String() (out string) {
-	if a.ErrCount > 0 {
-		out += fmt.Sprintf("%d errors", a.ErrCount)
-	}
-
-	if a.WasCancelled {
-		if len(out) == 0 {
-			out = "cancelled"
-		} else {
-			out += ", cancelled"
-		}
-	}
-
-	if len(out) != 0 {
-		out = " (" + out + ")"
-	}
-
-	return
-}
-
 // Aggregate is a general purpose implementation to gather fileInfo results
 func Aggregate(results <-chan Result, done <-chan bool,
 	resultHandler func(Result, chan<- Result) bool,
-	finalizer func(chan<- Result, *AggregateFinalizerState)) <-chan Result {
+	finalizer func(chan<- Result),
+	stats *utility.Stats) <-chan Result {
 	accumResult := make(chan Result)
 
 	go func() {
 		defer close(accumResult)
-
-		s := AggregateFinalizerState{}
-		st := time.Now()
 
 		// ACCUMULATE PATHS INFO
 		/////////////////////////
@@ -66,7 +36,7 @@ func Aggregate(results <-chan Result, done <-chan bool,
 			// If this happens, soon our results will be drained and we leave naturally
 			select {
 			case <-done:
-				s.WasCancelled = true
+				stats.WasCancelled = true
 				// fallthrough doesn't work in selects :(
 			default:
 				// we are just checking, but don't want to loose a result.
@@ -75,12 +45,11 @@ func Aggregate(results <-chan Result, done <-chan bool,
 			}
 
 			if !resultHandler(r, accumResult) {
-				s.ErrCount += 1
+				stats.ErrCount += 1
 			}
 		} // range results
-		s.Elapsed = time.Now().Sub(st)
 
-		finalizer(accumResult, &s)
+		finalizer(accumResult)
 	}()
 
 	return accumResult

@@ -156,8 +156,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	} // end resultHandler()
 
 	finalizer := func(
-		accumResult chan<- api.Result,
-		st *api.AggregateFinalizerState) {
+		accumResult chan<- api.Result) {
 
 		// All we have to do is to stop the sealers and gather their result, possibly deleting
 		// incomplete seals (created because there was some error on the way)
@@ -184,7 +183,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 					br.Prio = api.Valuable
 				} else {
 					// Just forward the error, hoping it is informative enough
-					st.ErrCount += 1
+					s.Stats.ErrCount += 1
 					br.Err = sres.err
 				}
 			}
@@ -193,7 +192,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		} // end for each tree/treeInfo tuple
 
 		prefix := "SEAL DONE"
-		if st.ErrCount > 0 {
+		if s.Stats.ErrCount > 0 {
 			prefix = "SEAL FAILED"
 		}
 
@@ -202,12 +201,12 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			Msg: fmt.Sprintf(
 				"%s: %s",
 				prefix,
-				s.Stats.DeltaString(&s.Stats, st.Elapsed, utility.StatsClientSep),
-			) + st.String(),
+				s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), utility.StatsClientSep),
+			) + s.Stats.String(),
 			Prio: api.Valuable,
 		}
 
 	} // end finalizer()
 
-	return api.Aggregate(results, s.Done, resultHandler, finalizer)
+	return api.Aggregate(results, s.Done, resultHandler, finalizer, &s.Stats)
 }

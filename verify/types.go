@@ -126,9 +126,8 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	}
 
 	finalizer := func(
-		accumResult chan<- api.Result,
-		st *api.AggregateFinalizerState) {
-		stats := s.Stats.DeltaString(&s.Stats, st.Elapsed, utility.StatsClientSep)
+		accumResult chan<- api.Result) {
+		stats := s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), utility.StatsClientSep)
 
 		if signatureMismatches == 0 && missingFiles == 0 {
 			accumResult <- &VerifyResult{
@@ -137,13 +136,13 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 						"VERIFY OK: None of %d file(s) changed after sealing [%s]",
 						s.Stats.MostFiles(),
 						stats,
-					) + st.String(),
+					) + s.Stats.String(),
 					Prio: api.Valuable,
 				},
 			}
 		} else {
-			st.ErrCount -= signatureMismatches
-			st.ErrCount -= missingFiles
+			s.Stats.ErrCount -= signatureMismatches
+			s.Stats.ErrCount -= missingFiles
 			accumResult <- &VerifyResult{
 				BasicResult: api.BasicResult{
 					Msg: fmt.Sprintf(
@@ -152,12 +151,12 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 						s.Stats.MostFiles(),
 						missingFiles,
 						stats,
-					) + st.String(),
+					) + s.Stats.String(),
 					Prio: api.Valuable,
 				},
 			}
 		}
 	}
 
-	return api.Aggregate(results, s.Done, resultHandler, finalizer)
+	return api.Aggregate(results, s.Done, resultHandler, finalizer, &s.Stats)
 }

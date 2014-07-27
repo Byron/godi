@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Byron/godi/utility"
 )
@@ -223,6 +224,8 @@ type Runner interface {
 func StartEngine(runner Runner,
 	generateHandler func(Result) bool,
 	aggregateHandler func(Result) bool) (err error) {
+
+	runner.Statistics().StartedAt = time.Now()
 
 	nprocs := runner.NumChannels()
 	results := make(chan Result, nprocs)

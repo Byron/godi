@@ -2,6 +2,7 @@ package utility
 
 import (
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -15,6 +16,7 @@ const (
 // thread-safe counters are used.
 // Implementations must keep these numbers up-to-date, while async processors will digest
 // and present the data in some form
+// NOTE: Even though not
 type Stats struct {
 	// PERFORMANCE METRICS
 	TotalFilesRead    uint32 // Amount of whole files we read so far
@@ -27,8 +29,14 @@ type Stats struct {
 	NumHashers        uint32 // Amount of hashers running in parallel
 
 	// GENERAL INFORMATION
-	NumSkippedFiles             uint32 // Amount of files we skipped right away
-	GatherHasNoValidDestination uint32 // Amount of gather procs which had write errors on all destinations
+	StartedAt                   time.Time // The time at which we started processing
+	NumSkippedFiles             uint32    // Amount of files we skipped right away
+	GatherHasNoValidDestination uint32    // Amount of gather procs which had write errors on all destinations
+
+	// AGGREGATION
+	// Aggregation step is single-threaded - no atomic operation needed
+	ErrCount     uint // Amount of errors that hit the aggregation step
+	WasCancelled bool // is true if the user cancelled
 }
 
 // CopyTo will atomically copy our fields to the destination structure. It will just read the fields atomically, and
@@ -46,8 +54,13 @@ func (s *Stats) CopyTo(d *Stats) {
 
 	d.NumHashers = atomic.LoadUint32(&s.NumHashers)
 
+	d.StartedAt = s.StartedAt
 	d.NumSkippedFiles = atomic.LoadUint32(&s.NumSkippedFiles)
 	d.GatherHasNoValidDestination = atomic.LoadUint32(&s.GatherHasNoValidDestination)
+
+	// Agg variables don't need to be atomic - we copy them here for completeness only
+	d.ErrCount = s.ErrCount
+	d.WasCancelled = s.WasCancelled
 }
 
 // MostFiles returns the greatest number of files, either the one that were read, or the ones that were written
@@ -78,7 +91,7 @@ func (b BytesVolume) String() string {
 		divider, unit = float64(1024<<40), "PiB"
 	} // end switch
 
-	return fmt.Sprintf("%.2f%s", float64(b)/divider, unit)
+	return fmt.Sprintf("%6.2f%s", float64(b)/divider, unit)
 }
 
 // Prints performance metrics as a single line full of useful information, including deltas of relevant metrics as compared
@@ -96,7 +109,7 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 				return ""
 			}
 		}
-		return fmt.Sprintf(" #Δ%d/s", uint64(float64(cur-prev)/td.Seconds()))
+		return fmt.Sprintf(" #Δ%5d/s", uint64(float64(cur-prev)/td.Seconds()))
 	}
 
 	bytesDelta := func(cur, prev uint64) string {
@@ -112,7 +125,7 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 
 	inOut := func(cur uint32) string {
 		if cur == 0 {
-			return ""
+			return "  "
 		}
 		return fmt.Sprintf("%d ", cur)
 	}
@@ -124,7 +137,13 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 	itf := atomic.LoadUint32(&s.TotalFilesRead)
 	ibr := atomic.LoadUint64(&s.BytesRead)
 
-	out := fmt.Sprintf("%s->READ #%d%s ⌰%s%s",
+	timeStr := fmt.Sprintf("%4.0fs", s.Elapsed().Seconds())
+	if resultMode {
+		timeStr = s.Elapsed().String()
+	}
+	out := fmt.Sprintf("🕑  %s%s", timeStr, sep)
+
+	out += fmt.Sprintf("%s->READ #%d%s ⌰%s%s",
 		inOut(atomic.LoadUint32(&s.FilesBeingRead)),
 		itf,
 		intDelta(itf, d.TotalFilesRead),
@@ -156,4 +175,31 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 	}
 
 	return out
+}
+
+// Return amount of time elapsed since we started the operation
+func (s *Stats) Elapsed() time.Duration {
+	return time.Now().Sub(s.StartedAt)
+}
+
+// String generates a string with general information
+func (s *Stats) String() (out string) {
+	var tokens []string
+
+	if s.ErrCount > 0 {
+		tokens = append(tokens, fmt.Sprintf("%d errors", s.ErrCount))
+	}
+	if s.NumSkippedFiles > 0 {
+		tokens = append(tokens, fmt.Sprintf("%d skipped", s.NumSkippedFiles))
+	}
+	if s.WasCancelled {
+		tokens = append(tokens, "cancelled")
+	}
+
+	if len(tokens) > 0 {
+		out = strings.Join(tokens, ", ")
+		out = " (" + out + ")"
+	}
+
+	return
 }
