@@ -7,7 +7,6 @@ import (
 	"hash"
 	"io"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 
 	"github.com/Byron/godi/utility"
@@ -50,14 +49,13 @@ func (h *HashStatAdapter) Sum(b []byte) []byte {
 // TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
 // Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
 // What we want is at max Y files being written continuously at a time
-func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, stats *utility.Stats,
+func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
-	rctrls map[string]*utility.ReadChannelController,
+	rctrl *utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
-	if len(rctrls) == 0 || wg == nil {
+	if rctrl == nil {
 		panic("ReadChannelController and WaitGroup must be set")
 	}
-	defer wg.Done()
 
 	sha1gen := HashStatAdapter{sha1.New(), stats}
 	md5gen := HashStatAdapter{md5.New(), stats}
@@ -148,11 +146,6 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 
 	// NOTE: This loop must not return ! It must be finished !!
 	for f := range files {
-		rctrl, hasRCtrlForRoot := rctrls[f.Root()]
-		if !hasRCtrlForRoot {
-			panic(fmt.Sprintf("Couldn't find read controller for directory at '%s'", f.Root()))
-		}
-
 		// In hash-only mode, there is only one result
 		var err error
 		if isWriting {

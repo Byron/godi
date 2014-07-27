@@ -1,8 +1,6 @@
 package seal
 
 import (
-	"sync"
-
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/utility"
 )
@@ -78,7 +76,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	return &c, err
 }
 
-func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup) {
+func (s *SealCommand) Gather(rctrl *utility.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		s := ""
 		if source != nil {
@@ -95,5 +93,5 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		return &res
 	}
 
-	api.Gather(files, results, wg, s.Statistics(), makeResult, s.RootedReaders, s.rootedWriters)
+	api.Gather(files, results, s.Statistics(), makeResult, rctrl, s.rootedWriters)
 }

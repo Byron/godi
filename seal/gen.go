@@ -9,9 +9,9 @@ import (
 	"github.com/Byron/godi/api"
 )
 
-func (s *SealCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
-	generate := func(files chan<- api.FileInfo, results chan<- api.Result) {
-		for _, tree := range s.Items {
+func (s *SealCommand) Generate() (<-chan api.Result, <-chan api.Result) {
+	generate := func(trees []string, files chan<- api.FileInfo, results chan<- api.Result) {
+		for _, tree := range trees {
 			cancelled, treeError := s.traverseFilesRecursively(files, results, s.Done, tree, tree)
 			if cancelled {
 				// interrupted usually, or there was an error
@@ -23,7 +23,7 @@ func (s *SealCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
 		}
 	}
 
-	return api.Generate(generate)
+	return api.Generate(s.RootedReaders, s, generate)
 }
 
 // Traverse recursively, return false if the caller should stop traversing due to an error

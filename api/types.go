@@ -238,7 +238,7 @@ type BasicRunner struct {
 	// Items we work on
 	Items []string
 	// A map of readers which maps from a root to the reader to use to read files that share the same root
-	RootedReaders map[string]*utility.ReadChannelController
+	RootedReaders []utility.RootedReadController
 	// A channel to let everyone know we should finish as soon as possible - this is done by closing the channel
 	Done chan bool
 
@@ -272,7 +272,7 @@ func (b *BasicRunner) NumChannels() int {
 func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Priority, filters []FileFilter) {
 	b.Items = items
 	b.Done = make(chan bool)
-	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, &b.Stats, b.Done)
+	b.RootedReaders = utility.NewDeviceReadControllers(numReaders, items, &b.Stats, b.Done)
 	if len(b.RootedReaders) == 0 {
 		panic("Didn't manage to build readers from input items")
 	}
@@ -309,20 +309,20 @@ type Runner interface {
 	// NOTE: Only valid after Init was called, and it's an error to call it beforehand
 	CancelChannel() chan bool
 
-	// Launches a go-routine which fills the returned FileInfo channel
+	// Launches generators, gatherers and an aggregator, setting up their connections to fit.
 	// Must close FileInfo channel when done
 	// Must listen for SIGTERM|SIGINT signals and abort if received
 	// May report errrors or information about the progress through generateResult, which must NOT be closed when done. Return nothing
 	// if there is nothing to report
 	// Must listen on done and return asap
-	Generate() (files <-chan FileInfo, generateResult <-chan Result)
+	Generate() (generateResult <-chan Result, aggregationResult <-chan Result)
 
 	// Will be launched as go routine and perform whichever operation on the FileInfo received from input channel
 	// Produces one result per input FileInfo and returns it in the given results channel
 	// Must listen for SIGTERM|SIGINT signals
 	// Use the wait group to mark when done, which is when the results channel need to be closed.
 	// Must listen on done and return asap
-	Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup)
+	Gather(rctrl *utility.ReadChannelController, files <-chan FileInfo, results chan<- Result)
 
 	// Aggregate the result channel and produce whatever you have to produce from the result of the Gather steps
 	// When you are done, place a single result instance into accumResult and close the channel
@@ -340,8 +340,6 @@ func StartEngine(runner Runner,
 
 	runner.Statistics().StartedAt = time.Now()
 
-	nprocs := runner.NumChannels()
-	results := make(chan Result, nprocs)
 	done := runner.CancelChannel()
 
 	// assure we close our done channel on signal
@@ -352,18 +350,7 @@ func StartEngine(runner Runner,
 		close(done)
 	}()
 
-	files, generateResult := runner.Generate()
-
-	wg := sync.WaitGroup{}
-	for i := 0; i < nprocs; i++ {
-		wg.Add(1)
-		go runner.Gather(files, results, &wg)
-	}
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-	accumResult := runner.Aggregate(results)
+	generateResult, accumResult := runner.Generate()
 
 	mkErrPicker := func(handler func(r Result) bool) func(r Result) bool {
 		return func(r Result) bool {

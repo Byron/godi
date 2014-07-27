@@ -14,6 +14,16 @@ const bufSize = 32 * 1024
 // Actually, this must remain 0 for our sync to work, right now, without pool
 const readChannelSize = 0
 
+// A utility structure to associate trees with a reader.
+// NOTE: Very similar to RootedReadController !
+type RootedReadController struct {
+	// The trees the controller should write to
+	Trees []string
+
+	// A possibly shared controller which may write to the given tree
+	Ctrl ReadChannelController
+}
+
 // The result of a read operation, similar to what Reader.Read returns
 type readResult struct {
 	buf []byte
@@ -229,19 +239,18 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 	return ctrl
 }
 
-// NewReadChannelDeviceMap returns a mapping from each of the given trees to a controller which deals with the
-// device the tree is on. If all trees are on the same device, you will get a map with len(trees) length, each one
-// referring to the same controller
-func NewReadChannelDeviceMap(nprocs int, trees []string, stats *Stats, done <-chan bool) map[string]*ReadChannelController {
+// A new list of Controllers, one per device it handles, which is associated with the tree's it can handle
+func NewDeviceReadControllers(nprocs int, trees []string, stats *Stats, done <-chan bool) []RootedReadController {
 	dm := DeviceMap(trees)
-	res := make(map[string]*ReadChannelController, len(dm))
+	res := make([]RootedReadController, len(dm))
 
-	for _, dirs := range dm {
-		rctrl := NewReadChannelController(nprocs, stats, done)
-		for _, dir := range dirs {
-			res[dir] = &rctrl
+	for did, trees := range dm {
+		// each device as so and so many sources. Each source uses the same read controller
+		res[did] = RootedReadController{
+			Trees: trees,
+			Ctrl:  NewReadChannelController(nprocs, stats, done),
 		}
-	}
+	} // for each tree set in deviceMap
 
 	return res
 }
@@ -249,27 +258,14 @@ func NewReadChannelDeviceMap(nprocs int, trees []string, stats *Stats, done <-ch
 // NOTE: Can this be a custom type, with just a function ? I think so !
 // Return the number of streams being handled in parallel
 // TODO(st) objectify
-func ReadChannelDeviceMapStreams(rm map[string]*ReadChannelController) int {
-	if len(rm) == 0 {
+func ReadChannelDeviceMapStreams(rctrls []RootedReadController) int {
+	if len(rctrls) == 0 {
 		panic("Input map was empty")
 	}
 
 	nstreams := 0
-	// count unique controllers to figure out stream multiplier
-	seen := make([]*ReadChannelController, 0, len(rm))
-
-	for _, ctrl := range rm {
-		cseen := false
-		for _, c := range seen {
-			if c == ctrl {
-				cseen = true
-				break
-			}
-		}
-		if !cseen {
-			seen = append(seen, ctrl)
-			nstreams += ctrl.Streams()
-		}
+	for _, rctrl := range rctrls {
+		nstreams += rctrl.Ctrl.Streams()
 	}
 
 	return nstreams

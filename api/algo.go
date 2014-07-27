@@ -1,22 +1,55 @@
 package api
 
 import (
+	"sync"
+
 	"github.com/Byron/godi/utility"
 )
 
 // Generate does all boilerplate required to be a valid generator
-func Generate(
-	generate func(chan<- FileInfo, chan<- Result)) (<-chan FileInfo, <-chan Result) {
+// Will produce as many generators as there are devices, each is handed a list of trees to handle
+func Generate(rctrls []utility.RootedReadController,
+	runner Runner,
+	generate func([]string, chan<- FileInfo, chan<- Result)) (<-chan Result, <-chan Result) {
+
 	files := make(chan FileInfo)
-	results := make(chan Result)
+	genResults := make(chan Result)
+	gatherToAgg := make(chan Result, runner.NumChannels())
+
+	genwg := sync.WaitGroup{} // wait group for generators
+	gatwg := sync.WaitGroup{} // wait group for gatherers
+
+	// Spawn generators - each one has num-streams gatherers
+	for _, rctrl := range rctrls {
+		genwg.Add(1)
+		go func(trees []string) {
+			generate(trees, files, genResults)
+			genwg.Done()
+		}(rctrl.Trees)
+
+		nstreams := rctrl.Ctrl.Streams()
+		for i := 0; i < nstreams; i++ {
+			gatwg.Add(1)
+			go func(ctrl *utility.ReadChannelController) {
+				runner.Gather(ctrl, files, gatherToAgg)
+				gatwg.Done()
+			}(&rctrl.Ctrl)
+		}
+	} // for each per-device controller
 
 	go func() {
+		// Cleans up when all are done
+		genwg.Wait()
 		defer close(files)
-		defer close(results)
-		generate(files, results)
+		defer close(genResults)
 	}()
 
-	return files, results
+	go func() {
+		gatwg.Wait()
+		close(gatherToAgg)
+	}()
+
+	return genResults, runner.Aggregate(gatherToAgg)
 }
 
 // Aggregate is a general purpose implementation to gather fileInfo results

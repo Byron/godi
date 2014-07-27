@@ -215,7 +215,7 @@ type WriteChannelController struct {
 }
 
 // A utility structure to associate a tree with a writer.
-// That way, writers can be more easily associated with a device which hosts Tree
+// That way, writers can be more easily associated with a device which hosts a particular Tree
 type RootedWriteController struct {
 	// The trees the controller should write to
 	Trees []string
