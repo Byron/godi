@@ -31,10 +31,10 @@ func Generate(rctrls []utility.RootedReadController,
 		nstreams := rctrl.Ctrl.Streams()
 		for i := 0; i < nstreams; i++ {
 			gatwg.Add(1)
-			go func(ctrl *utility.ReadChannelController, files <-chan FileInfo) {
-				runner.Gather(ctrl, files, gatherToAgg)
+			go func(ctrl utility.ReadChannelController, files <-chan FileInfo) {
+				runner.Gather(&ctrl, files, gatherToAgg)
 				gatwg.Done()
-			}(&rctrl.Ctrl, files)
+			}(rctrl.Ctrl, files)
 		}
 	} // for each per-device controller
 
