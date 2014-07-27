@@ -20,6 +20,9 @@ type FileInfo struct {
 	// Path relative to the directory it was found in
 	RelaPath string
 
+	// Provides information about the type of the file
+	Mode os.FileMode
+
 	// size of file
 	Size int64
 

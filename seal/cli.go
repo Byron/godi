@@ -227,7 +227,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 				// Make sure we don't copy onto ourselves
 				for _, stree := range sources {
 					for _, dtree := range dtrees {
-						if strings.HasPrefix(dtree, stree+string(os.PathSeparator)) {
+						if strings.HasPrefix(dtree+string(os.PathSeparator), stree) {
 							return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
 						}
 					}

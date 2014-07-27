@@ -144,6 +144,9 @@ type LazyFileWriteCloser struct {
 	// The path we should open a writer to on first write. This will fail if the fail already exists.
 	path string
 
+	// The mode the destination file should have when done writing
+	mode os.FileMode
+
 	// A writer we are using to perform the write
 	writer *os.File
 }
@@ -155,11 +158,12 @@ func (l *LazyFileWriteCloser) Path() string {
 
 // SetPath changes the path to the given one.
 // It's an error to set a new path while the previous writer wasn't closed yet
-func (l *LazyFileWriteCloser) SetPath(p string) {
+func (l *LazyFileWriteCloser) SetPath(p string, mode os.FileMode) {
 	if l.writer != nil {
 		panic("Previous writer wasn't close - can't set new path")
 	}
 	l.path = p
+	l.mode = mode
 }
 
 func (l *LazyFileWriteCloser) Write(b []byte) (n int, err error) {
@@ -169,9 +173,20 @@ func (l *LazyFileWriteCloser) Write(b []byte) (n int, err error) {
 		if err != nil {
 			return 0, err
 		}
-		l.writer, err = os.OpenFile(l.path, os.O_EXCL|os.O_WRONLY|os.O_CREATE, 0666)
-		if err != nil {
-			return 0, err
+
+		// NOTE: We may rightfully assume we see only one write in case of symlinks !
+		// This is because the read-buffer is large enough to hold any symlink.
+		// If not, the reader will panic
+
+		// Symlinks are created right away
+		if l.mode&os.ModeSymlink == os.ModeSymlink {
+			err = os.Symlink(string(b), l.path)
+			return len(b), err
+		} else {
+			l.writer, err = os.OpenFile(l.path, os.O_EXCL|os.O_WRONLY|os.O_CREATE, l.mode)
+			if err != nil {
+				return 0, err
+			}
 		}
 	}
 

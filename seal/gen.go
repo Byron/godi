@@ -66,13 +66,22 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 
 		if !fi.IsDir() {
 			path := filepath.Join(tree, fi.Name())
-			if !fi.Mode().IsRegular() {
-				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
-				results <- &api.BasicResult{
-					Msg:  fmt.Sprintf("Ignoring symbolic link: '%s'", path),
-					Prio: api.Info,
-				}
+			// Always ignore those pesky volatile hidden files that some programs spill everywhere ...
+			if fi.Name() == ".DS_Store" {
+				// Don't even bother telling !
 				continue
+			}
+
+			if !fi.Mode().IsRegular() {
+				// Skip devices, but don't skip symbolic links unless it's configured like that
+				if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
+					atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
+					results <- &api.BasicResult{
+						Msg:  fmt.Sprintf("Ignoring non-regular file: '%s'", path),
+						Prio: api.Info,
+					}
+					continue
+				}
 			}
 			if fr, _ := utf8.DecodeRuneInString(fi.Name()); fr == '.' {
 				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
@@ -94,6 +103,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 			files <- api.FileInfo{
 				Path:     path,
 				RelaPath: path[len(root)+1:],
+				Mode:     fi.Mode(),
 				Size:     fi.Size(),
 			}
 		}

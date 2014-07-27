@@ -30,6 +30,9 @@ type ChannelReader struct {
 	// An optional path, which will be opened for reading when Reader is nil
 	path string
 
+	// The mode of the file to read
+	mode os.FileMode
+
 	// A Reader interface, in case Path is unset. Use this if you want to open the file or provide your
 	// own custom reader
 	reader io.Reader
@@ -51,11 +54,12 @@ func (r *ReadChannelController) Streams() int {
 
 // Return a new channel reader
 // You should set either path
-func (r *ReadChannelController) NewChannelReaderFromPath(path string) *ChannelReader {
+func (r *ReadChannelController) NewChannelReaderFromPath(path string, mode os.FileMode) *ChannelReader {
 	// NOTE: size of this channel controls how much we can cache into memory before we block
 	// as the consumer doesn't keep up
 	cr := ChannelReader{
 		path:    path,
+		mode:    mode,
 		results: make(chan readResult, readChannelSize),
 		ready:   make(chan bool),
 	}
@@ -134,17 +138,40 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 		defer close(info.results)
 		defer close(info.ready)
 
+		sendError := func(err error) {
+			// Add one - the client reader will call Done after receiving our result
+			// We are always required to signal ready before we send
+			<-info.ready
+			info.results <- readResult{nil, 0, err}
+		}
+
 		var err error
 		ourReader := false
 		if info.reader == nil {
-			ourReader = true
-			info.reader, err = os.Open(info.path)
-			if err != nil {
-				// Add one - the client reader will call Done after receiving our result
-				// We are always required to signal ready before we send
-				<-info.ready
-				info.results <- readResult{nil, 0, err}
-				return
+			if info.mode&os.ModeSymlink == os.ModeSymlink {
+				ldest, err := os.Readlink(info.path)
+				if err != nil {
+					sendError(err)
+					return
+				} else {
+					// The contents of the link is our result - therefore, we finish it here
+					<-info.ready
+					atomic.AddUint64(&stats.BytesRead, uint64(len(ldest)))
+
+					if n := copy(info.buf[:], []byte(ldest)); n != len(ldest) {
+						panic("Couldn't copy symlink into buffer - was it larger than our buffer ??")
+					}
+
+					info.results <- readResult{info.buf[:len(ldest)], len(ldest), io.EOF}
+					return
+				}
+			} else {
+				ourReader = true
+				info.reader, err = os.Open(info.path)
+				if err != nil {
+					sendError(err)
+					return
+				}
 			}
 		}
 

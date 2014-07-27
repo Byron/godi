@@ -166,7 +166,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 					} else {
 						pmw.SetWriterAtIndex(awid, &channelWriters[awid])
 					}
-					lazyWriters[awid].SetPath(filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath))
+					lazyWriters[awid].SetPath(filepath.Join(wctrl.Trees[awid-fawid], f.RelaPath), f.Mode)
 					awid += 1
 				}
 			} // for each device's write controller
@@ -178,7 +178,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, st
 		} // handle write mode preparations
 
 		// let the other end open the file and close it as well
-		reader := rctrl.NewChannelReaderFromPath(f.Path)
+		reader := rctrl.NewChannelReaderFromPath(f.Path, f.Mode)
 
 		sha1gen.Reset()
 		md5gen.Reset()
