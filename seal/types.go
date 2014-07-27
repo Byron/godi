@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	IndexBaseName = "godi"
-	Name          = "seal"
+	Name = "seal"
 
 	modeSeal = Name
 	modeCopy = "sealed-copy"
@@ -75,7 +74,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	} else {
 		c.mode = modeCopy
 	}
-	err := c.Init(nReaders, nWriters, trees, api.Info)
+	err := c.Init(nReaders, nWriters, trees, api.Info, []api.FileFilter{api.FilterSeals})
 	return &c, err
 }
 

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Byron/godi/api"
@@ -16,6 +17,7 @@ const (
 	TimeEpsilon                   = 40 * time.Millisecond
 	StreamsPerInputDeviceFlagName = "streams-per-input-device"
 	LogLevelFlagName              = "verbosity"
+	FileExcludePatternFlagName    = "file-exclude-patterns"
 )
 
 // Wraps an Aggregator handler and tracks last time the handler was called.
@@ -49,7 +51,7 @@ func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result) bo
 			// From that point on, messages can come in more slowly
 			minLogInterval = StatisticalLoggingInterval
 			// Otherwise, prepare statistics
-			fmt.Println(stats.DeltaString(&lastStat, td, utility.StatsClientSep))
+			fmt.Println(stats.DeltaString(&lastStat, td, utility.StatsClientSep), stats.String())
 			lastLoggedAt = now
 			stats.CopyTo(&lastStat)
 		}
@@ -96,16 +98,26 @@ func RunAction(cmd api.Runner, c *cli.Context) {
 }
 
 // As CheckCommonFlagsAndInit, but will return all parsed and verified common values, including an optional error
-func CheckCommonFlags(c *cli.Context) (nr int, level api.Priority, err error) {
+func CheckCommonFlags(c *cli.Context) (nr int, level api.Priority, filters []api.FileFilter, err error) {
 	// Put parsed args in cmd and sanitize it
 	nr = c.GlobalInt(StreamsPerInputDeviceFlagName)
 	if nr < 1 {
-		return 0, level, fmt.Errorf("--%v must not be smaller than 1", StreamsPerInputDeviceFlagName)
+		return 0, level, filters, fmt.Errorf("--%v must not be smaller than 1", StreamsPerInputDeviceFlagName)
 	}
 
 	level, err = api.PriorityFromString(c.GlobalString(LogLevelFlagName))
 	if err != nil {
 		return
+	}
+
+	filterStr := c.GlobalString(FileExcludePatternFlagName)
+	for _, fstr := range strings.Split(filterStr, ",") {
+		if f, e := api.FileFilterFromString(fstr); e != nil {
+			err = e
+			return
+		} else {
+			filters = append(filters, f)
+		}
 	}
 
 	err = parseAdditionalFlags(c)
@@ -115,10 +127,10 @@ func CheckCommonFlags(c *cli.Context) (nr int, level api.Priority, err error) {
 // Check common args and init a command with them.
 // Further init and checking should be done in specialized function
 func CheckCommonFlagsAndInit(cmd api.Runner, c *cli.Context) error {
-	nr, level, err := CheckCommonFlags(c)
+	nr, level, filters, err := CheckCommonFlags(c)
 	if err != nil {
 		return err
 	}
 
-	return cmd.Init(nr, nr, c.Args(), level)
+	return cmd.Init(nr, nr, c.Args(), level, filters)
 }

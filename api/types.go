@@ -4,11 +4,118 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"regexp"
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Byron/godi/utility"
+)
+
+const IndexBaseName = "godi"
+
+const (
+	filterModeSymlinks int8 = iota
+	filterModeHidden
+	filterModeSeals
+	filterModeVolatile
+	filterModeFnMatch
+)
+
+// Must be kept in sync with indexPath() generator
+var reIsIndexPath = regexp.MustCompile(fmt.Sprintf(`%s_\d{4}-\d{2}-\d{2}_\d{2}\d{2}\d{2}\..*`, IndexBaseName))
+
+// return a path to an index file residing at tree
+func IndexPath(tree string, extension string) string {
+	n := time.Now()
+	return filepath.Join(tree, fmt.Sprintf("%s_%04d-%02d-%02d_%02d%02d%02d.%s",
+		IndexBaseName,
+		n.Year(),
+		n.Month(),
+		n.Day(),
+		n.Hour(),
+		n.Minute(),
+		n.Second(),
+		extension))
+}
+
+// A utility to encapsulate a file-filter
+// These exist in special modes to filter entire classes of files, and as FNMatch compatible string
+type FileFilter struct {
+	fnFilter string // fnmatch compatible string, used if mode is filterFnMatch
+	kind     int8   // The kind of files we apply to
+}
+
+func (f FileFilter) String() string {
+	switch f.kind {
+	case filterModeSymlinks:
+		return "SYMLINK"
+	case filterModeHidden:
+		return "HIDDEN"
+	case filterModeSeals:
+		return "SEALS"
+	case filterModeVolatile:
+		return "VOLATILE"
+	case filterModeFnMatch:
+		return f.fnFilter
+	default:
+		panic("Not implemented")
+	}
+}
+
+func (f *FileFilter) Matches(name string, mode os.FileMode) bool {
+	switch f.kind {
+	case filterModeSymlinks:
+		return mode&os.ModeSymlink == os.ModeSymlink
+	case filterModeHidden:
+		if fr, _ := utf8.DecodeRuneInString(name); fr == '.' {
+			return true
+		}
+	case filterModeSeals:
+		return reIsIndexPath.Match([]byte(name))
+	case filterModeVolatile:
+		return ((mode&os.ModeSymlink != os.ModeSymlink) && !mode.IsRegular()) || name == ".DS_Store"
+	case filterModeFnMatch:
+		{
+			// We assume the patten was already checked for correctness
+			res, _ := filepath.Match(f.fnFilter, name)
+			return res
+		}
+	default:
+		panic("unknown kind")
+	} // kind switch
+
+	// select may fall through, so defeault is no match
+	return false
+}
+
+// Return a new FileFilter matching the given string.
+// Every string which is not a special kind of filter will be interpreted as fnmatch filter. Err is returned if
+// the glob is invalid
+func FileFilterFromString(name string) (FileFilter, error) {
+	for _, f := range [...]FileFilter{FilterSymlinks, FilterHidden, FilterSeals, FilterVolatile} {
+		if f.String() == name {
+			return f, nil
+		}
+	}
+
+	if _, err := filepath.Match(name, "empty"); err != nil {
+		return FileFilter{}, err
+	}
+
+	return FileFilter{
+		fnFilter: name,
+		kind:     filterModeFnMatch,
+	}, nil
+}
+
+var (
+	FilterSymlinks = FileFilter{kind: filterModeSymlinks}
+	FilterHidden   = FileFilter{kind: filterModeHidden}
+	FilterSeals    = FileFilter{kind: filterModeSeals}
+	FilterVolatile = FileFilter{kind: filterModeVolatile}
 )
 
 // A struct holding information about a task, including
@@ -36,6 +143,7 @@ func (f *FileInfo) Root() string {
 	return f.Path[:len(f.Path)-len(f.RelaPath)-1]
 }
 
+// TODO(st): Should be named 'Importance'
 type Priority uint8
 
 const (
@@ -141,7 +249,8 @@ type BasicRunner struct {
 	// This member shouldn't be needed as logging is not done by the runner anyway - it's all done by result handlers.
 	// Only they are concerned, which is a function of the CLI entirely
 	// TODO(st) Fork CLI and make the fix, use the fork from that point on ... .
-	Level Priority
+	Level   Priority
+	Filters []FileFilter
 }
 
 func (b *BasicRunner) LogLevel() Priority {
@@ -160,7 +269,7 @@ func (b *BasicRunner) NumChannels() int {
 }
 
 // Initialize our Readers and items with the given information, including our cannel
-func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Priority) {
+func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Priority, filters []FileFilter) {
 	b.Items = items
 	b.Done = make(chan bool)
 	b.RootedReaders = utility.NewReadChannelDeviceMap(numReaders, items, &b.Stats, b.Done)
@@ -168,6 +277,7 @@ func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLeve
 		panic("Didn't manage to build readers from input items")
 	}
 	b.Level = maxLogLevel
+	b.Filters = filters
 }
 
 func (b *BasicRunner) CancelChannel() chan bool {
@@ -183,7 +293,7 @@ type Runner interface {
 	// can be assumed to be valid
 	// Sets the items we are supposed to be working on - must be checked by implementation, as they are
 	// very generic in nature
-	Init(numReaders, numWriters int, items []string, maxLogLevel Priority) error
+	Init(numReaders, numWriters int, items []string, maxLogLevel Priority, filters []FileFilter) error
 
 	// Return the amount of io-channels the runner may be using in parallel per device
 	NumChannels() int

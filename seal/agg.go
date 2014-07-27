@@ -5,31 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
-	"time"
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
 	"github.com/Byron/godi/utility"
 )
-
-// Must be kept in sync with indexPath generator
-var reIsIndexPath = regexp.MustCompile(fmt.Sprintf(`%s_\d{4}-\d{2}-\d{2}_\d{2}\d{2}\d{2}\.%s`, IndexBaseName, codec.GobExtension))
-
-// return a path to an index file residing at tree
-func indexPath(tree string, extension string) string {
-	n := time.Now()
-	return filepath.Join(tree, fmt.Sprintf("%s_%04d-%02d-%02d_%02d%02d%02d.%s",
-		IndexBaseName,
-		n.Year(),
-		n.Month(),
-		n.Day(),
-		n.Hour(),
-		n.Minute(),
-		n.Second(),
-		extension))
-}
 
 // Will setup a go-routine which writes a seal for the given tree, continuously as new files come in
 func setupIndexWriter(commonTree string) (chan<- api.FileInfo, <-chan indexWriterResult) {
@@ -49,7 +30,7 @@ func setupIndexWriter(commonTree string) (chan<- api.FileInfo, <-chan indexWrite
 		encoder := codec.Gob{}
 
 		// This will and should fail if the file already exists
-		indexPath := indexPath(commonTree, encoder.Extension())
+		indexPath := api.IndexPath(commonTree, encoder.Extension())
 		fd, err := os.OpenFile(indexPath, os.O_EXCL|os.O_CREATE|os.O_WRONLY, 0666)
 		if err == nil {
 			bfd := bufio.NewWriterSize(fd, 512*1024)
@@ -85,6 +66,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			// If the file doesn't exist anymore, we don't care either
 			err := os.Remove(path)
 			if err == nil {
+				s.Stats.NumUndoneFiles += 1
 				br.Msg = fmt.Sprintf("Removed '%s'", path)
 				accumResult <- &br
 

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
-	"unicode/utf8"
 
 	"github.com/Byron/godi/api"
 )
@@ -56,6 +55,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 	}
 
 	// first generate infos
+toNextFile:
 	for _, fi := range dirInfos {
 
 		// Actually we wouldn't need atomic access here, but lets be sure the race-detector is happy with us
@@ -66,38 +66,16 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 
 		if !fi.IsDir() {
 			path := filepath.Join(tree, fi.Name())
-			// Always ignore those pesky volatile hidden files that some programs spill everywhere ...
-			if fi.Name() == ".DS_Store" {
-				// Don't even bother telling !
-				continue
-			}
 
-			if !fi.Mode().IsRegular() {
-				// Skip devices, but don't skip symbolic links unless it's configured like that
-				if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
+			for _, excludeFilter := range s.Filters {
+				if excludeFilter.Matches(fi.Name(), fi.Mode()) {
 					atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
 					results <- &api.BasicResult{
-						Msg:  fmt.Sprintf("Ignoring non-regular file: '%s'", path),
+						Msg:  fmt.Sprintf("Ignoring '%s' at '%s'", excludeFilter, path),
 						Prio: api.Info,
 					}
-					continue
+					continue toNextFile
 				}
-			}
-			if fr, _ := utf8.DecodeRuneInString(fi.Name()); fr == '.' {
-				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
-				results <- &api.BasicResult{
-					Msg:  fmt.Sprintf("Ignoring hidden file: '%s'", path),
-					Prio: api.Info,
-				}
-				continue
-			}
-			if reIsIndexPath.Match([]byte(fi.Name())) {
-				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
-				results <- &api.BasicResult{
-					Msg:  fmt.Sprintf("Ignoring godi index: '%s'", path),
-					Prio: api.Info,
-				}
-				continue
 			}
 
 			files <- api.FileInfo{

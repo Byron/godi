@@ -30,7 +30,7 @@ func SubCommands() []gcli.Command {
 	return out
 }
 
-func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority) error {
+func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) error {
 	if len(items) == 0 {
 		return errors.New("Please provide at least one seal file")
 	}
@@ -46,7 +46,7 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogL
 		indexDirs[i] = filepath.Dir(index)
 	}
 
-	s.InitBasicRunner(numReaders, indexDirs, maxLogLevel)
+	s.InitBasicRunner(numReaders, indexDirs, maxLogLevel, filters)
 	s.Items = items
 	return nil
 }

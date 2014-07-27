@@ -68,7 +68,7 @@ func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Res
 func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
 	cmd.verify = c.Bool(verifyAfterCopy)
 	// have to do init ourselves as we set amount of writers
-	nr, level, err := cli.CheckCommonFlags(c)
+	nr, level, filters, err := cli.CheckCommonFlags(c)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
 		return fmt.Errorf("--%v must not be smaller than 1", streamsPerOutputDevice)
 	}
 
-	return cmd.Init(nr, nw, c.Args(), level)
+	return cmd.Init(nr, nw, c.Args(), level, filters)
 }
 
 func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
@@ -189,7 +189,7 @@ func parseSources(items []string) (res []string, err error) {
 	return res, nil
 }
 
-func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority) (err error) {
+func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
 	if s.mode == modeSeal {
 		if len(items) == 0 {
 			return errors.New("Please provide at least one source directory to work on")
@@ -198,7 +198,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 		if err != nil {
 			return
 		}
-		s.InitBasicRunner(numReaders, items, maxLogLevel)
+		s.InitBasicRunner(numReaders, items, maxLogLevel, filters)
 	} else if s.mode == modeCopy {
 		// Parses [src, ...] => [dst, ...]
 		err = errors.New(usage)
@@ -232,7 +232,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 						}
 					}
 				}
-				s.InitBasicRunner(numReaders, sources, maxLogLevel)
+				s.InitBasicRunner(numReaders, sources, maxLogLevel, filters)
 
 				// build the device map with all writer destinations
 				dm := utility.DeviceMap(dtrees)

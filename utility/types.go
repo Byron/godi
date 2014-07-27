@@ -35,8 +35,9 @@ type Stats struct {
 
 	// AGGREGATION
 	// Aggregation step is single-threaded - no atomic operation needed
-	ErrCount     uint // Amount of errors that hit the aggregation step
-	WasCancelled bool // is true if the user cancelled
+	ErrCount       uint // Amount of errors that hit the aggregation step
+	NumUndoneFiles uint // Amout of files removed during undo
+	WasCancelled   bool // is true if the user cancelled
 }
 
 // CopyTo will atomically copy our fields to the destination structure. It will just read the fields atomically, and
@@ -60,6 +61,7 @@ func (s *Stats) CopyTo(d *Stats) {
 
 	// Agg variables don't need to be atomic - we copy them here for completeness only
 	d.ErrCount = s.ErrCount
+	d.NumUndoneFiles = s.NumUndoneFiles
 	d.WasCancelled = s.WasCancelled
 }
 
@@ -191,6 +193,9 @@ func (s *Stats) String() (out string) {
 	}
 	if s.NumSkippedFiles > 0 {
 		tokens = append(tokens, fmt.Sprintf("%d skipped", s.NumSkippedFiles))
+	}
+	if s.NumUndoneFiles > 0 {
+		tokens = append(tokens, fmt.Sprintf("%d Undone", s.NumUndoneFiles))
 	}
 	if s.WasCancelled {
 		tokens = append(tokens, "cancelled")
