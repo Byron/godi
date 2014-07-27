@@ -16,6 +16,7 @@ const (
 // Implementations must keep these numbers up-to-date, while async processors will digest
 // and present the data in some form
 type Stats struct {
+	// PERFORMANCE METRICS
 	TotalFilesRead    uint32 // Amount of whole files we read so far
 	TotalFilesWritten uint32 // Amount of whole files we wrote so far
 	FilesBeingRead    uint32 // Amount of files currently being read
@@ -24,6 +25,10 @@ type Stats struct {
 	BytesWritten      uint64 // Total of bytes written so far, counting all output streams
 	BytesHashed       uint64 // Total of bytes hashed so far, counting all active hashers
 	NumHashers        uint32 // Amount of hashers running in parallel
+
+	// GENERAL INFORMATION
+	NumSkippedFiles             uint32 // Amount of files we skipped right away
+	GatherHasNoValidDestination uint32 // Amount of gather procs which had write errors on all destinations
 }
 
 // CopyTo will atomically copy our fields to the destination structure. It will just read the fields atomically, and
@@ -40,6 +45,9 @@ func (s *Stats) CopyTo(d *Stats) {
 	d.BytesHashed = atomic.LoadUint64(&s.BytesHashed)
 
 	d.NumHashers = atomic.LoadUint32(&s.NumHashers)
+
+	d.NumSkippedFiles = atomic.LoadUint32(&s.NumSkippedFiles)
+	d.GatherHasNoValidDestination = atomic.LoadUint32(&s.GatherHasNoValidDestination)
 }
 
 // MostFiles returns the greatest number of files, either the one that were read, or the ones that were written
@@ -73,7 +81,7 @@ func (b BytesVolume) String() string {
 	return fmt.Sprintf("%.2f%s", float64(b)/divider, unit)
 }
 
-// Prints itself as a single line full of useful information, including deltas of relevant metrics as compared
+// Prints performance metrics as a single line full of useful information, including deltas of relevant metrics as compared
 // to the last state d. You will also give the temporal distance which separates this stat from the previous one
 // If you pass s as d, this indicates a result mode, which assumes you want the overall average throughput
 // Sep is the separator to use between fields

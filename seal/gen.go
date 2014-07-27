@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"github.com/Byron/godi/api"
 )
 
-func (s *SealCommand) Generate(feedback <-chan string) (<-chan api.FileInfo, <-chan api.Result) {
+func (s *SealCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
 	generate := func(files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, tree := range s.Items {
-			cancelled, treeError := s.traverseFilesRecursively(files, results, s.Done, feedback, tree, tree)
+			cancelled, treeError := s.traverseFilesRecursively(files, results, s.Done, tree, tree)
 			if cancelled {
 				// interrupted usually, or there was an error
 				break
@@ -27,7 +28,7 @@ func (s *SealCommand) Generate(feedback <-chan string) (<-chan api.FileInfo, <-c
 }
 
 // Traverse recursively, return false if the caller should stop traversing due to an error
-func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, results chan<- api.Result, done <-chan bool, feedback <-chan string, tree string, root string) (bool, bool) {
+func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, results chan<- api.Result, done <-chan bool, tree string, root string) (bool, bool) {
 	select {
 	case <-done:
 		return true, false
@@ -43,6 +44,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 		}
 		return false, true
 	}
+
 	dirInfos, err := f.Readdir(-1)
 	f.Close()
 	if err != nil {
@@ -55,20 +57,17 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 
 	// first generate infos
 	for _, fi := range dirInfos {
-		// Have to try real hard to drain the feedback channel, to assure it will never block to the writer
-		select {
-		case failedTree := <-feedback:
-			{
-				if failedTree == root {
-					return false, true
-				}
-			}
-		default:
-		} // select
+
+		// Actually we wouldn't need atomic access here, but lets be sure the race-detector is happy with us
+		// If at least one gather had errors to all destinations, there is no meaning in delivering more paths
+		if atomic.LoadUint32(&s.Stats.GatherHasNoValidDestination) > 0 {
+			return false, true
+		}
 
 		if !fi.IsDir() {
 			path := filepath.Join(tree, fi.Name())
 			if !fi.Mode().IsRegular() {
+				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
 				results <- &api.BasicResult{
 					Msg:  fmt.Sprintf("Ignoring symbolic link: '%s'", path),
 					Prio: api.Info,
@@ -76,6 +75,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 				continue
 			}
 			if fr, _ := utf8.DecodeRuneInString(fi.Name()); fr == '.' {
+				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
 				results <- &api.BasicResult{
 					Msg:  fmt.Sprintf("Ignoring hidden file: '%s'", path),
 					Prio: api.Info,
@@ -83,6 +83,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 				continue
 			}
 			if reIsIndexPath.Match([]byte(fi.Name())) {
+				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
 				results <- &api.BasicResult{
 					Msg:  fmt.Sprintf("Ignoring godi index: '%s'", path),
 					Prio: api.Info,
@@ -101,7 +102,7 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 	// then recurse
 	for _, fi := range dirInfos {
 		if fi.IsDir() {
-			cancelled, treeError := s.traverseFilesRecursively(files, results, done, feedback, filepath.Join(tree, fi.Name()), root)
+			cancelled, treeError := s.traverseFilesRecursively(files, results, done, filepath.Join(tree, fi.Name()), root)
 			if cancelled || treeError {
 				return cancelled, treeError
 			}

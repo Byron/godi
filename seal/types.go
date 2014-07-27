@@ -79,7 +79,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	return &c, err
 }
 
-func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, feedback chan<- string, wg *sync.WaitGroup) {
+func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		s := ""
 		if source != nil {
@@ -96,5 +96,5 @@ func (s *SealCommand) Gather(files <-chan api.FileInfo, results chan<- api.Resul
 		return &res
 	}
 
-	api.Gather(files, results, feedback, wg, s.Statistics(), makeResult, s.RootedReaders, s.rootedWriters)
+	api.Gather(files, results, wg, s.Statistics(), makeResult, s.RootedReaders, s.rootedWriters)
 }

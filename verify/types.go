@@ -34,15 +34,7 @@ func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
 	return &c, c.Init(nReaders, 0, indices, api.Info)
 }
 
-func (s *VerifyCommand) Generate(feedback <-chan string) (<-chan api.FileInfo, <-chan api.Result) {
-	// We will just drain the feedback channel, verify should actually continue on error
-	go func() {
-		for v := range feedback {
-			// Have to do something with v ...
-			_ = v
-		}
-	}()
-
+func (s *VerifyCommand) Generate() (<-chan api.FileInfo, <-chan api.Result) {
 	return api.Generate(func(files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, index := range s.Items {
 			c := codec.NewByPath(index)
@@ -87,7 +79,7 @@ func (s *VerifyCommand) Generate(feedback <-chan string) (<-chan api.FileInfo, <
 	})
 }
 
-func (s *VerifyCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, feedback chan<- string, wg *sync.WaitGroup) {
+func (s *VerifyCommand) Gather(files <-chan api.FileInfo, results chan<- api.Result, wg *sync.WaitGroup) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		res := VerifyResult{
 			BasicResult: api.BasicResult{
@@ -100,7 +92,7 @@ func (s *VerifyCommand) Gather(files <-chan api.FileInfo, results chan<- api.Res
 		return &res
 	}
 
-	api.Gather(files, results, feedback, wg, &s.Stats, makeResult, s.RootedReaders, nil)
+	api.Gather(files, results, wg, &s.Stats, makeResult, s.RootedReaders, nil)
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {

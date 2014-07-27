@@ -40,7 +40,7 @@ func (h *HashStatAdapter) Sum(b []byte) []byte {
 // TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
 // Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
 // What we want is at max Y files being written continuously at a time
-func Gather(files <-chan FileInfo, results chan<- Result, feedback chan<- string, wg *sync.WaitGroup, stats *utility.Stats,
+func Gather(files <-chan FileInfo, results chan<- Result, wg *sync.WaitGroup, stats *utility.Stats,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrls map[string]*utility.ReadChannelController,
 	wctrls []utility.RootedWriteController) {
@@ -130,7 +130,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, feedback chan<- string
 
 			// If all of our destinations are in fail state, let the gatherer know we can't do anything
 			if numFailedDestinations == numDestinations {
-				feedback <- forig.Root()
+				atomic.AddUint32(&stats.GatherHasNoValidDestination, 1)
 			}
 
 		} // handle write mode
