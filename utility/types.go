@@ -11,6 +11,16 @@ const (
 	StatsClientSep = " | "
 )
 
+// Append elm if it is not yet on dest
+func AppendUniqueString(dest []string, elm string) []string {
+	for _, d := range dest {
+		if d == elm {
+			return dest
+		}
+	}
+	return append(dest, elm)
+}
+
 // A structure to keep information about what is currently going on.
 // It is means to be used as shared resource, used by multiple threads, which is why
 // thread-safe counters are used.

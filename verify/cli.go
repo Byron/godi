@@ -9,6 +9,7 @@ import (
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/codec"
+	"github.com/Byron/godi/utility"
 
 	gcli "github.com/codegangsta/cli"
 )
@@ -35,8 +36,13 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogL
 		return errors.New("Please provide at least one seal file")
 	}
 
-	indexDirs := make([]string, len(items))
-	for i, index := range items {
+	validItems := make([]string, 0, len(items))
+	for _, index := range items {
+		validItems = utility.AppendUniqueString(validItems, index)
+	}
+
+	indexDirs := make([]string, len(validItems))
+	for i, index := range validItems {
 		if codec := codec.NewByPath(index); codec == nil {
 			return fmt.Errorf("Unknown seal file format: '%s'", index)
 		}
@@ -47,6 +53,6 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogL
 	}
 
 	s.InitBasicRunner(numReaders, indexDirs, maxLogLevel, filters)
-	s.Items = items
+	s.Items = validItems
 	return nil
 }

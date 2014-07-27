@@ -176,7 +176,7 @@ func parseSources(items []string) (res []string, err error) {
 				if i == x || strings.HasPrefix(ltree, rtree+string(os.PathSeparator)) {
 					continue
 				}
-				validTrees = append(validTrees, ltree)
+				validTrees = utility.AppendUniqueString(validTrees, ltree)
 			}
 		}
 		if len(validTrees) == 0 {
