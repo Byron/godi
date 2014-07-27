@@ -12,7 +12,6 @@ func Generate(rctrls []utility.RootedReadController,
 	runner Runner,
 	generate func([]string, chan<- FileInfo, chan<- Result)) (<-chan Result, <-chan Result) {
 
-	files := make(chan FileInfo)
 	genResults := make(chan Result)
 	gatherToAgg := make(chan Result, runner.NumChannels())
 
@@ -21,26 +20,27 @@ func Generate(rctrls []utility.RootedReadController,
 
 	// Spawn generators - each one has num-streams gatherers
 	for _, rctrl := range rctrls {
+		files := make(chan FileInfo)
 		genwg.Add(1)
-		go func(trees []string) {
+		go func(trees []string, files chan<- FileInfo) {
 			generate(trees, files, genResults)
+			close(files)
 			genwg.Done()
-		}(rctrl.Trees)
+		}(rctrl.Trees, files)
 
 		nstreams := rctrl.Ctrl.Streams()
 		for i := 0; i < nstreams; i++ {
 			gatwg.Add(1)
-			go func(ctrl *utility.ReadChannelController) {
+			go func(ctrl *utility.ReadChannelController, files <-chan FileInfo) {
 				runner.Gather(ctrl, files, gatherToAgg)
 				gatwg.Done()
-			}(&rctrl.Ctrl)
+			}(&rctrl.Ctrl, files)
 		}
 	} // for each per-device controller
 
 	go func() {
 		// Cleans up when all are done
 		genwg.Wait()
-		defer close(files)
 		defer close(genResults)
 	}()
 
