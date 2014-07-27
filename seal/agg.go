@@ -34,7 +34,7 @@ func setupIndexWriter(commonTree string) (chan<- api.FileInfo, <-chan indexWrite
 		fd, err := os.OpenFile(indexPath, os.O_EXCL|os.O_CREATE|os.O_WRONLY, 0666)
 		if err == nil {
 			bfd := bufio.NewWriterSize(fd, 512*1024)
-			err = encoder.Serialize(sealFiles, fd)
+			err = encoder.Serialize(sealFiles, bfd)
 			bfd.Flush()
 			fd.Close()
 			if err != nil {
@@ -102,7 +102,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			treeInfo.writtenFiles = append(treeInfo.writtenFiles, sr.Finfo.Path)
 		}
 
-		if !hasError {
+		if !hasError && treeInfo.lsr.err == nil {
 			// Provide some informational logging
 			sr.Prio = api.Info
 			if len(sr.source) == 0 {
@@ -111,8 +111,29 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 				sr.Msg = fmt.Sprintf("CP %s -> %s", sr.source, sr.Finfo.Path)
 			}
 
+			// The seal can fail anytime, for instance on permission issues or when there
+			// This select will block until something happens, usually this means
+			// TODO(st): As we don't expect to inrease performance with this async operation,
+			// it would be good to use a begin/do[,...]/end style serialization pattern
+			select {
+			case lsr, ok := <-treeInfo.sealResult:
+				if ok {
+					// Be sore we stop sending !
+					// Results are only sent once - if it sends now, it must be an error !
+					treeInfo.lsr = lsr
+					close(treeInfo.sealFInfos)
+
+					// Mark the tree early - I would always expect the error to be set here ...
+					if treeInfo.lsr.err != nil {
+						// error is counted where it is handled
+						treeInfo.hasError = true
+					} else {
+						panic("Didn't expect seal writer to stop early, but not provie an error")
+					}
+				}
 			// Send the valid file to the sealer
-			treeInfo.sealFInfos <- sr.Finfo
+			case treeInfo.sealFInfos <- sr.Finfo:
+			}
 		}
 
 		// Send previous error first, before error handling
@@ -143,31 +164,42 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		// All we have to do is to stop the sealers and gather their result, possibly deleting
 		// incomplete seals (created because there was some error on the way)
 		for tree, treeInfo := range treeInfoMap {
-			close(treeInfo.sealFInfos)
-			sres := <-treeInfo.sealResult
-
 			// Free now unused memory, just in case we do a verify or something else afterwards.
 			// Of course, the gc will decide when to actually free it.
 			treeInfo.writtenFiles = nil
 
-			br := api.BasicResult{}
+			if treeInfo.lsr.err == nil {
+				close(treeInfo.sealFInfos)
+				treeInfo.lsr = <-treeInfo.sealResult
+			}
 
-			if treeInfo.hasError {
-				os.Remove(sres.path)
-				br.Msg = fmt.Sprintf("Did not write seal for '%s' due to preceeding errors", tree)
-				br.Prio = api.Error
-			} else {
-				if sres.err == nil {
-					br.Msg = fmt.Sprintf("Wrote seal file to '%s'", sres.path)
+			br := api.BasicResult{}
+			if treeInfo.lsr.err == nil {
+				// Can we have an error here ? Just be sure we don't, otherwise we say to have
+				// written the file, and remove it in the next step
+				if !treeInfo.hasError {
+					br.Msg = fmt.Sprintf("Wrote seal file to '%s'", treeInfo.lsr.path)
 					// special marker, to allow others to easily retrieve seal files from the result
 					// No normal file has a size of -1
-					br.Finfo = api.FileInfo{Path: sres.path, Size: -1}
+					br.Finfo = api.FileInfo{Path: treeInfo.lsr.path, Size: -1}
 					br.Prio = api.Valuable
-				} else {
-					// Just forward the error, hoping it is informative enough
-					s.Stats.ErrCount += 1
-					br.Err = sres.err
 				}
+			} else {
+				// Just forward the error, hoping it is informative enough
+				// The error will be handled
+				s.Stats.ErrCount += 1
+				treeInfo.hasError = true
+			}
+
+			if treeInfo.hasError {
+				if len(treeInfo.lsr.path) > 0 {
+					os.Remove(treeInfo.lsr.path)
+				}
+				if treeInfo.lsr.err != nil {
+					br.Msg = fmt.Sprintln(treeInfo.lsr.err.Error())
+				}
+				br.Msg += fmt.Sprintf("Did not write seal for '%s' due to preceeding errors", tree)
+				br.Prio = api.Error
 			}
 
 			accumResult <- &br

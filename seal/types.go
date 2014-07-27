@@ -31,6 +31,9 @@ type aggregationTreeInfo struct {
 	// Will only yield a result one, and be closed afterwards
 	sealResult <-chan indexWriterResult
 
+	// A possible result we might have gotten due to an early seal error
+	lsr indexWriterResult // lastSealResult
+
 	// if true, the entire tree is considered faulty, and further results won't be recorded or accepted
 	hasError bool
 }
