@@ -60,7 +60,7 @@ toNextFile:
 
 		// Actually we wouldn't need atomic access here, but lets be sure the race-detector is happy with us
 		// If at least one gather had errors to all destinations, there is no meaning in delivering more paths
-		if atomic.LoadUint32(&s.Stats.GatherHasNoValidDestination) > 0 {
+		if atomic.LoadUint32(&s.Stats.StopTheEngines) > 0 {
 			return false, true
 		}
 

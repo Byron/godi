@@ -19,7 +19,7 @@ type FileSizeMismatch struct {
 }
 
 func (f *FileSizeMismatch) Error() string {
-	return fmt.Sprintf("Filesize of '%s' reported as %d, yet only %d bytes were read", f.Path, f.Want, f.Got)
+	return fmt.Sprintf("Filesize of '%s' reported as %d, yet %d bytes were read", f.Path, f.Want, f.Got)
 }
 
 // Intercepts Write calls and updates the stats accordingly. Implements only what we need, forwrading the calls as needed
@@ -138,7 +138,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 
 			// If all of our destinations are in fail state, let the gatherer know we can't do anything
 			if numFailedDestinations == numDestinations {
-				atomic.AddUint32(&stats.GatherHasNoValidDestination, 1)
+				atomic.AddUint32(&stats.StopTheEngines, 1)
 			}
 
 		} // handle write mode

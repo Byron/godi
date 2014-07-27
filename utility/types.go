@@ -39,9 +39,9 @@ type Stats struct {
 	NumHashers        uint32 // Amount of hashers running in parallel
 
 	// GENERAL INFORMATION
-	StartedAt                   time.Time // The time at which we started processing
-	NumSkippedFiles             uint32    // Amount of files we skipped right away
-	GatherHasNoValidDestination uint32    // Amount of gather procs which had write errors on all destinations
+	StartedAt       time.Time // The time at which we started processing
+	NumSkippedFiles uint32    // Amount of files we skipped right away
+	StopTheEngines  uint32    // Amount of gather procs which had write errors on all destinations
 
 	// AGGREGATION
 	// Aggregation step is single-threaded - no atomic operation needed
@@ -67,7 +67,7 @@ func (s *Stats) CopyTo(d *Stats) {
 
 	d.StartedAt = s.StartedAt
 	d.NumSkippedFiles = atomic.LoadUint32(&s.NumSkippedFiles)
-	d.GatherHasNoValidDestination = atomic.LoadUint32(&s.GatherHasNoValidDestination)
+	d.StopTheEngines = atomic.LoadUint32(&s.StopTheEngines)
 
 	// Agg variables don't need to be atomic - we copy them here for completeness only
 	d.ErrCount = s.ErrCount

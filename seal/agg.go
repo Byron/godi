@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync/atomic"
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
@@ -127,6 +128,27 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 					if treeInfo.lsr.err != nil {
 						// error is counted where it is handled
 						treeInfo.hasError = true
+						// Check if all trees have failures, and provide feedback to the generators !
+						// If we can't do anything useful anymore, we should stop
+						nft := 0 // num failed trees
+						for _, ti := range treeInfoMap {
+							if ti.hasError {
+								nft += 1
+							}
+						}
+
+						maxTrees := 0
+						if isWriting {
+							maxTrees = utility.WriteChannelDeviceMapTrees(s.rootedWriters)
+						} else {
+							for _, rctrl := range s.RootedReaders {
+								maxTrees += len(rctrl.Trees)
+							}
+						}
+
+						if nft == maxTrees {
+							atomic.AddUint32(&s.Stats.StopTheEngines, 1)
+						}
 					} else {
 						panic("Didn't expect seal writer to stop early, but not provie an error")
 					}
