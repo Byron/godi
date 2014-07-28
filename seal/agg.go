@@ -14,7 +14,10 @@ import (
 )
 
 // Will setup a go-routine which writes a seal for the given tree, continuously as new files come in
-func setupIndexWriter(commonTree string) (chan<- api.FileInfo, <-chan indexWriterResult) {
+func setupIndexWriter(commonTree string, encoder codec.Codec) (chan<- api.FileInfo, <-chan indexWriterResult) {
+	if encoder == nil {
+		panic("No encoder provided")
+	}
 
 	sealFiles := make(chan api.FileInfo)
 	// we may always put in one item, which allows this go-routine to go down without having to wait
@@ -28,7 +31,6 @@ func setupIndexWriter(commonTree string) (chan<- api.FileInfo, <-chan indexWrite
 		// assure we don't write with more streams than defined.
 		// Reason is that // we want this to be as fast as possible without blocking, which is also why it is cached
 		// reasonably well, allowing it to only write on larger chunks.
-		encoder := codec.Gob{}
 
 		// This will and should fail if the file already exists
 		indexPath := api.IndexPath(commonTree, encoder.Extension())
@@ -88,7 +90,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			// Initialize this root
 			// Create a new go-routine which will take care of streaming file-information straight to file
 			treeInfo = &aggregationTreeInfo{}
-			treeInfo.sealFInfos, treeInfo.sealResult = setupIndexWriter(treeRoot)
+			treeInfo.sealFInfos, treeInfo.sealResult = setupIndexWriter(treeRoot, codec.NewByName(s.format))
 			treeInfoMap[treeRoot] = treeInfo
 		}
 

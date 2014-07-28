@@ -55,6 +55,9 @@ type SealCommand struct {
 	// If set, we are supposed to run in verify mode
 	verify bool
 
+	// The name of the seal format to use
+	format string
+
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
 	rootedWriters []io.RootedWriteController

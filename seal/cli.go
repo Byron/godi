@@ -10,6 +10,7 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
+	"github.com/Byron/godi/codec"
 	"github.com/Byron/godi/io"
 	"github.com/Byron/godi/verify"
 
@@ -21,6 +22,7 @@ const (
 	usage                  = "Please specify sealed copies like so: source/ -- destination/"
 	verifyAfterCopy        = "verify"
 	streamsPerOutputDevice = "streams-per-output-device"
+	formatFlag             = "format"
 )
 
 // return subcommands for our particular area of algorithms
@@ -28,13 +30,20 @@ func SubCommands() []gcli.Command {
 	cmdseal := SealCommand{mode: modeSeal}
 	cmdcopy := SealCommand{mode: modeCopy}
 
+	fmt := gcli.StringFlag{
+		formatFlag,
+		codec.GobName,
+		fmt.Sprintf("The format of the produced seal file, one of %s", strings.Join(codec.Names(), ", ")),
+	}
+
 	return []gcli.Command{
 		gcli.Command{
 			Name:      modeSeal,
 			ShortName: "",
 			Usage:     "Generate a seal for one ore more directories, which allows them to be verified later on",
 			Action:    func(c *gcli.Context) { cli.RunAction(&cmdseal, c) },
-			Before:    func(c *gcli.Context) error { return cli.CheckCommonFlagsAndInit(&cmdseal, c) },
+			Before:    func(c *gcli.Context) error { return checkSeal(&cmdseal, c) },
+			Flags:     []gcli.Flag{fmt},
 		},
 		gcli.Command{
 			Name:      modeCopy,
@@ -45,6 +54,7 @@ func SubCommands() []gcli.Command {
 			Flags: []gcli.Flag{
 				gcli.BoolFlag{verifyAfterCopy, "Run `godi verify` on all produced seals when copy is finished"},
 				gcli.IntFlag{streamsPerOutputDevice + ", spod", 1, "Amount of parallel streams per output device"},
+				fmt,
 			},
 		},
 	}
@@ -63,6 +73,28 @@ func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Res
 		}
 		return
 	}
+}
+
+func checkSeal(cmd *SealCommand, c *gcli.Context) error {
+	cmd.format = c.String(formatFlag)
+	if len(cmd.format) > 0 {
+		valid := false
+		for _, name := range codec.Names() {
+			if name == cmd.format {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("Invalid seal format '%s', must be one of %s", cmd.format, strings.Join(codec.Names(), ", "))
+		}
+	}
+
+	if err := cli.CheckCommonFlagsAndInit(cmd, c); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
@@ -190,6 +222,11 @@ func parseSources(items []string) (res []string, err error) {
 }
 
 func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
+
+	if len(s.format) == 0 {
+		s.format = codec.GobName
+	}
+
 	if s.mode == modeSeal {
 		if len(items) == 0 {
 			return errors.New("Please provide at least one source directory to work on")

@@ -5,6 +5,12 @@ import (
 	"unicode/utf8"
 )
 
+func Names() []string {
+	// I believe I have seen this somewhere - maybe it can be optimized to be constant ?
+	names := [...]string{GobName, MHLName}
+	return names[:]
+}
+
 // Finds a codec which can decode the file at the given path.
 // We work strictly by name.
 func NewByPath(path string) Codec {
@@ -26,5 +32,16 @@ func NewByPath(path string) Codec {
 		return &MHL{}
 	}
 
+	return nil
+}
+
+// Find a codec matching the given name, and return it. Retuns nil otherwise
+func NewByName(name string) Codec {
+	switch {
+	case name == GobName:
+		return &Gob{}
+	case name == MHLName:
+		return &MHL{}
+	}
 	return nil
 }
