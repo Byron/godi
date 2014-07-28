@@ -10,7 +10,7 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
-	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/io"
 )
 
 // Will setup a go-routine which writes a seal for the given tree, continuously as new files come in
@@ -139,7 +139,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 						maxTrees := 0
 						if isWriting {
-							maxTrees = utility.WriteChannelDeviceMapTrees(s.rootedWriters)
+							maxTrees = io.WriteChannelDeviceMapTrees(s.rootedWriters)
 						} else {
 							for _, rctrl := range s.RootedReaders {
 								maxTrees += len(rctrl.Trees)
@@ -237,7 +237,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			Msg: fmt.Sprintf(
 				"%s: %s",
 				prefix,
-				s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), utility.StatsClientSep),
+				s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), io.StatsClientSep),
 			) + s.Stats.String(),
 			Prio: api.Valuable,
 		}

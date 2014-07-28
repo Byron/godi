@@ -2,7 +2,7 @@ package seal
 
 import (
 	"github.com/Byron/godi/api"
-	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/io"
 )
 
 const (
@@ -57,7 +57,7 @@ type SealCommand struct {
 
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
-	rootedWriters []utility.RootedWriteController
+	rootedWriters []io.RootedWriteController
 }
 
 // A result which is also able to hold information about the source of a file
@@ -79,7 +79,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	return &c, err
 }
 
-func (s *SealCommand) Gather(rctrl *utility.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
+func (s *SealCommand) Gather(rctrl *io.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		s := ""
 		if source != nil {

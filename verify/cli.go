@@ -9,7 +9,6 @@ import (
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/codec"
-	"github.com/Byron/godi/utility"
 
 	gcli "github.com/codegangsta/cli"
 )
@@ -38,7 +37,7 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogL
 
 	validItems := make([]string, 0, len(items))
 	for _, index := range items {
-		validItems = utility.AppendUniqueString(validItems, index)
+		validItems = api.AppendUniqueString(validItems, index)
 	}
 
 	indexDirs := make([]string, len(validItems))

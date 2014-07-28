@@ -1,6 +1,6 @@
 // +build !windows
 
-package utility
+package io
 
 import (
 	"os"

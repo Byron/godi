@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/Byron/godi/utility"
+	gio "github.com/Byron/godi/io"
 )
 
 // Thrown if the filesize we read didn't match with the filesize we were supposed to read
@@ -25,7 +25,7 @@ func (f *FileSizeMismatch) Error() string {
 // Intercepts Write calls and updates the stats accordingly. Implements only what we need, forwrading the calls as needed
 type HashStatAdapter struct {
 	hash  hash.Hash
-	stats *utility.Stats
+	stats *Stats
 }
 
 func (h *HashStatAdapter) Write(b []byte) (int, error) {
@@ -49,10 +49,10 @@ func (h *HashStatAdapter) Sum(b []byte) []byte {
 // TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
 // Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
 // What we want is at max Y files being written continuously at a time
-func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
+func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
-	rctrl *utility.ReadChannelController,
-	wctrls []utility.RootedWriteController) {
+	rctrl *gio.ReadChannelController,
+	wctrls []gio.RootedWriteController) {
 	if rctrl == nil {
 		panic("ReadChannelController and WaitGroup must be set")
 	}
@@ -62,11 +62,11 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 	const nHashes = 2
 	atomic.AddUint32(&stats.NumHashers, uint32(nHashes))
 	isWriting := len(wctrls) > 0
-	numDestinations := utility.WriteChannelDeviceMapTrees(wctrls)
+	numDestinations := gio.WriteChannelDeviceMapTrees(wctrls)
 
 	var multiWriter io.Writer
-	var channelWriters []utility.ChannelWriter
-	var lazyWriters []utility.LazyFileWriteCloser
+	var channelWriters []gio.ChannelWriter
+	var lazyWriters []gio.LazyFileWriteCloser
 
 	// We keep an index of failed destinations, skipping them in write mode after first failure
 	var isFailedDestination []bool
@@ -82,11 +82,11 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 		// We place the hashes last, as the writers will be changed in each iteration
 		writers[len(writers)-1] = &sha1gen
 		writers[len(writers)-2] = &md5gen
-		multiWriter = utility.NewParallelMultiWriter(writers)
+		multiWriter = gio.NewParallelMultiWriter(writers)
 
 		// Keeps all Writers we are going to prepare per source file
-		channelWriters = make([]utility.ChannelWriter, numDestinations)
-		lazyWriters = make([]utility.LazyFileWriteCloser, numDestinations)
+		channelWriters = make([]gio.ChannelWriter, numDestinations)
+		lazyWriters = make([]gio.LazyFileWriteCloser, numDestinations)
 		isFailedDestination = make([]bool, numDestinations)
 
 		// Init them, per controller, and set them to be used by the multi-writer right away
@@ -101,7 +101,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 			ofs = ofse
 		}
 	} else {
-		multiWriter = utility.NewUncheckedParallelMultiWriter(&sha1gen, &md5gen)
+		multiWriter = gio.NewUncheckedParallelMultiWriter(&sha1gen, &md5gen)
 	}
 
 	sendResults := func(f *FileInfo, err error) {
@@ -111,7 +111,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 			results <- makeResult(f, nil, err)
 		} else {
 			// Each parallel writer has it's own result, we just send it off
-			pmw := multiWriter.(*utility.ParallelMultiWriter)
+			pmw := multiWriter.(*gio.ParallelMultiWriter)
 			// Make sure we keep the source intact
 			forig := *f
 
@@ -127,10 +127,10 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 					e = err
 				}
 				// Could be a previously unset writer
-				if wc, ok := w.(utility.WriteCloser); ok {
+				if wc, ok := w.(gio.WriteCloser); ok {
 					wc.Close()
 					// we may change the same instance, as it will be copied into the Result structure later on
-					f.Path = wc.Writer().(*utility.LazyFileWriteCloser).Path()
+					f.Path = wc.Writer().(*gio.LazyFileWriteCloser).Path()
 					// it doesn't matter here if there actually is an error, aggregator will handle it
 					results <- makeResult(f, &forig, e)
 				}
@@ -159,7 +159,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *utility.Stats,
 				// We just create one ChannelWriter per destination, and let the writers
 				// deal with the parallelization and blocking
 				fawid := awid // the first index
-				pmw := multiWriter.(*utility.ParallelMultiWriter)
+				pmw := multiWriter.(*gio.ParallelMultiWriter)
 
 				for x := 0; x < len(wctrl.Trees); x++ {
 					// reset previous errror by resetting the writer pointer

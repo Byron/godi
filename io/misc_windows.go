@@ -1,4 +1,4 @@
-package utility
+package io
 
 // deviceMap currently only returns one device - how to obtain a device ID on windows ?
 func DeviceMap(paths []string) [][]string {

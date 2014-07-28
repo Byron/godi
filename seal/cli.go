@@ -10,7 +10,7 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
-	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/io"
 	"github.com/Byron/godi/verify"
 
 	gcli "github.com/codegangsta/cli"
@@ -176,7 +176,7 @@ func parseSources(items []string) (res []string, err error) {
 				if i == x || strings.HasPrefix(ltree, rtree+string(os.PathSeparator)) {
 					continue
 				}
-				validTrees = utility.AppendUniqueString(validTrees, ltree)
+				validTrees = api.AppendUniqueString(validTrees, ltree)
 			}
 		}
 		if len(validTrees) == 0 {
@@ -235,16 +235,16 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 				s.InitBasicRunner(numReaders, sources, maxLogLevel, filters)
 
 				// build the device map with all writer destinations
-				dm := utility.DeviceMap(dtrees)
+				dm := io.DeviceMap(dtrees)
 
 				// Finally, put all actual values into our list to have a deterministic iteration order.
 				// After all, we don't really care about the device from this point on
-				s.rootedWriters = make([]utility.RootedWriteController, len(dm))
+				s.rootedWriters = make([]io.RootedWriteController, len(dm))
 				for did, trees := range dm {
 					// each device as so and so many destinations. Each destination uses the same write controller
-					s.rootedWriters[did] = utility.RootedWriteController{
+					s.rootedWriters[did] = io.RootedWriteController{
 						Trees: trees,
-						Ctrl:  utility.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats),
+						Ctrl:  io.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats.Stats),
 					}
 				} // for each tree set in deviceMap
 

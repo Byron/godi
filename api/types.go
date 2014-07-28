@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/io"
 )
 
 const IndexBaseName = "godi"
@@ -238,12 +238,12 @@ type BasicRunner struct {
 	// Items we work on
 	Items []string
 	// A map of readers which maps from a root to the reader to use to read files that share the same root
-	RootedReaders []utility.RootedReadController
+	RootedReaders []io.RootedReadController
 	// A channel to let everyone know we should finish as soon as possible - this is done by closing the channel
 	Done chan bool
 
 	// our statistics instance
-	Stats utility.Stats
+	Stats Stats
 
 	// The maximum log-level. We just keep this value here because the cli makes a difference between CHECK and RUN !
 	// This member shouldn't be needed as logging is not done by the runner anyway - it's all done by result handlers.
@@ -257,7 +257,7 @@ func (b *BasicRunner) LogLevel() Priority {
 	return b.Level
 }
 
-func (b *BasicRunner) Statistics() *utility.Stats {
+func (b *BasicRunner) Statistics() *Stats {
 	return &b.Stats
 }
 
@@ -265,14 +265,14 @@ func (b *BasicRunner) NumChannels() int {
 	if len(b.RootedReaders) == 0 {
 		panic("NumChannels called before InitBasicRunner()")
 	}
-	return utility.ReadChannelDeviceMapStreams(b.RootedReaders)
+	return io.ReadChannelDeviceMapStreams(b.RootedReaders)
 }
 
 // Initialize our Readers and items with the given information, including our cannel
 func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Priority, filters []FileFilter) {
 	b.Items = items
 	b.Done = make(chan bool)
-	b.RootedReaders = utility.NewDeviceReadControllers(numReaders, items, &b.Stats, b.Done)
+	b.RootedReaders = io.NewDeviceReadControllers(numReaders, items, &b.Stats.Stats, b.Done)
 	if len(b.RootedReaders) == 0 {
 		panic("Didn't manage to build readers from input items")
 	}
@@ -303,7 +303,7 @@ type Runner interface {
 	LogLevel() Priority
 
 	// Statistics returns the commands shared statistics structure
-	Statistics() *utility.Stats
+	Statistics() *Stats
 
 	// CancelChannel returns the channel to close when the operation should stop prematurely
 	// NOTE: Only valid after Init was called, and it's an error to call it beforehand
@@ -322,7 +322,7 @@ type Runner interface {
 	// Must listen for SIGTERM|SIGINT signals
 	// Use the wait group to mark when done, which is when the results channel need to be closed.
 	// Must listen on done and return asap
-	Gather(rctrl *utility.ReadChannelController, files <-chan FileInfo, results chan<- Result)
+	Gather(rctrl *io.ReadChannelController, files <-chan FileInfo, results chan<- Result)
 
 	// Aggregate the result channel and produce whatever you have to produce from the result of the Gather steps
 	// When you are done, place a single result instance into accumResult and close the channel

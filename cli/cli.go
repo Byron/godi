@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Byron/godi/api"
-	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/io"
 
 	"github.com/codegangsta/cli"
 )
@@ -26,7 +26,7 @@ const (
 // NOTE: Even though it would be cleaner to just inject messages into the results channel, this way
 // we wouldn't know when the last message was emitted, possibly emitting too much
 // Done should be called to signal that we should stop
-func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result) bool, done <-chan bool) func(api.Result) bool {
+func MakeStatisticalLogHandler(stats *api.Stats, handler func(api.Result) bool, done <-chan bool) func(api.Result) bool {
 	lastLoggedAt := time.Now()
 	lastStat := *stats
 	minLogInterval := StatisticalLoggingInterval / 6
@@ -51,7 +51,7 @@ func MakeStatisticalLogHandler(stats *utility.Stats, handler func(api.Result) bo
 			// From that point on, messages can come in more slowly
 			minLogInterval = StatisticalLoggingInterval
 			// Otherwise, prepare statistics
-			fmt.Println(stats.DeltaString(&lastStat, td, utility.StatsClientSep), stats.String())
+			fmt.Println(stats.DeltaString(&lastStat, td, io.StatsClientSep), stats.String())
 			lastLoggedAt = now
 			stats.CopyTo(&lastStat)
 		}

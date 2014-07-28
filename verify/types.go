@@ -9,7 +9,7 @@ import (
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
-	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/io"
 )
 
 const (
@@ -91,7 +91,7 @@ func (s *VerifyCommand) Generate() (<-chan api.Result, <-chan api.Result) {
 		})
 }
 
-func (s *VerifyCommand) Gather(rctrl *utility.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
+func (s *VerifyCommand) Gather(rctrl *io.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		res := VerifyResult{
 			BasicResult: api.BasicResult{
@@ -147,7 +147,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 	finalizer := func(
 		accumResult chan<- api.Result) {
-		stats := s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), utility.StatsClientSep)
+		stats := s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), io.StatsClientSep)
 
 		if signatureMismatches == 0 && missingFiles == 0 {
 			accumResult <- &VerifyResult{

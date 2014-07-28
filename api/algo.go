@@ -3,12 +3,12 @@ package api
 import (
 	"sync"
 
-	"github.com/Byron/godi/utility"
+	"github.com/Byron/godi/io"
 )
 
 // Generate does all boilerplate required to be a valid generator
 // Will produce as many generators as there are devices, each is handed a list of trees to handle
-func Generate(rctrls []utility.RootedReadController,
+func Generate(rctrls []io.RootedReadController,
 	runner Runner,
 	generate func([]string, chan<- FileInfo, chan<- Result)) (<-chan Result, <-chan Result) {
 
@@ -31,7 +31,7 @@ func Generate(rctrls []utility.RootedReadController,
 		nstreams := rctrl.Ctrl.Streams()
 		for i := 0; i < nstreams; i++ {
 			gatwg.Add(1)
-			go func(ctrl utility.ReadChannelController, files <-chan FileInfo) {
+			go func(ctrl io.ReadChannelController, files <-chan FileInfo) {
 				runner.Gather(&ctrl, files, gatherToAgg)
 				gatwg.Done()
 			}(rctrl.Ctrl, files)
@@ -56,7 +56,7 @@ func Generate(rctrls []utility.RootedReadController,
 func Aggregate(results <-chan Result, done <-chan bool,
 	resultHandler func(Result, chan<- Result) bool,
 	finalizer func(chan<- Result),
-	stats *utility.Stats) <-chan Result {
+	stats *Stats) <-chan Result {
 	accumResult := make(chan Result)
 
 	go func() {
