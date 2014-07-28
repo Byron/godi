@@ -62,7 +62,7 @@ func (s *Stats) IntDelta(cur, prev uint32, td time.Duration, resultMode bool) st
 			return ""
 		}
 	}
-	return fmt.Sprintf(" #%s%04d/s", SymbolDelta, uint64(float64(cur-prev)/td.Seconds()))
+	return fmt.Sprintf(" %s%s%04d/s", SymbolHash, SymbolDelta, uint64(float64(cur-prev)/td.Seconds()))
 }
 
 func (s *Stats) BytesDelta(cur, prev uint64, td time.Duration, resultMode bool) string {

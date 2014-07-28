@@ -99,7 +99,12 @@ func (s *VerifyCommand) Gather(rctrl *io.ReadChannelController, files <-chan api
 				Prio:  api.Info,
 				Err:   err,
 			},
-			ifinfo: *f,
+		}
+		if source != nil {
+			// We just copy the originally retrieved file-info
+			res.ifinfo = *source
+		} else {
+			panic("Should have received the original fileInfo, to obtain the sealed values for hashes")
 		}
 		return &res
 	}
@@ -117,6 +122,9 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		if r.Error() != nil {
 			if os.IsNotExist(r.Error()) || os.IsPermission(r.Error()) {
 				missingFiles += 1
+				vr.Err = fmt.Errorf("MISSING %s: %s", SymbolMismatch, vr.Finfo.Path)
+				accumResult <- vr
+				return false
 			} else if serr, isFileSizeType := r.Error().(*api.FileSizeMismatch); isFileSizeType {
 				// The file-size changed, thus the hashes will be different to. Say it accordingly.
 				signatureMismatches += 1
@@ -164,14 +172,18 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		} else {
 			s.Stats.ErrCount -= signatureMismatches
 			s.Stats.ErrCount -= missingFiles
+			suffix := ""
+			if missingFiles > 0 {
+				suffix = fmt.Sprintf(", with %d missing", missingFiles)
+			}
 			accumResult <- &VerifyResult{
 				BasicResult: api.BasicResult{
 					Msg: fmt.Sprintf(
-						"VERIFY %s: %d of %d file(s) have changed on disk after sealing, %d are missing [%s]",
+						"VERIFY %s: %d of %d file(s) have changed on disk after sealing%s [%s]",
 						SymbolFail,
 						signatureMismatches,
-						s.Stats.MostFiles(),
-						missingFiles,
+						s.Stats.MostFiles()-uint32(missingFiles),
+						suffix,
 						stats,
 					) + s.Stats.String(),
 					Prio: api.Valuable,

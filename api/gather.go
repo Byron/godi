@@ -104,11 +104,12 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 		multiWriter = gio.NewUncheckedParallelMultiWriter(&sha1gen, &md5gen)
 	}
 
-	sendResults := func(f *FileInfo, err error) {
+	// umf == unmodifiedFileInfo
+	sendResults := func(f *FileInfo, umf *FileInfo, err error) {
 
 		if !isWriting {
 			// NOTE: in seal mode, we might want to communicate this ... after all, we don't get the seal done
-			results <- makeResult(f, nil, err)
+			results <- makeResult(f, umf, err)
 		} else {
 			// Each parallel writer has it's own result, we just send it off
 			pmw := multiWriter.(*gio.ParallelMultiWriter)
@@ -192,23 +193,24 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 			// This should actually never fail, the way we are implemented.
 			// If it does, it's the WriteTo() implementation, and as we are decoupled from it,
 			// let's make the check here anyway ...
-			sendResults(&f, err)
+			sendResults(&f, &f, err)
 			continue
 		}
 
 		// Always keep the hash as far as we have it - it's a value to preserve
+		umf := f
 		f.Sha1 = sha1gen.Sum(nil)
 		f.MD5 = md5gen.Sum(nil)
 
 		if written != f.Size {
 			err = &FileSizeMismatch{f.Path, f.Size, written}
-			sendResults(&f, err)
+			sendResults(&f, &umf, err)
 			continue
 		}
 
 		// all good
 
-		sendResults(&f, nil)
+		sendResults(&f, &umf, nil)
 	} // end for each file to process
 
 	// Keep the count valid ...

@@ -40,7 +40,7 @@ func TestSeal(t *testing.T) {
 	}
 
 	// Return true if we should break the loop
-	resHandler := testlib.ResultHandler(t)
+	resHandler := testlib.ResultHandler(t, false)
 
 	if err := api.StartEngine(cmd, resHandler, resHandler); err != nil {
 		t.Fatal(err)

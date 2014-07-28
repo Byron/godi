@@ -7,10 +7,15 @@ import (
 )
 
 // Return a function makes tests fail if there was an error result during an operation
-func ResultHandler(t *testing.T) func(api.Result) bool {
+// If logOnly is True, errors will not make the test fail. Useful if errors are expected.
+func ResultHandler(t *testing.T, logOnly bool) func(api.Result) bool {
 	return func(res api.Result) bool {
 		if res.Error() != nil {
-			t.Error(res.Error())
+			if logOnly {
+				t.Log(res.Error())
+			} else {
+				t.Error(res.Error())
+			}
 		} else {
 			t.Log(res.Info())
 		}

@@ -1,6 +1,7 @@
 package verify_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/Byron/godi/api"
@@ -10,11 +11,11 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-	datasetTree, _, _ := testlib.MakeDatasetOrPanic()
+	datasetTree, file, _ := testlib.MakeDatasetOrPanic()
 	defer testlib.RmTree(datasetTree)
 
 	sealcmd, _ := seal.NewCommand([]string{datasetTree}, 1, 0)
-	resHandler := testlib.ResultHandler(t)
+	resHandler := testlib.ResultHandler(t, false)
 
 	// keeps track of created indices
 	var indices []string
@@ -34,7 +35,27 @@ func TestVerify(t *testing.T) {
 		t.Error(err)
 	}
 
-	// TODO(st): Alter File
+	// ALTER FILE
+	fd, err := os.OpenFile(file, os.O_WRONLY, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := fd.Write([]byte("a")); err != nil || n != 1 {
+		t.Fatal(err)
+	}
+	fd.Close()
 
-	// TODO(st): Remove File
+	resHandler = testlib.ResultHandler(t, true)
+	verifycmd, _ = verify.NewCommand([]string{indices[0]}, 1)
+	err = api.StartEngine(verifycmd, resHandler, resHandler)
+	if err == nil {
+		t.Error("Failed to detect file with changed byte")
+	}
+
+	os.Remove(file)
+	verifycmd, _ = verify.NewCommand([]string{indices[0]}, 1)
+	err = api.StartEngine(verifycmd, resHandler, resHandler)
+	if err == nil {
+		t.Error("Failed to detect a file was removed")
+	}
 }
