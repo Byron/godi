@@ -8,7 +8,6 @@ import (
 
 const (
 	SymbolDelta         = "Δ"
-	SymbolHash          = "⌗"
 	StatsClientSep      = " | "
 	ElapsedData    int8 = 1 << iota
 	ReadData

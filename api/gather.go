@@ -18,8 +18,17 @@ type FileSizeMismatch struct {
 	Want, Got int64
 }
 
+// Thrown if a file hash didn't match - it's used in the verify implementation, primarily
+type FileHashMismatch struct {
+	Path string
+}
+
 func (f *FileSizeMismatch) Error() string {
 	return fmt.Sprintf("Filesize of '%s' reported as %d, yet %d bytes were read", f.Path, f.Want, f.Got)
+}
+
+func (f *FileHashMismatch) Error() string {
+	return f.Path
 }
 
 // Intercepts Write calls and updates the stats accordingly. Implements only what we need, forwrading the calls as needed

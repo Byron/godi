@@ -220,7 +220,11 @@ type BasicResult struct {
 
 func (s *BasicResult) Info() (string, Priority) {
 	if s.Err != nil {
-		return s.Err.Error(), Error
+		msg := s.Err.Error()
+		if len(s.Msg) > 0 {
+			msg = s.Msg
+		}
+		return msg, Error
 	}
 	return s.Msg, s.Prio
 }

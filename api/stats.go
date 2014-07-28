@@ -59,9 +59,10 @@ func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
 	out := s.DeltaDataString(io.ElapsedData|io.ReadData, &d.Stats, td, sep)
 
 	bh := atomic.LoadUint64(&s.BytesHashed)
-	out += fmt.Sprintf("%s%sHASH ⌰%s%s",
+	out += fmt.Sprintf("%s%sHASH %s%s%s",
 		sep,
 		s.Stats.InOut(atomic.LoadUint32(&s.NumHashers)),
+		io.SymbolHash,
 		io.BytesVolume(bh),
 		s.Stats.BytesDelta(bh, d.BytesHashed, td, resultMode),
 	)

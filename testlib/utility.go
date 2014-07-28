@@ -12,9 +12,9 @@ func ResultHandler(t *testing.T, logOnly bool) func(api.Result) bool {
 	return func(res api.Result) bool {
 		if res.Error() != nil {
 			if logOnly {
-				t.Log(res.Error())
+				t.Log(res.Info())
 			} else {
-				t.Error(res.Error())
+				t.Error(res.Info())
 			}
 		} else {
 			t.Log(res.Info())

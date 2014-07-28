@@ -74,7 +74,7 @@ func MakeLogHandler(maxLogLevel api.Priority) func(r api.Result) bool {
 		}
 
 		if r.Error() != nil {
-			fmt.Fprintln(os.Stderr, r.Error())
+			fmt.Fprintln(os.Stderr, info)
 		} else {
 			fmt.Fprintln(os.Stdout, info)
 		}

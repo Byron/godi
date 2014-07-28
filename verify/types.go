@@ -122,13 +122,13 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		if r.Error() != nil {
 			if os.IsNotExist(r.Error()) || os.IsPermission(r.Error()) {
 				missingFiles += 1
-				vr.Err = fmt.Errorf("MISSING %s: %s", SymbolMismatch, vr.Finfo.Path)
+				vr.Msg = fmt.Sprintf("MISSING %s: %s", SymbolMismatch, vr.Finfo.Path)
 				accumResult <- vr
 				return false
 			} else if serr, isFileSizeType := r.Error().(*api.FileSizeMismatch); isFileSizeType {
 				// The file-size changed, thus the hashes will be different to. Say it accordingly.
 				signatureMismatches += 1
-				vr.Err = fmt.Errorf("SIZE %s: %s sealed with size %dB, got size %dB", SymbolMismatch, serr.Path, serr.Want, serr.Got)
+				vr.Msg = fmt.Sprintf("SIZE %s: %s sealed with size %dB, got size %dB", SymbolMismatch, serr.Path, serr.Want, serr.Got)
 				accumResult <- vr
 				return false
 			} else {
@@ -142,7 +142,8 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		vr.Prio = api.Info
 		if (len(vr.ifinfo.Sha1) > 0 && bytes.Compare(vr.ifinfo.Sha1, vr.Finfo.Sha1) != 0) ||
 			(len(vr.ifinfo.MD5) > 0 && bytes.Compare(vr.ifinfo.MD5, vr.Finfo.MD5) != 0) {
-			vr.Err = fmt.Errorf("HASH %s: %s", SymbolMismatch, vr.Finfo.Path)
+			vr.Msg = fmt.Sprintf("HASH %s: %s flipped at least one bit", SymbolMismatch, vr.Finfo.Path)
+			vr.Err = &api.FileHashMismatch{Path: vr.Finfo.Path}
 			signatureMismatches += 1
 			hasError = true
 			vr.Prio = api.Error
