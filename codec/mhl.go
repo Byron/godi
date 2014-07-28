@@ -34,10 +34,18 @@ type mhlHash struct {
 	// HashDate    string `xml:"hashdate"`
 }
 
-// ToFileInfo copies our parsed XML values into the respective fields of the given FileInfo structure.
+// The inverse method of toFileInfo()
+func (m *mhlHash) fromFileInfo(f *api.FileInfo) {
+	m.File = f.RelaPath
+	m.Size = f.Size
+	m.Sha1 = fmt.Sprintf("%x", f.Sha1)
+	m.Md5 = fmt.Sprintf("%x", f.MD5)
+}
+
+// toFileInfo copies our parsed XML values into the respective fields of the given FileInfo structure.
 // Fields unavailable to h will be reset, and an error is returned if a value could not be parsed/converted to the
 // actual type.
-func (h *mhlHash) ToFileInfo(f *api.FileInfo) error {
+func (h *mhlHash) toFileInfo(f *api.FileInfo) error {
 	if len(h.File) == 0 {
 		return errors.New("Empty file field")
 	}
@@ -85,7 +93,20 @@ type MHL struct {
 }
 
 func (m *MHL) Serialize(in <-chan api.FileInfo, writer io.Writer) (err error) {
-	return errors.New("Not implemented")
+	enc := xml.NewEncoder(writer)
+	enc.Indent("  ", "    ")
+	writer.Write([]byte(xml.Header))
+	hl := mhlHashList{
+		Version: MHLVersion,
+	}
+
+	h := mhlHash{}
+	for fi := range in {
+		h.fromFileInfo(&fi)
+		hl.HashInfo = append(hl.HashInfo, h)
+	}
+
+	return enc.Encode(hl)
 }
 
 func (m *MHL) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate func(*api.FileInfo) bool) error {
@@ -107,7 +128,7 @@ func (m *MHL) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 	// Otherwise, just stream all the pre-read data
 	fi := api.FileInfo{}
 	for _, h := range hl.HashInfo {
-		if err := h.ToFileInfo(&fi); err != nil {
+		if err := h.toFileInfo(&fi); err != nil {
 			return err
 		}
 

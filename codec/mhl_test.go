@@ -1,28 +1,70 @@
 package codec
 
 import (
+	"bytes"
 	"encoding/xml"
+	"sync"
 	"testing"
 
 	"github.com/Byron/godi/api"
 )
 
-func TestMHLDecode(t *testing.T) {
+// Decode
+func decodeMHL(t *testing.T, fixture []byte, expectedFileInfos int) {
 	hl := mhlHashList{}
-	if err := xml.Unmarshal([]byte(mhlFixture), &hl); err != nil {
+	if err := xml.Unmarshal(fixture, &hl); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(hl.HashInfo) != 16 {
-		t.Errorf("Expected 16 entries, got %d", len(hl.HashInfo))
+	if len(hl.HashInfo) != expectedFileInfos {
+		t.Errorf("Expected %d entries, got %d", expectedFileInfos, len(hl.HashInfo))
 	}
 
 	fi := api.FileInfo{}
 	for _, h := range hl.HashInfo {
-		if err := h.ToFileInfo(&fi); err != nil {
+		if err := h.toFileInfo(&fi); err != nil {
 			t.Error(err)
 		}
 	}
+}
+
+func TestMHLDecode(t *testing.T) {
+	decodeMHL(t, []byte(mhlFixture), 16)
+}
+
+func TestMHLEncode(t *testing.T) {
+	fic := make(chan api.FileInfo)
+	w := bytes.NewBuffer(make([]byte, 0, 64*1024))
+	codec := MHL{}
+	wg := sync.WaitGroup{}
+	var err error
+
+	wg.Add(1)
+	go func() {
+		err = codec.Serialize(fic, w)
+		wg.Done()
+		// If this finishes (early), we'd rather panic the feeder
+		if err != nil {
+			close(fic)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		codec.Deserialize(bytes.NewReader([]byte(mhlFixture)), fic, func(f *api.FileInfo) bool { return true })
+		close(fic)
+		wg.Done()
+	}()
+
+	// Fill in the information read from our fixture
+	wg.Wait()
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(string(w.Bytes()))
+	}
+
+	decodeMHL(t, w.Bytes(), 16)
 }
 
 const mhlFixture = `<?xml version="1.0" encoding="UTF-8"?>

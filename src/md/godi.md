@@ -10,6 +10,10 @@ Otherwise, you can seal existing folders, and verify them at another time to ass
 
 ## Seal
 
+TODO:
+
+* about differences in seal formats and why gobz should be preferred on big datasets
+
 ## Verify
 
 ## Sealed Copy
