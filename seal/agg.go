@@ -227,9 +227,9 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			accumResult <- &br
 		} // end for each tree/treeInfo tuple
 
-		prefix := "SEAL DONE"
+		prefix := fmt.Sprintf("SEAL %s", SymbolSuccess)
 		if s.Stats.ErrCount > 0 {
-			prefix = "SEAL FAILED"
+			prefix = fmt.Sprintf("SEAL %s", SymbolFail)
 		}
 
 		// Final seal result !

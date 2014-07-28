@@ -7,6 +7,8 @@ import (
 )
 
 const (
+	SymbolDelta         = "Δ"
+	SymbolHash          = "⌗"
 	StatsClientSep      = " | "
 	ElapsedData    int8 = 1 << iota
 	ReadData
@@ -60,7 +62,7 @@ func (s *Stats) IntDelta(cur, prev uint32, td time.Duration, resultMode bool) st
 			return ""
 		}
 	}
-	return fmt.Sprintf(" #Δ%04d/s", uint64(float64(cur-prev)/td.Seconds()))
+	return fmt.Sprintf(" #%s%04d/s", SymbolDelta, uint64(float64(cur-prev)/td.Seconds()))
 }
 
 func (s *Stats) BytesDelta(cur, prev uint64, td time.Duration, resultMode bool) string {
@@ -71,7 +73,7 @@ func (s *Stats) BytesDelta(cur, prev uint64, td time.Duration, resultMode bool) 
 			return ""
 		}
 	}
-	return fmt.Sprintf(" Δ%s/s", BytesVolume(float64(cur-prev)/td.Seconds()))
+	return fmt.Sprintf(" %s%s/s", SymbolDelta, BytesVolume(float64(cur-prev)/td.Seconds()))
 }
 
 func (s *Stats) InOut(cur uint32) string {
@@ -95,17 +97,19 @@ func (s *Stats) DeltaDataString(dataType int8, d *Stats, td time.Duration, sep s
 		if resultMode {
 			timeStr = s.Elapsed().String()
 		}
-		out += fmt.Sprintf("🕑  %s%s", timeStr, sep)
+		out += fmt.Sprintf("%s  %s%s", SymbolWallclock, timeStr, sep)
 	}
 
 	if dataType&ReadData == ReadData && (s.TotalFilesRead > 0 || s.FilesBeingRead > 0) {
 		itf := atomic.LoadUint32(&s.TotalFilesRead)
 		ibr := atomic.LoadUint64(&s.BytesRead)
 
-		out += fmt.Sprintf("%s->READ #%04d%s ⌰%s%s",
+		out += fmt.Sprintf("%s->READ %s%04d%s %s%s%s",
 			s.InOut(atomic.LoadUint32(&s.FilesBeingRead)),
+			SymbolHash,
 			itf,
 			s.IntDelta(itf, d.TotalFilesRead, td, resultMode),
+			SymbolTotal,
 			BytesVolume(ibr),
 			s.BytesDelta(ibr, d.BytesRead, td, resultMode),
 		)
@@ -115,11 +119,13 @@ func (s *Stats) DeltaDataString(dataType int8, d *Stats, td time.Duration, sep s
 		otf := atomic.LoadUint32(&s.TotalFilesWritten)
 		obw := atomic.LoadUint64(&s.BytesWritten)
 
-		out += fmt.Sprintf("%s%sWRITE #%04d%s ⌰%s%s",
+		out += fmt.Sprintf("%s%sWRITE %s%04d%s %s%s%s",
 			sep,
 			s.InOut(atomic.LoadUint32(&s.FilesBeingWritten)),
+			SymbolHash,
 			otf,
 			s.IntDelta(otf, d.TotalFilesWritten, td, resultMode),
+			SymbolTotal,
 			BytesVolume(obw),
 			s.BytesDelta(obw, d.BytesWritten, td, resultMode),
 		)
