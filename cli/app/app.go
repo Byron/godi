@@ -49,7 +49,7 @@ func NewGodiApp() *cli.App {
 			excludePatternsDescription,
 		},
 	}
-	app.Version = "v0.5.0"
+	app.Version = "v0.9.0"
 
 	gocli.AddAdditinalFlags(app)
 
