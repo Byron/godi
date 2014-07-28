@@ -57,8 +57,6 @@ func (s *Stats) IntDelta(cur, prev uint32, td time.Duration, resultMode bool) st
 	if prev == cur {
 		if resultMode {
 			prev = 0
-		} else {
-			return ""
 		}
 	}
 	return fmt.Sprintf(" %s%s%04d/s", SymbolHash, SymbolDelta, uint64(float64(cur-prev)/td.Seconds()))

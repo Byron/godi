@@ -22,6 +22,8 @@ func NewByPath(path string) Codec {
 	switch ext {
 	case GobExtension:
 		return &Gob{}
+	case MHLExtension:
+		return &MHL{}
 	}
 
 	return nil
