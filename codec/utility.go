@@ -1,9 +1,21 @@
 package codec
 
 import (
+	"hash"
 	"path/filepath"
 	"unicode/utf8"
+
+	"github.com/Byron/godi/api"
 )
+
+// Take hashes of input arguments in predefined order
+// NOTE: If order changes for some reason, we have to change the file version !
+func hashInfo(sha1enc hash.Hash, finfo *api.FileInfo) {
+	sha1enc.Write([]byte(finfo.RelaPath))
+	sha1enc.Write([]byte(finfo.Path))
+	sha1enc.Write(finfo.Sha1)
+	sha1enc.Write(finfo.MD5)
+}
 
 func Names() []string {
 	// I believe I have seen this somewhere - maybe it can be optimized to be constant ?

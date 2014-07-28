@@ -7,7 +7,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"hash"
 	"io"
 	"strings"
 
@@ -32,15 +31,6 @@ func (g *Gob) Extension() string {
 	return GobExtension
 }
 
-// Take hashes of input arguments in predefined order
-// NOTE: If order changes for some reason, we have to change the file version !
-func hashInfo(sha1enc hash.Hash, relaPath string, finfo *api.FileInfo) {
-	sha1enc.Write([]byte(relaPath))
-	sha1enc.Write([]byte(finfo.Path))
-	sha1enc.Write(finfo.Sha1)
-	sha1enc.Write(finfo.MD5)
-}
-
 func (g *Gob) Serialize(in <-chan api.FileInfo, writer io.Writer) (err error) {
 	gzipWriter, _ := gzip.NewWriterLevel(writer, 9)
 	defer gzipWriter.Close()
@@ -54,7 +44,7 @@ func (g *Gob) Serialize(in <-chan api.FileInfo, writer io.Writer) (err error) {
 
 	// NOTE: we re-encode to get rid of the map
 	for finfo := range in {
-		hashInfo(sha1enc, finfo.RelaPath, &finfo)
+		hashInfo(sha1enc, &finfo)
 		if err = encoder.Encode(&finfo); err != nil {
 			return
 		}
@@ -106,7 +96,7 @@ func (g *Gob) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 		}
 
 		// Have to hash it before we hand it to the predicate, as it might alter the data
-		hashInfo(sha1enc, v.RelaPath, &v)
+		hashInfo(sha1enc, &v)
 
 		if !predicate(&v) {
 			return nil

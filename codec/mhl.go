@@ -3,6 +3,8 @@
 package codec
 
 import (
+	"bytes"
+	"crypto/sha1"
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
@@ -19,9 +21,15 @@ const (
 )
 
 type mhlHashList struct {
-	XMLName  xml.Name  `xml:"hashlist"`
-	Version  string    `xml:"version,attr"`
-	HashInfo []mhlHash `xml:"hash"`
+	XMLName   xml.Name     `xml:"hashlist"`
+	Version   string       `xml:"version,attr"`
+	HashInfo  []mhlHash    `xml:"hash"`
+	Signature mhlSignature `xml:"signature"`
+}
+
+type mhlSignature struct {
+	XMLName xml.Name `xml:"signature"`
+	Sha1    string   `xml:"sha1"`
 }
 
 type mhlHash struct {
@@ -95,6 +103,7 @@ type MHL struct {
 func (m *MHL) Serialize(in <-chan api.FileInfo, writer io.Writer) (err error) {
 	enc := xml.NewEncoder(writer)
 	enc.Indent("  ", "    ")
+	sha1enc := sha1.New()
 	writer.Write([]byte(xml.Header))
 	hl := mhlHashList{
 		Version: MHLVersion,
@@ -102,15 +111,21 @@ func (m *MHL) Serialize(in <-chan api.FileInfo, writer io.Writer) (err error) {
 
 	h := mhlHash{}
 	for fi := range in {
+		// Have to flatten the Path - after all, mhl has no support for absolute paths
+		fi.Path = fi.RelaPath
+		hashInfo(sha1enc, &fi)
 		h.fromFileInfo(&fi)
 		hl.HashInfo = append(hl.HashInfo, h)
 	}
+
+	hl.Signature.Sha1 = fmt.Sprintf("%x", sha1enc.Sum(nil))
 
 	return enc.Encode(hl)
 }
 
 func (m *MHL) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate func(*api.FileInfo) bool) error {
 	dec := xml.NewDecoder(reader)
+	sha1enc := sha1.New()
 	hl := mhlHashList{}
 
 	if err := dec.Decode(&hl); err != nil {
@@ -131,11 +146,26 @@ func (m *MHL) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 		if err := h.toFileInfo(&fi); err != nil {
 			return err
 		}
+		// Bring back the Path, which is unset in XML, for the hashing to have something useful
+		fi.Path = fi.RelaPath
+		hashInfo(sha1enc, &fi)
 
 		if !predicate(&fi) {
 			return nil
 		}
 		out <- fi
+	}
+
+	// Yes, we do the check last, this way the user can at least see what might be wrong ... even though
+	// the verify operations fails in the end ... .
+	// This is disputable - if we know the file changed, the seal is broken and we have no reason to assume
+	// we could find out anything different ... .
+	if len(hl.Signature.Sha1) > 0 {
+		if hls, err := hex.DecodeString(hl.Signature.Sha1); err != nil {
+			return fmt.Errorf("Invalid signature fomat: %s", hl.Signature.Sha1)
+		} else if bytes.Compare(hls, sha1enc.Sum(nil)) != 0 {
+			return errors.New("Signature mismatch - seal was modified")
+		}
 	}
 
 	return nil
