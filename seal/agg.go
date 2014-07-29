@@ -1,7 +1,6 @@
 package seal
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,9 +35,9 @@ func setupIndexWriter(commonTree string, encoder codec.Codec) (chan<- api.FileIn
 		indexPath := api.IndexPath(commonTree, encoder.Extension())
 		fd, err := os.OpenFile(indexPath, os.O_EXCL|os.O_CREATE|os.O_WRONLY, 0666)
 		if err == nil {
-			bfd := bufio.NewWriterSize(fd, 512*1024)
-			err = encoder.Serialize(sealFiles, bfd)
-			bfd.Flush()
+			// We assume the serializer deals with buffering if he needs it.
+			// MHL caches in memory, and gob uses zip, which allocates a big buffer itself
+			err = encoder.Serialize(sealFiles, fd)
 			fd.Close()
 			if err != nil {
 				// Remove intermediate results

@@ -72,6 +72,9 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 	atomic.AddUint32(&stats.NumHashers, uint32(nHashes))
 	isWriting := len(wctrls) > 0
 	numDestinations := gio.WriteChannelDeviceMapTrees(wctrls)
+	// The hgher this number, the less syscall and communication overhead we will have.
+	// As we expect mostly larger files, we go for bigger buffers
+	var buf [512 * 1024]byte
 
 	var multiWriter io.Writer
 	var channelWriters []gio.ChannelWriter
@@ -191,7 +194,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 		} // handle write mode preparations
 
 		// let the other end open the file and close it as well
-		reader := rctrl.NewChannelReaderFromPath(f.Path, f.Mode)
+		reader := rctrl.NewChannelReaderFromPath(f.Path, f.Mode, buf[:])
 
 		sha1gen.Reset()
 		md5gen.Reset()

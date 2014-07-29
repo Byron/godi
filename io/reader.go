@@ -54,7 +54,7 @@ type ChannelReader struct {
 	ready chan bool
 
 	// Our buffer
-	buf [bufSize]byte
+	buf []byte
 }
 
 // Return amount of streams we handle in parallel
@@ -64,12 +64,14 @@ func (r *ReadChannelController) Streams() int {
 
 // Return a new channel reader
 // You should set either path
-func (r *ReadChannelController) NewChannelReaderFromPath(path string, mode os.FileMode) *ChannelReader {
+// The buffer must not be shared among multiple channel readers !
+func (r *ReadChannelController) NewChannelReaderFromPath(path string, mode os.FileMode, buf []byte) *ChannelReader {
 	// NOTE: size of this channel controls how much we can cache into memory before we block
 	// as the consumer doesn't keep up
 	cr := ChannelReader{
 		path:    path,
 		mode:    mode,
+		buf:     buf,
 		results: make(chan readResult, readChannelSize),
 		ready:   make(chan bool),
 	}
@@ -78,9 +80,10 @@ func (r *ReadChannelController) NewChannelReaderFromPath(path string, mode os.Fi
 	return &cr
 }
 
-func (r *ReadChannelController) NewChannelReaderFromReader(reader io.Reader) *ChannelReader {
+func (r *ReadChannelController) NewChannelReaderFromReader(reader io.Reader, buf []byte) *ChannelReader {
 	cr := ChannelReader{
 		reader:  reader,
+		buf:     buf,
 		results: make(chan readResult, readChannelSize),
 		ready:   make(chan bool),
 	}
@@ -168,7 +171,7 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 					<-info.ready
 					atomic.AddUint64(&stats.BytesRead, uint64(len(ldest)))
 
-					if n := copy(info.buf[:], []byte(ldest)); n != len(ldest) {
+					if n := copy(info.buf, []byte(ldest)); n != len(ldest) {
 						panic("Couldn't copy symlink into buffer - was it larger than our buffer ??")
 					}
 
@@ -208,7 +211,7 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 				}
 			default:
 				{
-					nread, err = info.reader.Read(info.buf[:])
+					nread, err = info.reader.Read(info.buf)
 					atomic.AddUint64(&stats.BytesRead, uint64(nread))
 					info.results <- readResult{info.buf[:nread], nread, err}
 					// we send all results, but abort if the reader is done for whichever reason
