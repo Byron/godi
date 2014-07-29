@@ -69,6 +69,16 @@ If you are using godi more regularly, it is adviced to put it into your shell's 
 [![Build Status](https://travis-ci.org/Byron/godi.svg?branch=master)](https://travis-ci.org/Byron/godi)
 
 Latest releases [can be found here](https://github.com/Byron/godi/releases).
+Developer docs can be found at [godoc.org](http://godoc.org/github.com/Byron/godi)
+
+## Infrastructure
+
+* [Manual and User Documentation](http://byron.github.io/godi)
+* [Issue Tracker](https://github.com/Byron/godi/issues)
+* [API Documentation](http://godoc.org/github.com/Byron/godi)
+* [Continuous Integration](https://travis-ci.org/Byron/godi)
+
+As there is no mailing list, please use the issue tracker for support requests or questions.
 
 ## Credits
 

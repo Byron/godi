@@ -117,7 +117,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			// Provide some informational logging
 			sr.Prio = api.Info
 			if len(sr.source) == 0 {
-				sr.Msg = fmt.Sprintf("# %s", sr.Finfo.Path)
+				sr.Msg = fmt.Sprintf("%s %s", io.SymbolHash, sr.Finfo.Path)
 			} else {
 				sr.Msg = fmt.Sprintf("CP %s -> %s", sr.source, sr.Finfo.Path)
 			}

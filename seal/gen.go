@@ -9,9 +9,34 @@ import (
 	"github.com/Byron/godi/api"
 )
 
+func sendErrorAtRoot(results chan<- api.Result, err error, root string) {
+	results <- &SealResult{
+		BasicResult: api.BasicResult{
+			Err:   err,
+			Prio:  api.Error,
+			Finfo: api.FileInfo{Path: root},
+		},
+	}
+}
+
 func (s *SealCommand) Generate() <-chan api.Result {
 	generate := func(trees []string, files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, tree := range trees {
+			// could also be a file
+			if tstat, err := os.Stat(tree); err != nil {
+				sendErrorAtRoot(results, fmt.Errorf("Couldn't access tree or file '%s': %v", tree, err), tree)
+				continue
+			} else if !tstat.IsDir() {
+				// Assume it's a file and send it of like that
+				files <- api.FileInfo{
+					Path:     tree,
+					RelaPath: filepath.Base(tree),
+					Mode:     tstat.Mode(),
+					Size:     tstat.Size(),
+				}
+				continue
+			}
+
 			cancelled, treeError := s.traverseFilesRecursively(files, results, s.Done, tree, tree)
 			if cancelled {
 				// interrupted usually, or there was an error
@@ -37,26 +62,14 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 	// read dir and, build file info, and recurse into subdirectories
 	f, err := os.Open(tree)
 	if err != nil {
-		results <- &SealResult{
-			BasicResult: api.BasicResult{
-				Err:   err,
-				Prio:  api.Error,
-				Finfo: api.FileInfo{Path: root},
-			},
-		}
+		sendErrorAtRoot(results, err, root)
 		return false, true
 	}
 
 	dirInfos, err := f.Readdir(-1)
 	f.Close()
 	if err != nil {
-		results <- &SealResult{
-			BasicResult: api.BasicResult{
-				Err:   err,
-				Prio:  api.Error,
-				Finfo: api.FileInfo{Path: root},
-			},
-		}
+		sendErrorAtRoot(results, err, root)
 		return false, true
 	}
 

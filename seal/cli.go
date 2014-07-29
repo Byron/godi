@@ -171,17 +171,25 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 // Parse all valid source items from the given list.
 // May either be files or directories. The returned list may be shorter, as contained paths are
 // skipped automatically. Paths will be normalized.
-func parseSources(items []string) (res []string, err error) {
+func parseSources(items []string, allowFiles bool) (res []string, err error) {
 	invalidTrees := make([]string, 0, len(items))
 	res = make([]string, len(items))
 	noTrees := make([]string, 0, len(items))
+	noRegularFiles := []string{}
 	copy(res, items)
 
 	for i, tree := range res {
 		if stat, err := os.Stat(tree); err != nil {
 			invalidTrees = append(invalidTrees, tree)
+			continue
 		} else if !stat.IsDir() {
-			noTrees = append(noTrees, tree)
+			if !allowFiles {
+				noTrees = append(noTrees, tree)
+				continue
+			} else if !stat.Mode().IsRegular() {
+				noRegularFiles = append(noRegularFiles, tree)
+			}
+			// otherwise it's a regular file
 		}
 		tree = path.Clean(tree)
 		if !filepath.IsAbs(tree) {
@@ -198,6 +206,9 @@ func parseSources(items []string) (res []string, err error) {
 	}
 	if len(noTrees) > 0 {
 		return nil, errors.New("The following items are no directory: " + strings.Join(noTrees, ", "))
+	}
+	if len(noRegularFiles) > 0 {
+		return nil, errors.New("The following items are no regular files: " + strings.Join(noRegularFiles, ", "))
 	}
 
 	// drop trees which are a sub-tree of another, or which are equal !
@@ -231,7 +242,7 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 		if len(items) == 0 {
 			return errors.New("Please provide at least one source directory to work on")
 		}
-		items, err = parseSources(items)
+		items, err = parseSources(items, true)
 		if err != nil {
 			return
 		}
@@ -251,12 +262,12 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 				if i == len(items)-1 {
 					return
 				}
-				sources, e := parseSources(items[:i])
+				sources, e := parseSources(items[:i], true)
 				if e != nil {
 					return e
 				}
 
-				dtrees, e := parseSources(items[i+1:])
+				dtrees, e := parseSources(items[i+1:], false)
 				if e != nil {
 					return e
 				}

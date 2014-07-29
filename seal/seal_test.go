@@ -20,10 +20,8 @@ func TestSeal(t *testing.T) {
 	var err error
 
 	_, err = seal.NewCommand([]string{dataFile}, 1, 0)
-	if err == nil {
-		t.Fatal("Expected it to not like files as directory")
-	} else {
-		t.Log(err)
+	if err != nil {
+		t.Fatal("Expected it to like files as directory")
 	}
 
 	cmd, err = seal.NewCommand([]string{datasetTree, filepath.Join(datasetTree, testlib.FirstSubDir, "..", testlib.FirstSubDir)}, 1, 0)
