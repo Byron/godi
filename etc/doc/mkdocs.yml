@@ -10,8 +10,10 @@ site_dir: ../../doc/mkdocs/html
 
 pages:
 - ['index.md', 'Home']
-- ['godi.md', 'Manual']
-- ['contrib.md', 'Contribute']
+- ['usage.md', 'Learn', 'How to Use Godi']
+- ['details.md', 'Learn', 'About Details']
+- ['proprietary.md', 'Learn', 'About Others']
+- ['contribute.md', 'Contribute']
 - ['license.md', 'About', 'License']
 
 theme: yeti

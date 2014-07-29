@@ -1,24 +1,11 @@
-This page explains all sub-commands and how to use them.
-
-When it's your intend to transfer large amounts of data in high-speed and in a sealed (and possibly verified) fashion, `sealed-copy` is the sub-command for you.
-
-Otherwise, you can seal existing folders, and verify them at another time to assure the data is still what it is supposed to be. Please note that filesystems like ZFS have this kind of feature built-in - `godi` just allows you to assert your data's integrity on any storage system.
 
 ![under construction](https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png)
 
-# Subcommands
+## Seal Formats
 
-## Seal
+* Also mention performance implications
 
-TODO:
-
-* about differences in seal formats and why gobz should be preferred on big datasets
-
-## Verify
-
-## Sealed Copy
-
-# Increasing Performance
+## Increasing Performance
 
 For understanding this paragraph, it's beneficial to understand how data is processed in godi. Without getting into too much detail, you can see that data is first read from storage, then hashed, and possibly be written in any of the copy-enabled modes.
 
@@ -30,7 +17,15 @@ Nonetheless, depending on the type of storage, you might benefit from multiple s
 
 It is vital to test for good values for `--num-readers` and `--num-writers` to get optimal performance for your respective hardware. By default, there may be as many hashers as you have cores, and this rarely needs a change unless `godi` is competing with other programs for the CPU.
 
-## Performance Example
 
-* **TODO**
-    + show how various settings are affecting each other, especially on a hot cache or through a network.
+
+## Limitations
+
+### Windows
+* Multi-device optimizations [don't currently apply](https://github.com/Byron/godi/issues/13) on windows
+* When ctrl+C is pressed in the in the git-bash to interrupt the program, godi will attempt to stop, but appears to be killed before it can finish cleanup. This seriously hampers atomic operation, and it is advised to use the cmd.exe prompt. Might be related to [this issue](http://stackoverflow.com/questions/10021373/what-is-the-windows-equivalent-of-process-onsigint-in-node-js) in some way.
+
+### General
+* Sealed copy ignores permission bits on directories, and will create them with `0777` in generally. It does, however, respect and maintain the mode of copied files.
+* `godi` is very careful about memory consumption, yet atomicity comes at the cost of keeping a list of files already copied for undo purposes. That list grows over time, and consumed ~200MB for 765895 files. It might be worth providing a flag to turn undo off.
+

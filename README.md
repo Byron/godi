@@ -1,56 +1,84 @@
-`godi` stands for "go data integrity" and is a commandline utility to generate signature files from a directory tree. This allows to re-check the tree for consistency, and thus verify the data is intact. This is especially useful if data is retrieved from unreliable media, and copied to another storage device.
+# SEAL, COPY & VERIFY - FAST
 
-As it is very common to verify copy operations, `godi` is able to copy files in the moment is hashes them, optionally verifying the destination after it was copied.
+`godi` stands for "go data integrity" and is a [commandline utility](http://en.wikipedia.org/wiki/Command-line_interface) to generate seal files from a directory tree. This allows to re-check the tree for consistency, and thus verify the data is intact. This is especially useful if valuable, immutable data is retrieved from potentially unreliable media, and copied to another storage device.
 
-## Usage
+As it is very common to verify copy operations, `godi` is able to copy files in the moment is generates the seal, to one or more destinations.
+
+`godi` was inspired by the [media hash list](http://mediahashlist.org) tool, whose seal file format it can read and write. It aims to be easier to use, and faster. On a quad core CPU, `godi` turned to be *6x* the speed of `mhl`.
+
+## Usage Examples
+
+**Protect your valuable, immutable data against silent corruption and create a seal**
 
 ```bash
-# Generate a signature for all files in directory tree/
-godi seal tree/
-
-# results in godi-seal.xml file
+$ godi seal /path/to/data
+[...]
+Wrote seal file to '/path/to/data/godi_2014-07-29_142701.gobz'
+SEAL DONE: WC 7.09s | ->READ ⌗0034 ⌗Δ0004/s ⌰4.70GiB Δ678.61MiB/s | HASH ⌗  9.40GiB Δ  1.33GiB/s
 ```
 
-## Benefits over MHL
+**Verify that data is still intact as compared against the seal**
 
-* **Performance**
-    + `godi` is up to multiple times faster
-    + Those inclined may maximize bandwidth by tuning parallelism
-    + Will read in parallel from multiple devices, leveraging all device's maximum bandwidth.
-    + Can write to multiple devices at once, creating multiple duplicates of your data as fast as your slowest writer. If one device fails, all other devices will still receive their duplicates, whereas the failed device will not have an intermediate result (see atomic operation).
-* **Copy or archive on the fly**
-    + While hashing, you can also transfer the data, reading it only once in the process. With MHL, you need to copy first, and hash afterwards, which reads the data twice. `godi`s operation assumes the storage works correctly, however, there is a safe mode which verifies the copy nonetheless.
-    + It will never overwrite existing files.
-* **Atomic Operation**
-    + It will not produce intermediate results, and either finish successfully, or not at all.
-    + Particularly useful when copying or archiving, as it will not leave any written file(s), allowing to safely abort and retry at will. The latter is good during performance tuning.
-* **Usability**
-    + `godi` just works. `mhl` will fail (for some reason) if it finds a hidden file. `godi` will just ignore hidden files and symbolic links and otherwise process everything in its way.
-    + `godi` comes with a state of the art commandline interface, allowing to learn the command by using it. No manual required.
-    + `mhl` seals are not protected against being altered. File corruption or intentional changes can't be detected, and will lead to invalid verification results.
-    + During verify, `mhl` will just check one of the sha1 or md5 hashes, in that order, which leaves room as tiny as a billionth atom to accidentally verify a file. `godi` will verify against all hashes it has taken.
+```bash
+$ godi verify /path/to/data/godi_2014-07-29_142701.gobz
+[...]
+VERIFY SUCCESS: None of 35 file(s) changed based on seal in '/path/to/data' [WC  4.794198665s | ->READ ⌗0035 ⌗Δ0007/s ⌰  4.70GiB Δ1004.33MiB/s | HASH ⌗  9.40GiB Δ  1.96GiB/s]
+```
 
+**Seal valuable data and duplicate it to two backup devices**
 
-## Limitations
+```bash
+$ godi sealed-copy /path/to/data -- /media/d1 /media/d2
+[...]
+Wrote seal file to '/media/d1/godi_2014-07-29_144842.gobz'
+Wrote seal file to '/media/d2/godi_2014-07-29_144842.gobz'
+SEAL DONE: WC  3.761588954s |   ->READ ⌗0475 ⌗Δ0126/s ⌰407.90MiB Δ108.44MiB/s |   HASH ⌗815.81MiB Δ216.88MiB/s |   WRITE ⌗0950 ⌗Δ0252/s ⌰815.81MiB Δ216.88MiB/s (16 skipped)
+```
 
-### Windows
-* Multi-device optimizations [don't currently apply](https://github.com/Byron/godi/issues/13) on windows
-* When ctrl+C is pressed in the in the git-bash to interrupt the program, godi will attempt to stop, but appears to be killed before it can finish cleanup. This seriously hampers atomic operation, and it is advised to use the cmd.exe prompt. Might be related to [this issue](http://stackoverflow.com/questions/10021373/what-is-the-windows-equivalent-of-process-onsigint-in-node-js) in some way.
+**Seal valuable data and duplicate it to two backup devices [PARANOID VERSION]**
 
-### General
-* Sealed copy ignores permission bits on directories, and will create them with `0777` in generally. It does, however, respect and maintain the mode of copied files.
-* `godi` is very careful about memory consumption, yet atomicity comes at the cost of keeping a list of files already copied for undo purposes. That list grows over time, and consumed ~200MB for 765895 files. It might be worth providing a flag to turn undo off.
+```bash
+$ godi sealed-copy --verify /path/to/data -- /media/d3 /media/d4
+[...]
+Wrote seal file to '/media/d3/godi_2014-07-29_145114.gobz'
+Wrote seal file to '/media/d4/godi_2014-07-29_145114.gobz'
+SEAL DONE: WC  3.039262074s |   ->READ ⌗0475 ⌗Δ0156/s ⌰407.90MiB Δ134.21MiB/s |   HASH ⌗815.81MiB Δ268.42MiB/s |   WRITE ⌗0950 ⌗Δ0312/s ⌰815.81MiB Δ268.42MiB/s (16 skipped)
+[...]
+VERIFY SUCCESS: None of 475 file(s) changed based on seal in '/media/d3'
+VERIFY SUCCESS: None of 475 file(s) changed based on seal in '/media/d4' [WC  2.297587367s |   ->READ ⌗0950 ⌗Δ0413/s ⌰815.81MiB Δ355.07MiB/s |   HASH ⌗  1.59GiB Δ710.15MiB/s]
+```
+
+Read more [on the documentation page](http://byron.github.io/godi)
+
+## Installation
+
+* Download and extract the multi-platform archive from the [latest release](https://github.com/Byron/godi/releases)
+* Typing `godi/<platform>/godi` in a [terminal](http://en.wikipedia.org/wiki/Terminal_emulator) from the extraction point displays help on the respective platform.
+
+If you are using godi more regularly, it is adviced to put it into your shell's [executable search path](http://en.wikipedia.org/wiki/PATH_(variable))
+
+## Features
+
+* protect your data against unnoticed and silent corruption
+* [atomically](http://en.wikipedia.org/wiki/Atomic_operation) duplicate data to one or more locations while protecting it against corruption
+* use all available device bandwidth and CPU cores to finish your work *much* faster.
+* runs on all major and minor platforms
 
 ## Development Status
 
 [![Build Status](https://travis-ci.org/Byron/godi.svg?branch=master)](https://travis-ci.org/Byron/godi)
-![under construction](https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png)
+
+Latest releases [can be found here](https://github.com/Byron/godi/releases).
 
 ## Credits
 
 `godi` uses the following libraries:
 
 * [codegangsta/cli](https://github.com/codegangsta/cli)
+
+`godi` is inspired by
+
+* [media hash list](http://mediahashlist.org)
 
 ### LICENSE
 
