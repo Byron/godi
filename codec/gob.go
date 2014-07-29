@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"crypto/sha1"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -65,6 +64,11 @@ func (g *Gob) Serialize(in <-chan api.FileInfo, writer io.Writer) (err error) {
 }
 
 func (g *Gob) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate func(*api.FileInfo) bool) error {
+	// formats an error to match our desired type
+	fe := func(err error) error {
+		return &DecodeError{Msg: err.Error()}
+	}
+
 	gzipReader, _ := gzip.NewReader(reader)
 	sha1enc := sha1.New()
 	d := gob.NewDecoder(gzipReader)
@@ -72,12 +76,12 @@ func (g *Gob) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 	// Lets make the fields clear, and not reuse variables even if we could
 	fileVersion := 0
 	if err := d.Decode(&fileVersion); err != nil {
-		return err
+		return fe(err)
 	}
 
 	// Of course we would implement reading other formats too
 	if fileVersion != Version {
-		return fmt.Errorf("Cannot handle index file: invalid header version: %d", fileVersion)
+		return &DecodeError{Msg: fmt.Sprintf("Cannot handle index file: invalid header version: %d", fileVersion)}
 	}
 
 	var readError error
@@ -91,7 +95,7 @@ func (g *Gob) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 			if strings.Contains(readError.Error(), "type mismatch in decoder") {
 				break
 			} else {
-				return readError
+				return fe(readError)
 			}
 		}
 
@@ -106,12 +110,12 @@ func (g *Gob) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 
 	var signature []byte
 	if err := d.Decode(&signature); err != nil {
-		return err
+		return fe(err)
 	}
 
 	// Finally, compare signature of seal with the one we made ...
 	if bytes.Compare(signature, sha1enc.Sum(nil)) != 0 {
-		return errors.New("Signature mismatch")
+		return &SignatureMismatchError{}
 	}
 
 	return nil

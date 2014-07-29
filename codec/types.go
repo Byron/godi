@@ -6,11 +6,7 @@ import (
 	"github.com/Byron/godi/api"
 )
 
-type CodecError struct {
-}
-
 type DecodeError struct {
-	CodecError
 	Msg string
 }
 
@@ -19,7 +15,7 @@ func (d *DecodeError) Error() string {
 }
 
 type SignatureMismatchError struct {
-	CodecError
+	DecodeError
 }
 
 func (s *SignatureMismatchError) Error() string {
@@ -42,6 +38,7 @@ type Codec interface {
 	// sending it down the channel. It returns false in case you should stop reading and return without error
 	// Check the done-channel and cancel the operation
 	// This function doesn't close the stream
+	// The only errors returned must of type DecodeError
 	Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate func(*api.FileInfo) bool) error
 
 	// Extension returns the file extension of the codec, without the '.' prefix

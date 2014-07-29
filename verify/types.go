@@ -27,6 +27,12 @@ type VerifyResult struct {
 	ifinfo          api.FileInfo // the file information we have seen in the index
 }
 
+// Keeps some information on a per-tree level
+type treeInfo struct {
+	signatureMismatches, missingFiles, numFiles uint
+	sealBroken                                  bool
+}
+
 // NewCommand returns an initialized verify command
 func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
 	c := VerifyCommand{}
@@ -57,7 +63,13 @@ func (s *VerifyCommand) Generate() <-chan api.Result {
 				fd, err := os.Open(index)
 				if err != nil {
 					results <- &VerifyResult{
-						BasicResult: api.BasicResult{Err: err},
+						BasicResult: api.BasicResult{
+							Err: &codec.DecodeError{Msg: err.Error()},
+							Finfo: api.FileInfo{
+								Path:     index,
+								RelaPath: filepath.Base(index),
+							},
+						},
 					}
 					continue
 				}
@@ -84,8 +96,11 @@ func (s *VerifyCommand) Generate() <-chan api.Result {
 				if err != nil {
 					results <- &VerifyResult{
 						BasicResult: api.BasicResult{
-							Err:   err,
-							Finfo: api.FileInfo{Path: index},
+							Err: err,
+							Finfo: api.FileInfo{
+								Path:     index,
+								RelaPath: filepath.Base(index),
+							},
 						},
 					}
 					continue
@@ -116,28 +131,38 @@ func (s *VerifyCommand) Gather(rctrl *io.ReadChannelController, files <-chan api
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
+	treeInfoMap := make(map[string]*treeInfo)
 
-	var signatureMismatches uint = 0
-	var missingFiles uint = 0
-	var brokenSeals uint = 0
 	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
 		vr := r.(*VerifyResult)
 
-		if r.Error() != nil {
-			if os.IsNotExist(r.Error()) || os.IsPermission(r.Error()) {
-				missingFiles += 1
+		ti, hasTi := treeInfoMap[vr.Finfo.Root()]
+		if !hasTi {
+			ti = &treeInfo{}
+			treeInfoMap[vr.Finfo.Root()] = ti
+		}
+
+		if vr.Err != nil {
+			if os.IsNotExist(vr.Err) || os.IsPermission(vr.Err) {
+				ti.missingFiles += 1
 				vr.Msg = fmt.Sprintf("MISSING %s: %s", SymbolMismatch, vr.Finfo.Path)
 				accumResult <- vr
 				return false
-			} else if serr, isFileSizeType := r.Error().(*api.FileSizeMismatch); isFileSizeType {
+			} else if serr, isFileSizeType := vr.Err.(*api.FileSizeMismatch); isFileSizeType {
 				// The file-size changed, thus the hashes will be different to. Say it accordingly.
-				signatureMismatches += 1
+				ti.signatureMismatches += 1
+				ti.numFiles += 1
 				vr.Msg = fmt.Sprintf("SIZE %s: %s sealed with size %dB, got size %dB", SymbolMismatch, serr.Path, serr.Want, serr.Got)
 				accumResult <- vr
 				return false
-			} else if _, isSealSigMismatch := r.Error().(*codec.SignatureMismatchError); isSealSigMismatch {
-				brokenSeals += 1
+			} else if _, isSealSigMismatch := vr.Err.(*codec.SignatureMismatchError); isSealSigMismatch {
+				ti.sealBroken = true
 				vr.Msg = fmt.Sprintf("SEAL %s: '%s' was modified after sealing or is corrupted - don't trust the verify results", SymbolMismatch, vr.Finfo.Path)
+				accumResult <- vr
+				return false
+			} else if _, isDecodeErr := vr.Err.(*codec.DecodeError); isDecodeErr {
+				ti.sealBroken = true
+				vr.Msg = fmt.Sprintf("SEAL %s", "Failed to decode seal at '%s' with error '%s' - verify results can't be trusted", SymbolFail, vr.Finfo.Path, vr.Err.Error())
 				accumResult <- vr
 				return false
 			} else {
@@ -149,15 +174,17 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 		hasError := false
 		vr.Prio = api.Info
+		// From here on, it must be a file with no obvious error
+		ti.numFiles += 1
 		if (len(vr.ifinfo.Sha1) > 0 && bytes.Compare(vr.ifinfo.Sha1, vr.Finfo.Sha1) != 0) ||
 			(len(vr.ifinfo.MD5) > 0 && bytes.Compare(vr.ifinfo.MD5, vr.Finfo.MD5) != 0) {
 			vr.Msg = fmt.Sprintf("HASH %s: %s flipped at least one bit", SymbolMismatch, vr.Finfo.Path)
 			vr.Err = &api.FileHashMismatch{Path: vr.Finfo.Path}
-			signatureMismatches += 1
+			ti.signatureMismatches += 1
 			hasError = true
 			vr.Prio = api.Error
 		} else {
-			vr.Msg = fmt.Sprintf("OK: %s", vr.Finfo.Path)
+			vr.Msg = fmt.Sprintf("%s: %s", SymbolOK, vr.Finfo.Path)
 		}
 		accumResult <- vr
 		return !hasError
@@ -165,42 +192,56 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 	finalizer := func(
 		accumResult chan<- api.Result) {
-		stats := s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), io.StatsClientSep)
 
-		if signatureMismatches == 0 && missingFiles == 0 && brokenSeals == 0 {
-			accumResult <- &VerifyResult{
-				BasicResult: api.BasicResult{
-					Msg: fmt.Sprintf(
-						"VERIFY %s: None of %d file(s) changed after sealing [%s]",
-						SymbolSuccess,
-						s.Stats.MostFiles(),
-						stats,
-					) + s.Stats.String(),
-					Prio: api.Valuable,
-				},
+		count := 0
+		stats := ""
+		for _, ti := range treeInfoMap {
+			count += 1
+
+			s.Stats.ErrCount -= ti.signatureMismatches
+			s.Stats.ErrCount -= ti.missingFiles
+
+			// the last result we produce has the final statistics
+			if count == len(treeInfoMap) {
+				stats = fmt.Sprintf(" [%s]%s",
+					s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), io.StatsClientSep),
+					s.Stats.String(),
+				)
 			}
-		} else {
-			s.Stats.ErrCount -= signatureMismatches
-			s.Stats.ErrCount -= missingFiles
-			suffix := ""
-			if missingFiles > 0 {
-				suffix = fmt.Sprintf(", with %d missing", missingFiles)
+
+			if ti.signatureMismatches == 0 && ti.missingFiles == 0 && !ti.sealBroken {
+				accumResult <- &VerifyResult{
+					BasicResult: api.BasicResult{
+						Msg: fmt.Sprintf(
+							"VERIFY %s: None of %d file(s) changed after sealing%s",
+							SymbolSuccess,
+							ti.numFiles,
+							stats,
+						),
+						Prio: api.Valuable,
+					},
+				}
+			} else {
+				suffix := ""
+				if ti.missingFiles > 0 {
+					suffix = fmt.Sprintf(", with %d missing", ti.missingFiles)
+				}
+				accumResult <- &VerifyResult{
+					BasicResult: api.BasicResult{
+						Msg: fmt.Sprintf(
+							"VERIFY %s: %d of %d file(s) have changed on disk after sealing%s%s",
+							SymbolFail,
+							ti.signatureMismatches,
+							ti.numFiles,
+							suffix,
+							stats,
+						),
+						Prio: api.Valuable,
+					},
+				}
 			}
-			accumResult <- &VerifyResult{
-				BasicResult: api.BasicResult{
-					Msg: fmt.Sprintf(
-						"VERIFY %s: %d of %d file(s) have changed on disk after sealing%s [%s]",
-						SymbolFail,
-						signatureMismatches,
-						s.Stats.MostFiles()-uint32(missingFiles),
-						suffix,
-						stats,
-					) + s.Stats.String(),
-					Prio: api.Valuable,
-				},
-			}
-		}
-	}
+		} // end for each treeInfo
+	} // end finalizer
 
 	return api.Aggregate(results, s.Done, resultHandler, finalizer, &s.Stats)
 }
