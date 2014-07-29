@@ -131,6 +131,8 @@ func (s *VerifyCommand) Gather(rctrl *io.ReadChannelController, files <-chan api
 }
 
 func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
+	// Associates a root with with the respective tree information
+	// This comes at the disadvantage that we can't differentiate if there are multiple seals underneath the same root.
 	treeInfoMap := make(map[string]*treeInfo)
 
 	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
@@ -195,7 +197,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 		count := 0
 		stats := ""
-		for _, ti := range treeInfoMap {
+		for treeRoot, ti := range treeInfoMap {
 			count += 1
 
 			s.Stats.ErrCount -= ti.signatureMismatches
@@ -213,9 +215,10 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 				accumResult <- &VerifyResult{
 					BasicResult: api.BasicResult{
 						Msg: fmt.Sprintf(
-							"VERIFY %s: None of %d file(s) changed after sealing%s",
+							"VERIFY %s: None of %d file(s) changed based on seal in '%s'%s",
 							SymbolSuccess,
 							ti.numFiles,
+							treeRoot,
 							stats,
 						),
 						Prio: api.Valuable,
@@ -224,16 +227,17 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			} else {
 				suffix := ""
 				if ti.missingFiles > 0 {
-					suffix = fmt.Sprintf(", with %d missing", ti.missingFiles)
+					suffix = fmt.Sprintf(", with %d missing,", ti.missingFiles)
 				}
 				accumResult <- &VerifyResult{
 					BasicResult: api.BasicResult{
 						Msg: fmt.Sprintf(
-							"VERIFY %s: %d of %d file(s) have changed on disk after sealing%s%s",
+							"VERIFY %s: %d of %d file(s) have changed%s based on seal in '%s'%s",
 							SymbolFail,
 							ti.signatureMismatches,
 							ti.numFiles,
 							suffix,
+							treeRoot,
 							stats,
 						),
 						Prio: api.Valuable,
