@@ -59,6 +59,15 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
 		sr := r.(*SealResult)
 
+		// If we have no file information, this one is likely to be sent by the generator.
+		// For now we just pass it on.
+		// NOTE(st): right now we are trying to seal as much as possible, but count errors on the way
+		// We could use the gen info to abort early, by marking entire trees as failed.
+		if sr.FromGenerator() {
+			accumResult <- r
+			return sr.Err == nil
+		}
+
 		deleteResultSafely := func(tree, path string) {
 			if !isWriting {
 				panic("Shouldn't ever try to delete a file we have not written ... ")

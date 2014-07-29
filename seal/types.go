@@ -70,6 +70,11 @@ type SealResult struct {
 	source string
 }
 
+// Returns true if this result was sent from a generator. The latter sends the root as Path, but doesn't set a RelaPath
+func (s *SealResult) FromGenerator() bool {
+	return len(s.Finfo.RelaPath) == 0
+}
+
 // NewCommand returns an initialized seal command
 func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	c := SealCommand{}

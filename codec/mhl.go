@@ -129,15 +129,15 @@ func (m *MHL) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 	hl := mhlHashList{}
 
 	if err := dec.Decode(&hl); err != nil {
-		return err
+		return &DecodeError{Msg: err.Error()}
 	}
 
 	if hl.Version != MHLVersion {
-		return fmt.Errorf("Unsupported MHL version - got %s, want %s", hl.Version, MHLVersion)
+		return &DecodeError{Msg: fmt.Sprintf("Unsupported MHL version - got %s, want %s", hl.Version, MHLVersion)}
 	}
 
 	if len(hl.HashInfo) == 0 {
-		return errors.New("Didn't find a single hash in media hash list")
+		return &DecodeError{Msg: "Didn't find a single hash in media hash list"}
 	}
 
 	// Otherwise, just stream all the pre-read data
@@ -162,9 +162,9 @@ func (m *MHL) Deserialize(reader io.Reader, out chan<- api.FileInfo, predicate f
 	// we could find out anything different ... .
 	if len(hl.Signature.Sha1) > 0 {
 		if hls, err := hex.DecodeString(hl.Signature.Sha1); err != nil {
-			return fmt.Errorf("Invalid signature fomat: %s", hl.Signature.Sha1)
+			return &DecodeError{Msg: fmt.Sprintf("Invalid signature fomat: %s", hl.Signature.Sha1)}
 		} else if bytes.Compare(hls, sha1enc.Sum(nil)) != 0 {
-			return errors.New("Signature mismatch - seal was modified")
+			return &SignatureMismatchError{}
 		}
 	}
 

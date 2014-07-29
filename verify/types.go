@@ -33,7 +33,7 @@ func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
 	return &c, c.Init(nReaders, 0, indices, api.Info, nil)
 }
 
-func (s *VerifyCommand) Generate() (<-chan api.Result, <-chan api.Result) {
+func (s *VerifyCommand) Generate() <-chan api.Result {
 	return api.Generate(s.RootedReaders, s,
 		func(trees []string, files chan<- api.FileInfo, results chan<- api.Result) {
 			for _, index := range s.Items {
@@ -83,7 +83,10 @@ func (s *VerifyCommand) Generate() (<-chan api.Result, <-chan api.Result) {
 
 				if err != nil {
 					results <- &VerifyResult{
-						BasicResult: api.BasicResult{Err: err},
+						BasicResult: api.BasicResult{
+							Err:   err,
+							Finfo: api.FileInfo{Path: index},
+						},
 					}
 					continue
 				}
@@ -116,6 +119,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 	var signatureMismatches uint = 0
 	var missingFiles uint = 0
+	var brokenSeals uint = 0
 	resultHandler := func(r api.Result, accumResult chan<- api.Result) bool {
 		vr := r.(*VerifyResult)
 
@@ -129,6 +133,11 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 				// The file-size changed, thus the hashes will be different to. Say it accordingly.
 				signatureMismatches += 1
 				vr.Msg = fmt.Sprintf("SIZE %s: %s sealed with size %dB, got size %dB", SymbolMismatch, serr.Path, serr.Want, serr.Got)
+				accumResult <- vr
+				return false
+			} else if _, isSealSigMismatch := r.Error().(*codec.SignatureMismatchError); isSealSigMismatch {
+				brokenSeals += 1
+				vr.Msg = fmt.Sprintf("SEAL %s: '%s' was modified after sealing or is corrupted - don't trust the verify results", SymbolMismatch, vr.Finfo.Path)
 				accumResult <- vr
 				return false
 			} else {
@@ -158,7 +167,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 		accumResult chan<- api.Result) {
 		stats := s.Stats.DeltaString(&s.Stats, s.Stats.Elapsed(), io.StatsClientSep)
 
-		if signatureMismatches == 0 && missingFiles == 0 {
+		if signatureMismatches == 0 && missingFiles == 0 && brokenSeals == 0 {
 			accumResult <- &VerifyResult{
 				BasicResult: api.BasicResult{
 					Msg: fmt.Sprintf(

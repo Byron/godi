@@ -319,7 +319,7 @@ type Runner interface {
 	// May report errrors or information about the progress through generateResult, which must NOT be closed when done. Return nothing
 	// if there is nothing to report
 	// Must listen on done and return asap
-	Generate() (generateResult <-chan Result, aggregationResult <-chan Result)
+	Generate() (aggregationResult <-chan Result)
 
 	// Will be launched as go routine and perform whichever operation on the FileInfo received from input channel
 	// Produces one result per input FileInfo and returns it in the given results channel
@@ -354,7 +354,7 @@ func StartEngine(runner Runner,
 		close(done)
 	}()
 
-	generateResult, accumResult := runner.Generate()
+	accumResult := runner.Generate()
 
 	mkErrPicker := func(handler func(r Result) bool) func(r Result) bool {
 		return func(r Result) bool {
@@ -371,19 +371,12 @@ func StartEngine(runner Runner,
 	rwg := sync.WaitGroup{}
 	rwg.Add(1)
 	go func() {
-		for r := range generateResult {
-			generateHandler(r)
-		}
-		rwg.Done()
-	}()
-	rwg.Add(1)
-	go func() {
 		for r := range accumResult {
 			aggregateHandler(r)
 		}
 		rwg.Done()
 	}()
-
 	rwg.Wait()
+
 	return
 }

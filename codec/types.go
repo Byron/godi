@@ -6,6 +6,26 @@ import (
 	"github.com/Byron/godi/api"
 )
 
+type CodecError struct {
+}
+
+type DecodeError struct {
+	CodecError
+	Msg string
+}
+
+func (d *DecodeError) Error() string {
+	return d.Msg
+}
+
+type SignatureMismatchError struct {
+	CodecError
+}
+
+func (s *SignatureMismatchError) Error() string {
+	return "Signature mismatch - seal was modified"
+}
+
 // Represents a codec's standard capabilities.
 // A codec is a specialized implementation able to read and write indices of file hash information
 // NOTE: Even though it would be more idiomatic to have two interfaces for read and write respectively,

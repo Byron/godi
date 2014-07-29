@@ -9,7 +9,7 @@ import (
 	"github.com/Byron/godi/api"
 )
 
-func (s *SealCommand) Generate() (<-chan api.Result, <-chan api.Result) {
+func (s *SealCommand) Generate() <-chan api.Result {
 	generate := func(trees []string, files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, tree := range trees {
 			cancelled, treeError := s.traverseFilesRecursively(files, results, s.Done, tree, tree)
@@ -37,9 +37,12 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 	// read dir and, build file info, and recurse into subdirectories
 	f, err := os.Open(tree)
 	if err != nil {
-		results <- &api.BasicResult{
-			Err:  err,
-			Prio: api.Error,
+		results <- &SealResult{
+			BasicResult: api.BasicResult{
+				Err:   err,
+				Prio:  api.Error,
+				Finfo: api.FileInfo{Path: root},
+			},
 		}
 		return false, true
 	}
@@ -47,9 +50,12 @@ func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, result
 	dirInfos, err := f.Readdir(-1)
 	f.Close()
 	if err != nil {
-		results <- &api.BasicResult{
-			Err:  err,
-			Prio: api.Error,
+		results <- &SealResult{
+			BasicResult: api.BasicResult{
+				Err:   err,
+				Prio:  api.Error,
+				Finfo: api.FileInfo{Path: root},
+			},
 		}
 		return false, true
 	}
@@ -70,9 +76,12 @@ toNextFile:
 			for _, excludeFilter := range s.Filters {
 				if excludeFilter.Matches(fi.Name(), fi.Mode()) {
 					atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
-					results <- &api.BasicResult{
-						Msg:  fmt.Sprintf("Ignoring '%s' at '%s'", excludeFilter, path),
-						Prio: api.Info,
+					results <- &SealResult{
+						BasicResult: api.BasicResult{
+							Msg:   fmt.Sprintf("Ignoring '%s' at '%s'", excludeFilter, path),
+							Prio:  api.Info,
+							Finfo: api.FileInfo{Path: root},
+						},
 					}
 					continue toNextFile
 				}
