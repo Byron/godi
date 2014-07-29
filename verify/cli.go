@@ -30,13 +30,20 @@ func SubCommands() []gcli.Command {
 	return out
 }
 
-func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) error {
+func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
 	if len(items) == 0 {
 		return errors.New("Please provide at least one seal file")
 	}
 
 	validItems := make([]string, 0, len(items))
 	for _, index := range items {
+		index = filepath.Clean(index)
+		if !filepath.IsAbs(index) {
+			index, err = filepath.Abs(index)
+			if err != nil {
+				return err
+			}
+		}
 		validItems = api.AppendUniqueString(validItems, index)
 	}
 

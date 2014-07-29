@@ -90,7 +90,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 func (s *SealCommand) Gather(rctrl *io.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		s := ""
-		if source != nil {
+		if source != nil && source.Path != f.Path {
 			s = source.Path
 		}
 		res := SealResult{
