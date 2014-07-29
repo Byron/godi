@@ -6,10 +6,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
         
-        <link rel="canonical" href="https://byron.github.io/godi/contrib/">
+        <link rel="canonical" href="https://byron.github.io/godi/details/">
         <link rel="shortcut icon" href="../img/favicon.ico">
 
-        <title>Contribute - godi</title>
+        <title>About Details - godi</title>
 
         <link href="../css/bootstrap-custom.min.css" rel="stylesheet">
         <link href="../css/font-awesome-4.0.3.css" rel="stylesheet">
@@ -56,7 +56,7 @@
             
             
             
-                <li class="dropdown">
+                <li class="dropdown active">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">Learn <b class="caret"></b></a>
                     <ul class="dropdown-menu">
                     
@@ -64,12 +64,12 @@
                             <a href="../usage/">How to Use Godi</a>
                         </li>
                     
-                        <li >
-                            <a href="../mhl/">About MHL</a>
+                        <li class="active">
+                            <a href="./">About Details</a>
                         </li>
                     
                         <li >
-                            <a href="../details/">About Details</a>
+                            <a href="../proprietary/">About Others</a>
                         </li>
                     
                     </ul>
@@ -77,8 +77,8 @@
             
             
             
-                <li class="active">
-                    <a href="./">Contribute</a>
+                <li >
+                    <a href="../contribute/">Contribute</a>
                 </li>
             
             
@@ -101,12 +101,12 @@
             <ul class="nav navbar-nav navbar-right">
                 
                 <li >
-                    <a rel="next" href="../details/">
+                    <a rel="next" href="../usage/">
                         <i class="fa fa-arrow-left"></i> Previous
                     </a>
                 </li>
                 <li >
-                    <a rel="prev" href="../license/">
+                    <a rel="prev" href="../proprietary/">
                         Next <i class="fa fa-arrow-right"></i>
                     </a>
                 </li>
@@ -129,16 +129,45 @@
             <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
     <ul class="nav bs-sidenav">
     
-        <li class="main active"><a href="#package-structure">Package Structure</a></li>
+        <li class="main active"><a href="#seal-formats">Seal Formats</a></li>
+        
+    
+        <li class="main "><a href="#increasing-performance">Increasing Performance</a></li>
+        
+    
+        <li class="main "><a href="#limitations">Limitations</a></li>
+        
+            <li><a href="#windows">Windows</a></li>
+        
+            <li><a href="#general">General</a></li>
         
     
     </ul>
 </div></div>
             <div class="col-md-9" role="main">
 
-<p>This page provdes more inforamtion about how godi is structured in case someone seeks to make contributions.</p>
-<h1 id="package-structure">Package Structure</h1>
-<p><img alt="architecture" src="../img/packages.dia.txt.png" /></p>
+<p><img alt="under construction" src="https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png" /></p>
+<h2 id="seal-formats">Seal Formats</h2>
+<ul>
+<li>Also mention performance implications</li>
+</ul>
+<h2 id="increasing-performance">Increasing Performance</h2>
+<p>For understanding this paragraph, it's beneficial to understand how data is processed in godi. Without getting into too much detail, you can see that data is first read from storage, then hashed, and possibly be written in any of the copy-enabled modes.</p>
+<p><img alt="architecture" src="../img/arch.dia.txt.png" /></p>
+<p>As the <em>Hasher</em> part can easily deliver 450MB/s per core, you can imagine that the bottleneck will occour during disk-based input-output operations. For example, reading from an SSD with a cold filesystem cache will rarely deliver more than 500MB/s, and writing to an SSD would not be much faster either.</p>
+<p>Nonetheless, depending on the type of storage, you might benefit from multiple simultaneous reads, and/or multiple simultaneous writes, which may drastically increase the perceived performance.</p>
+<p>It is vital to test for good values for <code>--num-readers</code> and <code>--num-writers</code> to get optimal performance for your respective hardware. By default, there may be as many hashers as you have cores, and this rarely needs a change unless <code>godi</code> is competing with other programs for the CPU.</p>
+<h2 id="limitations">Limitations</h2>
+<h3 id="windows">Windows</h3>
+<ul>
+<li>Multi-device optimizations <a href="https://github.com/Byron/godi/issues/13">don't currently apply</a> on windows</li>
+<li>When ctrl+C is pressed in the in the git-bash to interrupt the program, godi will attempt to stop, but appears to be killed before it can finish cleanup. This seriously hampers atomic operation, and it is advised to use the cmd.exe prompt. Might be related to <a href="http://stackoverflow.com/questions/10021373/what-is-the-windows-equivalent-of-process-onsigint-in-node-js">this issue</a> in some way.</li>
+</ul>
+<h3 id="general">General</h3>
+<ul>
+<li>Sealed copy ignores permission bits on directories, and will create them with <code>0777</code> in generally. It does, however, respect and maintain the mode of copied files.</li>
+<li><code>godi</code> is very careful about memory consumption, yet atomicity comes at the cost of keeping a list of files already copied for undo purposes. That list grows over time, and consumed ~200MB for 765895 files. It might be worth providing a flag to turn undo off.</li>
+</ul>
 </div>
         </div>
 

@@ -6,10 +6,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
         
-        <link rel="canonical" href="https://byron.github.io/godi/contrib/">
+        <link rel="canonical" href="https://byron.github.io/godi/mhl/">
         <link rel="shortcut icon" href="../img/favicon.ico">
 
-        <title>Contribute - godi</title>
+        <title>About MHL - godi</title>
 
         <link href="../css/bootstrap-custom.min.css" rel="stylesheet">
         <link href="../css/font-awesome-4.0.3.css" rel="stylesheet">
@@ -56,7 +56,7 @@
             
             
             
-                <li class="dropdown">
+                <li class="dropdown active">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">Learn <b class="caret"></b></a>
                     <ul class="dropdown-menu">
                     
@@ -64,8 +64,8 @@
                             <a href="../usage/">How to Use Godi</a>
                         </li>
                     
-                        <li >
-                            <a href="../mhl/">About MHL</a>
+                        <li class="active">
+                            <a href="./">About MHL</a>
                         </li>
                     
                         <li >
@@ -77,8 +77,8 @@
             
             
             
-                <li class="active">
-                    <a href="./">Contribute</a>
+                <li >
+                    <a href="../contrib/">Contribute</a>
                 </li>
             
             
@@ -101,12 +101,12 @@
             <ul class="nav navbar-nav navbar-right">
                 
                 <li >
-                    <a rel="next" href="../details/">
+                    <a rel="next" href="../usage/">
                         <i class="fa fa-arrow-left"></i> Previous
                     </a>
                 </li>
                 <li >
-                    <a rel="prev" href="../license/">
+                    <a rel="prev" href="../details/">
                         Next <i class="fa fa-arrow-right"></i>
                     </a>
                 </li>
@@ -129,16 +129,41 @@
             <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
     <ul class="nav bs-sidenav">
     
-        <li class="main active"><a href="#package-structure">Package Structure</a></li>
+        <li class="main active"><a href="#benefits-over-mhl">Benefits over MHL</a></li>
         
     
     </ul>
 </div></div>
             <div class="col-md-9" role="main">
 
-<p>This page provdes more inforamtion about how godi is structured in case someone seeks to make contributions.</p>
-<h1 id="package-structure">Package Structure</h1>
-<p><img alt="architecture" src="../img/packages.dia.txt.png" /></p>
+<p><img alt="under construction" src="https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png" /></p>
+<h2 id="benefits-over-mhl">Benefits over MHL</h2>
+<ul>
+<li><strong>Performance</strong><ul>
+<li><code>godi</code> is up to multiple times faster</li>
+<li>Those inclined may maximize bandwidth by tuning parallelism</li>
+<li>Will read in parallel from multiple devices, leveraging all device's maximum bandwidth.</li>
+<li>Can write to multiple devices at once, creating multiple duplicates of your data as fast as your slowest writer. If one device fails, all other devices will still receive their duplicates, whereas the failed device will not have an intermediate result (see atomic operation).</li>
+</ul>
+</li>
+<li><strong>Copy or archive on the fly</strong><ul>
+<li>While hashing, you can also transfer the data, reading it only once in the process. With MHL, you need to copy first, and hash afterwards, which reads the data twice. <code>godi</code>s operation assumes the storage works correctly, however, there is a safe mode which verifies the copy nonetheless.</li>
+<li>It will never overwrite existing files.</li>
+</ul>
+</li>
+<li><strong>Atomic Operation</strong><ul>
+<li>It will not produce intermediate results, and either finish successfully, or not at all.</li>
+<li>Particularly useful when copying or archiving, as it will not leave any written file(s), allowing to safely abort and retry at will. The latter is good during performance tuning.</li>
+</ul>
+</li>
+<li><strong>Usability</strong><ul>
+<li><code>godi</code> just works. <code>mhl</code> will fail (for some reason) if it finds a hidden file. <code>godi</code> will just ignore hidden files and symbolic links and otherwise process everything in its way.</li>
+<li><code>godi</code> comes with a state of the art commandline interface, allowing to learn the command by using it. No manual required.</li>
+<li><code>mhl</code> seals are not protected against being altered. File corruption or intentional changes can't be detected, and will lead to invalid verification results.</li>
+<li>During verify, <code>mhl</code> will just check one of the sha1 or md5 hashes, in that order, which leaves room as tiny as a billionth atom to accidentally verify a file. <code>godi</code> will verify against all hashes it has taken.</li>
+</ul>
+</li>
+</ul>
 </div>
         </div>
 
