@@ -35,16 +35,9 @@ func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogL
 		return errors.New("Please provide at least one seal file")
 	}
 
-	validItems := make([]string, 0, len(items))
-	for _, index := range items {
-		index = filepath.Clean(index)
-		if !filepath.IsAbs(index) {
-			index, err = filepath.Abs(index)
-			if err != nil {
-				return err
-			}
-		}
-		validItems = api.AppendUniqueString(validItems, index)
+	validItems, err := api.ParseSources(items, true)
+	if err != nil {
+		return
 	}
 
 	indexDirs := make([]string, len(validItems))
