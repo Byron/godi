@@ -129,7 +129,13 @@
             <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
     <ul class="nav bs-sidenav">
     
-        <li class="main active"><a href="#seal-formats">Seal Formats</a></li>
+        <li class="main active"><a href="#atomic-operation">Atomic Operation</a></li>
+        
+    
+        <li class="main "><a href="#input-file-filters">Input File-Filters</a></li>
+        
+    
+        <li class="main "><a href="#seal-formats">Seal Formats</a></li>
         
     
         <li class="main "><a href="#increasing-performance">Increasing Performance</a></li>
@@ -146,17 +152,68 @@
 </div></div>
             <div class="col-md-9" role="main">
 
-<p><img alt="under construction" src="https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png" /></p>
+<h2 id="atomic-operation">Atomic Operation</h2>
+<p>Atomic operations are complex operations, which either fail altogether, or complete successfully, providing a strong guarantee that there is no intermediate, incorrect result.</p>
+<p><code>godi</code> is read-only when <em>verifying</em> data, and <em>atomicity</em> doesn't apply.
+It will be writing a single file per source when <em>sealing</em>, and it will only do so if it managed to read all source files successfully.</p>
+<p>In <em>sealed-copy</em> mode, it will potentially write hundreds of thousands of files to multiple destinations. If one of these fails to write, it will remove all the files underneath a destination that it has written so far, but keeps writing unaffected destinations. Have a look <a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_cancelled.mov.gif">at this feature in action</a></p>
+<p>This feature implies that it has to remember all files written so far, and tests showed that it requires about 250MB of RAM for one million files. For thousands of files, the memory consumption will stay well below 10MB though.</p>
+<h2 id="input-file-filters">Input File-Filters</h2>
+<p>During <em>seal</em> and <em>sealed-copy</em> operations, <code>godi</code> traverses directories to find files for reading. Which files it picks depends on the input file filter, specified using the <code>--file-exclude-patterns</code> flag.</p>
+<p>By default, it will exclude files which are known to change a lot, like <em>.DS_Store</em> on osx, but you may specify to ignore hidden files, symbolic links, <code>godi</code> <em>seal files</em>, as well as files matching a <a href="http://en.wikipedia.org/wiki/Glob_(programming)">glob</a> pattern.</p>
+<p>This is an example of the <a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify_exclude-filter.mov.gif">file-exclude-pattern in action</a>, note the increasing amount of skipped files when the filter is in use.</p>
+<p>The <em>verify</em> operation will always verify all files mentioned in the seal, a filter does not apply.</p>
 <h2 id="seal-formats">Seal Formats</h2>
+<p>A seal is a file that stores <em>signatures</em> of <em>data files</em>, each identifying the contents of the file. If a single bit within that data file changes, the signature will be a different one. In information technology, such a signature is called a <a href="http://en.wikipedia.org/wiki/Cryptographic_hash_function">hash</a>. <code>godi</code> computes not one, but two of these, called <a href="http://en.wikipedia.org/wiki/MD5">MD5</a> and <a href="http://en.wikipedia.org/wiki/SHA-1">SHA1</a>.</p>
+<p>Currently there are two <em>seal file</em> formats which can be written and verified.</p>
 <ul>
-<li>Also mention performance implications</li>
+<li>
+<p><strong>gob</strong></p>
+<ul>
+<li>A compressed binary format which can be streamed when writing and verifying. This is highly relevant when huge directory trees are sealed or verified - both in terms of memory and disk-space consumption. The <em>gob</em> format takes up 40MB for 700k files, using up to 200MB of RAM in the process, whereas the same process in MHL format used 450MB and produced a <em>seal file</em> with 190MB in size. Verifying the <em>gob</em> file starts right away, whereas it take 16s until the <em>mhl</em> file verification begins.</li>
+<li><code>godi</code>s default format.</li>
+<li>temper-proof thanks to signature (read more further down)</li>
+<li>Uses the <em>gobz</em> file extension.</li>
 </ul>
+</li>
+<li>
+<p><strong>mhl</strong></p>
+<ul>
+<li>A human-readable XML based format as introduced by the <a href="http://mediahashlist.org">media hash list</a>(<code>mhl</code>) program.</li>
+<li>Even though <em>seal files</em> created by the <code>mhl</code> tool won't have a signature, and therefore aren't temper-proof, those created by <code>godi</code> will have one.</li>
+<li><code>mhl</code> can read mhl seal files created by <code>godi</code>, and vice versa.</li>
+<li><code>godi</code> will not embed information about the creator of the seal, as it believes that meta-data should be provided by the user of the program, and should be sealed like any other file.</li>
+<li>Uses the <em>mhl</em> file extension</li>
+</ul>
+</li>
+</ul>
+<p>All <em>seal files</em> generated by <code>godi</code> will carry a signature to assure that changes to any information stored in the file will be detected. This is helpful to detect silent corruption of the file as well as intentional adjustments.</p>
 <h2 id="increasing-performance">Increasing Performance</h2>
-<p>For understanding this paragraph, it's beneficial to understand how data is processed in godi. Without getting into too much detail, you can see that data is first read from storage, then hashed, and possibly be written in any of the copy-enabled modes.</p>
-<p><img alt="architecture" src="../img/arch.dia.txt.png" /></p>
-<p>As the <em>Hasher</em> part can easily deliver 450MB/s per core, you can imagine that the bottleneck will occour during disk-based input-output operations. For example, reading from an SSD with a cold filesystem cache will rarely deliver more than 500MB/s, and writing to an SSD would not be much faster either.</p>
-<p>Nonetheless, depending on the type of storage, you might benefit from multiple simultaneous reads, and/or multiple simultaneous writes, which may drastically increase the perceived performance.</p>
-<p>It is vital to test for good values for <code>--num-readers</code> and <code>--num-writers</code> to get optimal performance for your respective hardware. By default, there may be as many hashers as you have cores, and this rarely needs a change unless <code>godi</code> is competing with other programs for the CPU.</p>
+<p>For understanding this paragraph, it's beneficial to understand how data is processed in godi. Without getting into too much detail, you can see that data is first read from storage, then hashed, and possibly written in <code>sealed-copy</code> mode.</p>
+<p><img alt="architecture" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/png/arch.txt.png" /></p>
+<p>All data is handled in parallel, thus it is read, right after reading fed into two hashers, and into all outputs, and all that in parallel.</p>
+<p>As the <em>Hasher</em> part can easily deliver 450MB/s per core, you can imagine that the bottleneck will occur during disk-based input or output operations. For example, reading from an SSD with a cold filesystem cache will rarely deliver more than 500MB/s, and writing to an SSD would not be much faster either.</p>
+<p>Nonetheless, depending on the type of storage, you might benefit from multiple simultaneous reads, and/or multiple simultaneous writes, which may drastically increase the perceived performance. The amount of simultaneous reads and writes is setup per device you are reading from or writing to.</p>
+<p>It is vital to test for good values for <code>--streams-per-input-device</code>(<em>-spid) and <code>--streams-per-output-device</code>(</em>-spod*) to get optimal performance for your respective hardware. By default, there may be as many hashers as you have cores, and this rarely needs a change unless <code>godi</code> is competing with other programs for the CPU.</p>
+<p><a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_seal_performance.mov.gif">Have a look at this video</a>, showing how a fast input device will need 6 cores for processing all the data. It maximized the CPU usage, as the device could feed data even faster.</p>
+<p>As a summary, there are a few rules to remember</p>
+<ul>
+<li><em>seal</em> and <em>verify</em> operations are as slow as the slowest input device.<ul>
+<li>fast devices are effectively slowed down by slow devices</li>
+</ul>
+</li>
+<li><em>sealed-copy</em> operations are as slow as the slowest input device or the slowest output device.<ul>
+<li>If a slow reader doesn't deliver, writers have to wait.</li>
+<li>Fast readers have to wait for slow writers.</li>
+</ul>
+</li>
+<li><em>seal</em>, <em>verify</em> and <em>sealed-copy</em> operations are only as fast as your CPU allows.<ul>
+<li>If your CPU is the bottleneck, feed more cores by increasing the <code>--streams-per-input-device</code> values respectively.</li>
+<li>Each input stream feeds two cores to create an <code>MD5</code> and <code>SHA1</code> hash in parallel. An additional input device stream will feed 2 additional cores, until either the input bandwidth is to low or all cores are maxed out.</li>
+</ul>
+</li>
+</ul>
+<p>As each input stream is fed by exactly one file, you need to have enough files to keep them busy. For example, if you have only one big file, there is only about 2 cores to work on it, no matter how many input streams are set up.</p>
 <h2 id="limitations">Limitations</h2>
 <h3 id="windows">Windows</h3>
 <ul>
@@ -166,7 +223,8 @@
 <h3 id="general">General</h3>
 <ul>
 <li>Sealed copy ignores permission bits on directories, and will create them with <code>0777</code> in generally. It does, however, respect and maintain the mode of copied files.</li>
-<li><code>godi</code> is very careful about memory consumption, yet atomicity comes at the cost of keeping a list of files already copied for undo purposes. That list grows over time, and consumed ~200MB for 765895 files. It might be worth providing a flag to turn undo off.</li>
+<li><code>godi</code> is very careful about memory consumption, yet atomicity comes at the cost of keeping a list of files already copied for undo purposes. That list grows over time, and consumed ~200MB for 765895 files. It might be worth providing a flag to turn undo off. This limitation is already <a href="https://github.com/Byron/godi/issues/26">tracked</a></li>
+<li>Hidden directories are currently not excluded. However, a <code>--folder-exclude-patterns</code> flag could put directory filtering under the user's control. This feature is already <a href="https://github.com/Byron/godi/issues/25">planned for a future release</a></li>
 </ul>
 </div>
         </div>

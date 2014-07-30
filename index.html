@@ -131,11 +131,13 @@
     
         <li class="main active"><a href="#seal-copy-verify-fast">SEAL, COPY &amp; VERIFY - FAST</a></li>
         
+            <li><a href="#why-godi">Why Godi</a></li>
+        
             <li><a href="#usage-examples">Usage Examples</a></li>
         
-            <li><a href="#installation">Installation</a></li>
-        
             <li><a href="#features">Features</a></li>
+        
+            <li><a href="#installation">Installation</a></li>
         
             <li><a href="#development-status">Development Status</a></li>
         
@@ -152,53 +154,43 @@
 <p><code>godi</code> stands for "go data integrity" and is a <a href="http://en.wikipedia.org/wiki/Command-line_interface">commandline utility</a> to generate seal files from a directory tree. This allows to re-check the tree for consistency, and thus verify the data is intact. This is especially useful if valuable, immutable data is retrieved from potentially unreliable media, and copied to another storage device.</p>
 <p>As it is very common to verify copy operations, <code>godi</code> is able to copy files in the moment is generates the seal, to one or more destinations.</p>
 <p><code>godi</code> was inspired by the <a href="http://mediahashlist.org">media hash list</a> tool, whose seal file format it can read and write. It aims to be easier to use, and faster. On a quad core CPU, <code>godi</code> turned to be <em>6x</em> the speed of <code>mhl</code>.</p>
+<h2 id="why-godi">Why Godi</h2>
+<p><code>godi</code> helps you to protect your data against unnoticed corruption, which represents an undesired change. Data files suitable for such protection is</p>
+<ul>
+<li><strong>valuable</strong> and reproducing it is either costly or prohibitive<ul>
+<li>Imagine you are on set of a block buster, and have to handle the camera data of a multi-million action shot that took weeks to prepare.</li>
+<li>Your digital product is delivered to the client, and you want him to be sure that data was not corrupted in-flight. It's also an insurance for you as you can prove that the data was still intact on your end.</li>
+</ul>
+</li>
+<li><strong>immutable</strong> and will not be changed directly<ul>
+<li>You took pictures of the Niagara Falls, and even though you want to do some post-processing, you will always keep the original. It should remain exactly as is, and will only serve as source for various image manipulations.</li>
+</ul>
+</li>
+</ul>
+<p>Therefore, if your data files change a lot, <code>godi</code> is not for you.</p>
 <h2 id="usage-examples">Usage Examples</h2>
-<p><strong>Protect your valuable, immutable data against silent corruption and create a seal</strong></p>
-<pre class="prettyprint well"><code class="bash">$ godi seal /path/to/data
-[...]
-Wrote seal file to '/path/to/data/godi_2014-07-29_142701.gobz'
-SEAL DONE: WC 7.09s | -&gt;READ ⌗0034 ⌗Δ0004/s ⌰4.70GiB Δ678.61MiB/s | HASH ⌗  9.40GiB Δ  1.33GiB/s
-</code></pre>
-
-<p><strong>Verify that data is still intact as compared against the seal</strong></p>
-<pre class="prettyprint well"><code class="bash">$ godi verify /path/to/data/godi_2014-07-29_142701.gobz
-[...]
-VERIFY SUCCESS: None of 35 file(s) changed based on seal in '/path/to/data' [WC  4.794198665s | -&gt;READ ⌗0035 ⌗Δ0007/s ⌰  4.70GiB Δ1004.33MiB/s | HASH ⌗  9.40GiB Δ  1.96GiB/s]
-</code></pre>
-
-<p><strong>Seal valuable data and duplicate it to two backup devices</strong></p>
-<pre class="prettyprint well"><code class="bash">$ godi sealed-copy /path/to/data -- /media/d1 /media/d2
-[...]
-Wrote seal file to '/media/d1/godi_2014-07-29_144842.gobz'
-Wrote seal file to '/media/d2/godi_2014-07-29_144842.gobz'
-SEAL DONE: WC  3.761588954s |   -&gt;READ ⌗0475 ⌗Δ0126/s ⌰407.90MiB Δ108.44MiB/s |   HASH ⌗815.81MiB Δ216.88MiB/s |   WRITE ⌗0950 ⌗Δ0252/s ⌰815.81MiB Δ216.88MiB/s (16 skipped)
-</code></pre>
-
-<p><strong>Seal valuable data and duplicate it to two backup devices [PARANOID VERSION]</strong></p>
-<pre class="prettyprint well"><code class="bash">$ godi sealed-copy --verify /path/to/data -- /media/d3 /media/d4
-[...]
-Wrote seal file to '/media/d3/godi_2014-07-29_145114.gobz'
-Wrote seal file to '/media/d4/godi_2014-07-29_145114.gobz'
-SEAL DONE: WC  3.039262074s |   -&gt;READ ⌗0475 ⌗Δ0156/s ⌰407.90MiB Δ134.21MiB/s |   HASH ⌗815.81MiB Δ268.42MiB/s |   WRITE ⌗0950 ⌗Δ0312/s ⌰815.81MiB Δ268.42MiB/s (16 skipped)
-[...]
-VERIFY SUCCESS: None of 475 file(s) changed based on seal in '/media/d3'
-VERIFY SUCCESS: None of 475 file(s) changed based on seal in '/media/d4' [WC  2.297587367s |   -&gt;READ ⌗0950 ⌗Δ0413/s ⌰815.81MiB Δ355.07MiB/s |   HASH ⌗  1.59GiB Δ710.15MiB/s]
-</code></pre>
-
+<p><strong>Protect your valuable, immutable data against silent corruption and create a seal</strong>
+<img alt="seal" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_seal.mov.gif" /></p>
+<p><strong>Verify that data is still intact as compared against the seal</strong>
+<img alt="verify" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify.mov.gif" /></p>
+<p><strong>Seal valuable data and duplicate it to two backup devices</strong>
+<img alt="sealed-copy" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy.mov.gif" /></p>
+<p><strong>Seal valuable data and duplicate it to two backup devices [PARANOID VERSION]</strong>
+<img alt="sealed-copy-verify" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy-verify.mov.gif" /></p>
 <p>Read more <a href="http://byron.github.io/godi">on the documentation page</a></p>
+<h2 id="features">Features</h2>
+<ul>
+<li>protect your data against unnoticed and silent corruption</li>
+<li><a href="http://en.wikipedia.org/wiki/Atomic_operation">atomically</a> duplicate data to one or more locations while protecting it against corruption, without fearing to overwrite existing files.</li>
+<li>use all available device bandwidth and CPU cores to finish your work <em>much</em> faster</li>
+<li>runs on all major and minor platforms</li>
+</ul>
 <h2 id="installation">Installation</h2>
 <ul>
 <li>Download and extract the multi-platform archive from the <a href="https://github.com/Byron/godi/releases">latest release</a></li>
 <li>Typing <code>godi/&lt;platform&gt;/godi</code> in a <a href="http://en.wikipedia.org/wiki/Terminal_emulator">terminal</a> from the extraction point displays help on the respective platform.</li>
 </ul>
 <p>If you are using godi more regularly, it is adviced to put it into your shell's <a href="http://en.wikipedia.org/wiki/PATH_(variable)">executable search path</a></p>
-<h2 id="features">Features</h2>
-<ul>
-<li>protect your data against unnoticed and silent corruption</li>
-<li><a href="http://en.wikipedia.org/wiki/Atomic_operation">atomically</a> duplicate data to one or more locations while protecting it against corruption</li>
-<li>use all available device bandwidth and CPU cores to finish your work <em>much</em> faster.</li>
-<li>runs on all major and minor platforms</li>
-</ul>
 <h2 id="development-status">Development Status</h2>
 <p><a href="https://travis-ci.org/Byron/godi"><img alt="Build Status" src="https://travis-ci.org/Byron/godi.svg?branch=master" /></a></p>
 <p>Latest releases <a href="https://github.com/Byron/godi/releases">can be found here</a>.
@@ -207,10 +199,10 @@ Developer docs can be found at <a href="http://godoc.org/github.com/Byron/godi">
 <ul>
 <li><a href="http://byron.github.io/godi">Manual and User Documentation</a></li>
 <li><a href="https://github.com/Byron/godi/issues">Issue Tracker</a></li>
+<li><a href="https://groups.google.com/forum/#!forum/go-data-integrity">Support Forum</a></li>
 <li><a href="http://godoc.org/github.com/Byron/godi">API Documentation</a></li>
 <li><a href="https://travis-ci.org/Byron/godi">Continuous Integration</a></li>
 </ul>
-<p>As there is no mailing list, please use the issue tracker for support requests or questions.</p>
 <h2 id="credits">Credits</h2>
 <p><code>godi</code> uses the following libraries:</p>
 <ul>

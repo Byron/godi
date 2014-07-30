@@ -129,31 +129,87 @@
             <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
     <ul class="nav bs-sidenav">
     
-        <li class="main active"><a href="#subcommands">Subcommands</a></li>
+        <li class="main active"><a href="#how-to-run-godi">How to Run Godi</a></li>
         
-            <li><a href="#seal">Seal</a></li>
+    
+        <li class="main "><a href="#helping-yourself">Helping Yourself</a></li>
         
-            <li><a href="#verify">Verify</a></li>
+    
+        <li class="main "><a href="#subcommands">Subcommands</a></li>
         
-            <li><a href="#sealed-copy">Sealed Copy</a></li>
+            <li><a href="#seal-protect-data-from-change">Seal - Protect Data from Change</a></li>
+        
+            <li><a href="#verify-assure-data-didnt-change">Verify - Assure Data didn't Change</a></li>
+        
+            <li><a href="#sealed-copy-seal-with-duplication">Sealed Copy - Seal with Duplication</a></li>
         
     
     </ul>
 </div></div>
             <div class="col-md-9" role="main">
 
-<p>This page explains all sub-commands and how to use them.</p>
-<p>When it's your intend to transfer large amounts of data in high-speed and in a sealed (and possibly verified) fashion, <code>sealed-copy</code> is the sub-command for you.</p>
-<p>Otherwise, you can seal existing folders, and verify them at another time to assure the data is still what it is supposed to be. Please note that filesystems like ZFS have this kind of feature built-in - <code>godi</code> just allows you to assert your data's integrity on any storage system.</p>
-<p><img alt="under construction" src="https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png" /></p>
-<h1 id="subcommands">Subcommands</h1>
-<h2 id="seal">Seal</h2>
-<p>TODO:</p>
-<ul>
-<li>about differences in seal formats and why gobz should be preferred on big datasets</li>
-</ul>
-<h2 id="verify">Verify</h2>
-<h2 id="sealed-copy">Sealed Copy</h2>
+<p>This document aims at users with at least basic knowledge on how to use a terminal to run command-line programs.</p>
+<h2 id="how-to-run-godi">How to Run Godi</h2>
+<p>Godi is a command-line program, which requires you to use a terminal emulator to run it and see its output. If you are unfamiliar with terminals or don't have the time to look into how to use one, <code>godi</code> isn't for you.</p>
+<p>You can at all times and without negative effects <a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_cancelled.mov.gif">abort a running command</a> by pressing <code>ctrl+c</code>, which is the same as for all other command-line tools.</p>
+<h2 id="helping-yourself">Helping Yourself</h2>
+<p>It's not always feasible to consult the Internet to learn how to do something. Good to know that <code>godi</code> has all the help you will ever need to use it built right into itself.</p>
+<p>It has a modern command-line interface which uses sub-commands to separate distinct features from each other. In any case, you will always see an elaborate help text as follows.</p>
+<pre class="prettyprint well"><code class="bash"># General help
+$ godi
+# The same as above
+$ godi help
+# Help for the specified sub-command
+$ godi help sealed-copy
+
+# Traditional ways to do that work as well
+$ godi -h
+$ godi --help
+# and the same for subcommands
+$ godi seal -h
+$ godi seal --help
+</code></pre>
+
+<h2 id="subcommands">Subcommands</h2>
+<p>The following sections explain which <code>godi</code> sub-command to use based on the particular problem it solves for you.</p>
+<h3 id="seal-protect-data-from-change">Seal - Protect Data from Change</h3>
+<p><img alt="seal" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_seal.mov.gif" /></p>
+<p>The <em>seal</em> sub-command produces a <em>seal file</em> which stores signatures of files. A signature is like a fingerprint, uniquely identifying the entire contents of the file. If that contents changes in any way, it's signature changes with it.</p>
+<p>Therefore a seal is like an insurance you want to have when dealing with valuable, immutable data to assure it still is what you think it is.</p>
+<p>You can seal one or more files or directories in one go.</p>
+<pre class="prettyprint well"><code class="bash"># Seal a file and a directory, producing two seal files
+$ godi seal ~/Desktop/myWeddingVideo.mov /Volumes/encrypted/taxes/2012
+</code></pre>
+
+<p>This sub-command is affected by <a href="../details/#Input%20File-Filters">input file filters</a>, and it is possible to choose between <a href="../details/#Seal%20Formats">different seal formats</a>.</p>
+<h3 id="verify-assure-data-didnt-change">Verify - Assure Data didn't Change</h3>
+<p><img alt="seal" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify.mov.gif" /></p>
+<p>This operation requires a <em>seal file</em> and will let you know if the files recorded within the seal have changed on disk, have changed their size, or are missing entirely. If you do not have a seal file, you can create one using the <em>seal</em> sub-command.</p>
+<p>You can specify one or more seal files to be checked at once.</p>
+<pre class="prettyprint well"><code class="bash"># Verify files on disk have not been altered compared to the given seal file
+$ godi verify ~/Desktop/godi_2014-07-30_102257.gobz /Volumes/encrypted/taxes/2012/godi_2014-07-30_102259.gobz
+</code></pre>
+
+<p>And this is how it looks if <a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify-fail.mov.gif">something is not in order</a>.</p>
+<h3 id="sealed-copy-seal-with-duplication">Sealed Copy - Seal with Duplication</h3>
+<p><img alt="sealed-copy" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy.mov.gif" /></p>
+<p>Considering that a seal will only help you to identify undesired changes to your valuable data, the only way to restore unaltered versions of such data is to have multiple copies if it. In information technology, the safety of data is expressed in terms of redundancy, that is how many copies of data is available. There are various ways to increase the redundancy and therefore safety of data, one of which <code>godi</code> can help you with.</p>
+<p>The <em>sealed-copy</em> copy sub-command allows you to not only seal your data, but to generate one or more duplicates in the same go. This is preferred to copy manually, and seal afterwards, as it will read your data only once, and will therefore be faster.</p>
+<pre class="prettyprint well"><code class="bash"># Copy to a single destination - godi does not create the destination directory for you
+$ godi sealed-copy ~/valuables /Volumes/backup/valuables
+
+# You can create multiple copies at once - note the double-dash to separate sources from destinations
+$ godi sealed-copy ~/valuables -- /Volumes/backup01/valuables /Volumes/backup02/valuables
+</code></pre>
+
+<p>If you have the time and if you want to absolutely sure that the destination data is exactly what you expect, you can use the <code>--verify</code> flag. That way, all data will be verified right after all copy operations are finished. Please also note that this will re-read all written data, which takes additional time.</p>
+<pre class="prettyprint well"><code class="bash"># Will re-read all data in the destination to assure it was written correctly.
+$ godi sealed-copy --verify ~/valuables /Volumes/backup/valuables
+</code></pre>
+
+<p>Have a look at <a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy-verify_full.mov.gif">this video</a> to see the <code>--verify</code> flag in action.</p>
+<p>This sub-command is affected by <a href="../details/#Input%20File-Filters">input file filters</a>, and subject to <a href="../details/#Atomic%20Operation">atomic operations</a>.</p>
+<p><code>godi</code> will <em>never</em> overwrite existing files, as shown <a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_fail-write.mov.gif">in this video</a>.</p>
 </div>
         </div>
 
