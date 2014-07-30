@@ -212,13 +212,21 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			}
 
 			if ti.signatureMismatches == 0 && ti.missingFiles == 0 && !ti.sealBroken {
+				// Make sure we don't pretend it's fine, just because none of the read files SO FAR had an issue
+				ss := SymbolSuccess
+				suffix := ""
+				if s.Stats.ErrCount > 0 {
+					ss = SymbolFail
+					suffix = ", but didn't read entire seal"
+				}
 				accumResult <- &VerifyResult{
 					BasicResult: api.BasicResult{
 						Msg: fmt.Sprintf(
-							"VERIFY %s: None of %d file(s) changed based on seal in '%s'%s",
-							SymbolSuccess,
+							"VERIFY %s: None of %d file(s) changed based on seal in '%s'%s%s",
+							ss,
 							ti.numFiles,
 							treeRoot,
+							suffix,
 							stats,
 						),
 						Prio: api.Valuable,

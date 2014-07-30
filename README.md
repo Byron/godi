@@ -38,8 +38,8 @@ Read more [on the documentation page](http://byron.github.io/godi)
 ## Features
 
 * protect your data against unnoticed and silent corruption
-* [atomically](http://en.wikipedia.org/wiki/Atomic_operation) duplicate data to one or more locations while protecting it against corruption
-* use all available device bandwidth and CPU cores to finish your work *much* faster.
+* [atomically](http://en.wikipedia.org/wiki/Atomic_operation) duplicate data to one or more locations while protecting it against corruption, without fearing to overwrite existing files.
+* use all available device bandwidth and CPU cores to finish your work *much* faster
 * runs on all major and minor platforms
 
 ## Installation

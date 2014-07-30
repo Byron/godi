@@ -4,7 +4,7 @@ This document aims at users with at least basic knowledge on how to use a termin
 
 Godi is a command-line program, which requires you to use a terminal emulator to run it and see its output. If you are unfamiliar with terminals or don't have the time to look into how to use one, `godi` isn't for you.
 
-You can at all times and without negative effects abort a running command by pressing `ctrl+c`, which is the same as for all other command-line tools.
+You can at all times and without negative effects [abort a running command](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_cancelled.mov.gif) by pressing `ctrl+c`, which is the same as for all other command-line tools.
 
 ## Helping Yourself
 
@@ -88,4 +88,6 @@ $ godi sealed-copy --verify ~/valuables /Volumes/backup/valuables
 Have a look at [this video](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy-verify_full.mov.gif) to see the `--verify` flag in action.
 
 This sub-command is affected by [input file filters](details.md#Input File-Filters), and subject to [atomic operations](details.md#Atomic Operation).
+
+`godi` will *never* overwrite existing files, as shown [in this video](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_fail-write.mov.gif).
 
