@@ -1,6 +1,10 @@
 
 ![under construction](https://raw.githubusercontent.com/Byron/bcore/master/src/images/wip.png)
 
+## Atomic Operation
+
+## Input File-Filters
+
 ## Seal Formats
 
 * Also mention performance implications

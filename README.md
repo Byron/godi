@@ -6,6 +6,18 @@ As it is very common to verify copy operations, `godi` is able to copy files in 
 
 `godi` was inspired by the [media hash list](http://mediahashlist.org) tool, whose seal file format it can read and write. It aims to be easier to use, and faster. On a quad core CPU, `godi` turned to be *6x* the speed of `mhl`.
 
+## Why Godi
+
+`godi` helps you to protect your data against unnoticed corruption, which represents an undesired change. Data files suitable for such protection is
+
+* **valuable** and reproducing it is either costly or prohibitive
+    + Imagine you are on set of a block buster, and have to handle the camera data of a multi-million action shot that took weeks to prepare.
+    + Your digital product is delivered to the client, and you want him to be sure that data was not corrupted in-flight. It's also an insurance for you as you can prove that the data was still intact on your end.
+* **immutable** and will not be changed directly
+    + You took pictures of the Niagara Falls, and even though you want to do some post-processing, you will always keep the original. It should remain exactly as is, and will only serve as source for various image manipulations.
+
+Therefore, if your data files change a lot, `godi` is not for you.
+
 ## Usage Examples
 
 **Protect your valuable, immutable data against silent corruption and create a seal**
@@ -50,19 +62,19 @@ VERIFY SUCCESS: None of 475 file(s) changed based on seal in '/media/d4' [WC  2.
 
 Read more [on the documentation page](http://byron.github.io/godi)
 
-## Installation
-
-* Download and extract the multi-platform archive from the [latest release](https://github.com/Byron/godi/releases)
-* Typing `godi/<platform>/godi` in a [terminal](http://en.wikipedia.org/wiki/Terminal_emulator) from the extraction point displays help on the respective platform.
-
-If you are using godi more regularly, it is adviced to put it into your shell's [executable search path](http://en.wikipedia.org/wiki/PATH_(variable))
-
 ## Features
 
 * protect your data against unnoticed and silent corruption
 * [atomically](http://en.wikipedia.org/wiki/Atomic_operation) duplicate data to one or more locations while protecting it against corruption
 * use all available device bandwidth and CPU cores to finish your work *much* faster.
 * runs on all major and minor platforms
+
+## Installation
+
+* Download and extract the multi-platform archive from the [latest release](https://github.com/Byron/godi/releases)
+* Typing `godi/<platform>/godi` in a [terminal](http://en.wikipedia.org/wiki/Terminal_emulator) from the extraction point displays help on the respective platform.
+
+If you are using godi more regularly, it is adviced to put it into your shell's [executable search path](http://en.wikipedia.org/wiki/PATH_(variable))
 
 ## Development Status
 
@@ -75,10 +87,9 @@ Developer docs can be found at [godoc.org](http://godoc.org/github.com/Byron/god
 
 * [Manual and User Documentation](http://byron.github.io/godi)
 * [Issue Tracker](https://github.com/Byron/godi/issues)
+* [Support Forum](https://groups.google.com/forum/#!forum/go-data-integrity)
 * [API Documentation](http://godoc.org/github.com/Byron/godi)
 * [Continuous Integration](https://travis-ci.org/Byron/godi)
-
-As there is no mailing list, please use the issue tracker for support requests or questions.
 
 ## Credits
 

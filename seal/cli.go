@@ -17,10 +17,44 @@ import (
 
 const (
 	Sep                    = "--"
-	usage                  = "Please specify sealed copies like so: source/ -- destination/"
 	verifyAfterCopy        = "verify"
 	streamsPerOutputDevice = "streams-per-output-device"
 	formatFlag             = "format"
+	sealDescription        = `
+	Generate a seal for one ore more directories to allow them to be verified later.
+
+	A seal is a file with signatures, each of them is unique for the contents of the respective file.
+	If the file's contents changes, it's signature changes as well, which allows to detect changes
+	in a file reliably.
+
+	The 'verify' sub-command can test if the files on disk didn't change compared to their sealed signature.
+
+	[arguments ...] can be files or directories, for example
+
+	godi seal my-anniversary.mov /Volumes/backup/`
+
+	sealedCopyDescription = `
+	Seal one or more directories and copy their contents to one or more destinations.
+
+	To help protecting your valuable data effectively, you should have at least two 
+	copies around in case one of thm gets corrupted. This sub-command
+	does just that, and copies the data to one or more destinations while it is being sealed.
+
+	[arguments ...] specify the source file(s) or directories, as well as the destination(s), for example
+	godi sealed-copy s/ /Volumes/a
+	godi sealed-copy s1/ s2/ -- /Volumes/a /Volumes/b
+	`
+)
+
+var (
+	usage = fmt.Sprintf(`Please specify sealed copies like so: source/ %s destination/
+	%s can be omitted if there is only one source and one destination.`, Sep, Sep)
+	formatDescription = fmt.Sprintf(`The format of the produced seal file, one of %s
+	%s: is a compressed binary seal format, which is temper-proof and highly efficient, 
+	handling millions of files easily.
+	%s: is a human-readable XML format understood by mediahashlist.org, which will 
+	be inefficient for large amount of files`,
+		strings.Join(codec.Names(), ", "), codec.GobName, codec.MHLName)
 )
 
 // return subcommands for our particular area of algorithms
@@ -31,14 +65,14 @@ func SubCommands() []gcli.Command {
 	fmt := gcli.StringFlag{
 		formatFlag,
 		codec.GobName,
-		fmt.Sprintf("The format of the produced seal file, one of %s", strings.Join(codec.Names(), ", ")),
+		formatDescription,
 	}
 
 	return []gcli.Command{
 		gcli.Command{
 			Name:      modeSeal,
 			ShortName: "",
-			Usage:     "Generate a seal for one ore more directories, which allows them to be verified later on",
+			Usage:     sealDescription,
 			Action:    func(c *gcli.Context) { cli.RunAction(&cmdseal, c) },
 			Before:    func(c *gcli.Context) error { return checkSeal(&cmdseal, c) },
 			Flags:     []gcli.Flag{fmt},
@@ -46,7 +80,7 @@ func SubCommands() []gcli.Command {
 		gcli.Command{
 			Name:      modeCopy,
 			ShortName: "",
-			Usage:     "Generate a seal for one ore more directories and copy their contents to a destination directory",
+			Usage:     sealedCopyDescription,
 			Action:    func(c *gcli.Context) { startSealedCopy(&cmdcopy, c) },
 			Before:    func(c *gcli.Context) error { return checkSealedCopy(&cmdcopy, c) },
 			Flags: []gcli.Flag{
@@ -182,9 +216,36 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 		}
 		s.InitBasicRunner(numReaders, items, maxLogLevel, filters)
 	} else if s.mode == modeCopy {
-		// Parses [src, ...] => [dst, ...]
+		finishSetup := func(sources, dtrees []string) error {
+			// Make sure we don't copy onto ourselves
+			for _, stree := range sources {
+				for _, dtree := range dtrees {
+					if strings.HasPrefix(dtree+string(os.PathSeparator), stree) {
+						return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
+					}
+				}
+			}
+			s.InitBasicRunner(numReaders, sources, maxLogLevel, filters)
+
+			// build the device map with all writer destinations
+			dm := io.DeviceMap(dtrees)
+
+			// Finally, put all actual values into our list to have a deterministic iteration order.
+			// After all, we don't really care about the device from this point on
+			s.rootedWriters = make([]io.RootedWriteController, len(dm))
+			for did, trees := range dm {
+				// each device as so and so many destinations. Each destination uses the same write controller
+				s.rootedWriters[did] = io.RootedWriteController{
+					Trees: trees,
+					Ctrl:  io.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats.Stats),
+				}
+			} // for each tree set in deviceMap
+			return nil
+		} // end helper
+
+		// Parses [src, ...] -- [dst, ...]
 		err = errors.New(usage)
-		if len(items) < 3 {
+		if len(items) < 2 {
 			return
 		}
 
@@ -206,33 +267,14 @@ func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLev
 					return e
 				}
 
-				// Make sure we don't copy onto ourselves
-				for _, stree := range sources {
-					for _, dtree := range dtrees {
-						if strings.HasPrefix(dtree+string(os.PathSeparator), stree) {
-							return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
-						}
-					}
-				}
-				s.InitBasicRunner(numReaders, sources, maxLogLevel, filters)
-
-				// build the device map with all writer destinations
-				dm := io.DeviceMap(dtrees)
-
-				// Finally, put all actual values into our list to have a deterministic iteration order.
-				// After all, we don't really care about the device from this point on
-				s.rootedWriters = make([]io.RootedWriteController, len(dm))
-				for did, trees := range dm {
-					// each device as so and so many destinations. Each destination uses the same write controller
-					s.rootedWriters[did] = io.RootedWriteController{
-						Trees: trees,
-						Ctrl:  io.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats.Stats),
-					}
-				} // for each tree set in deviceMap
-
-				return nil
+				return finishSetup(sources, dtrees)
 			}
 		} // for each item
+
+		// So there is no separator, maybe it's source and destination ?
+		if len(items) == 2 {
+			return finishSetup(items[:1], items[1:])
+		}
 
 		// source-destination separator not found - prints usage
 		return

@@ -11,6 +11,38 @@ import (
 	"github.com/codegangsta/cli"
 )
 
+var (
+	excludePatternsDescription = fmt.Sprintf(`A comma separated list of patterns causing
+	an input file to be excluded when matched. The filter can apply 
+	to entire classes of files, or represents a glob pattern.
+	%-8s: Ignore all symbolic links
+	%-8s: Ignore all hidden files. Only files starting with a period are hidden
+	%-8s: Ignore all godi seal files. They are matched by their default name
+	%-8s: Ignore files which change a lot or are expendable,
+	like '.DS_Store' on OSX. Devices like tty's match too.
+	Everything else is interpreted as glob, and '*.mov' will exclude 
+	all quicktime mov files.
+	A filter like '%s,%s,%s,*.mov,*.dpx' would ignore all hidden 
+	files, symbolic links, volatile files, as well those ending with .mov and .dpx.
+	If there is nothing behind the '=' sign, no all files will be handled.
+	`, api.FilterSymlinks, api.FilterHidden, api.FilterSeals, api.FilterVolatile,
+		api.FilterHidden, api.FilterVolatile, api.FilterSymlinks)
+
+	inputStreamsDescription = `Amount of parallel streams per input device.
+	If you device is very fast, or if the dataset contains many small files, 
+	it may inrease performance to set values of two or higher.`
+
+	verbosityDescription = fmt.Sprintf(`"Defines the overall amount of information you see,
+	may take one of '%s', '%s' and '%s'.
+	%-5s: disables all output. That way, you can only use the program's 
+	error code to learn about success or failure
+	%-5s: shows only errors and results
+	%-5s: shows all of the above, and detailed progress information,
+	might be too verbose when handling many small files`,
+		api.Info, api.Error, api.LogDisabled,
+		api.Info, api.Error, api.LogDisabled)
+)
+
 // Builds a Cli app from all commands we know and returns it
 func NewGodiApp() *cli.App {
 	app := cli.NewApp()
@@ -20,29 +52,18 @@ func NewGodiApp() *cli.App {
 	cmds = append(cmds, seal.SubCommands()...)
 	cmds = append(cmds, verify.SubCommands()...)
 
-	app.Usage = "Verify data integrity and transfer data securely at highest speeds"
-	app.Commands = cmds
+	app.Usage = `Verify data integrity and transfer data securely at highest speeds.
 
-	excludePatternsDescription := fmt.Sprintf(`A comma separated list of patterns that will cause
-	an input file to be excluded when matched. The filter can apply to entire classes
-	of files, or represents a glob pattern.
-	%-8s: Ignore all symbolic links
-	%-8s: Ignore all hidden files. Only files starting with a period are considered to match.
-	%-8s: Ignore all godi seal files. Those are matched by their default name only.
-	%-8s: Ignore files which are known to changed a lot and used for bookkeeping only, like '.DS_Store' on OSX. Devices like tty's match too.
-	Everything else is interpreted as glob, and '*.mov' will exclude all quicktime mov files.
-	A filter like '%s,%s,%s,*.mov,*.dpx' would ignore all hidden files, symbolic links, volatile files, 
-	as well those having the .mov and .dpx extension.
-	If there is nothing behind the '=' sign, no all files will be handled.
-	`, api.FilterSymlinks, api.FilterHidden, api.FilterSeals, api.FilterVolatile,
-		api.FilterHidden, api.FilterVolatile, api.FilterSymlinks)
+	Read more in the web-manual at http://byron.github.io/godi
+	`
+	app.Commands = cmds
 
 	// general flags
 	app.Flags = []cli.Flag{
-		cli.IntFlag{gocli.StreamsPerInputDeviceFlagName + ", spid", 1, "Amount of parallel streams per input device"},
+		cli.IntFlag{gocli.StreamsPerInputDeviceFlagName + ", spid", 1, inputStreamsDescription},
 		cli.StringFlag{gocli.LogLevelFlagName,
 			api.Error.String(),
-			fmt.Sprintf("One of %s, %s, or '%s' to disable all output", api.Info, api.Error, api.LogDisabled),
+			verbosityDescription,
 		},
 		cli.StringFlag{gocli.FileExcludePatternFlagName,
 			api.FilterVolatile.String(),
@@ -50,6 +71,7 @@ func NewGodiApp() *cli.App {
 		},
 	}
 	app.Version = "v0.9.0"
+	app.Author = "Sebastian Thiel & Contributors"
 
 	gocli.AddAdditinalFlags(app)
 
