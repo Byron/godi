@@ -21,44 +21,17 @@ Therefore, if your data files change a lot, `godi` is not for you.
 ## Usage Examples
 
 **Protect your valuable, immutable data against silent corruption and create a seal**
-
-```bash
-$ godi seal /path/to/data
-[...]
-Wrote seal file to '/path/to/data/godi_2014-07-29_142701.gobz'
-SEAL DONE: WC 7.09s | ->READ ⌗0034 ⌗Δ0004/s ⌰4.70GiB Δ678.61MiB/s | HASH ⌗  9.40GiB Δ  1.33GiB/s
-```
+![seal](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_seal.mov.gif)
 
 **Verify that data is still intact as compared against the seal**
+![verify](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify.mov.gif)
 
-```bash
-$ godi verify /path/to/data/godi_2014-07-29_142701.gobz
-[...]
-VERIFY SUCCESS: None of 35 file(s) changed based on seal in '/path/to/data' [WC  4.794198665s | ->READ ⌗0035 ⌗Δ0007/s ⌰  4.70GiB Δ1004.33MiB/s | HASH ⌗  9.40GiB Δ  1.96GiB/s]
-```
 
 **Seal valuable data and duplicate it to two backup devices**
-
-```bash
-$ godi sealed-copy /path/to/data -- /media/d1 /media/d2
-[...]
-Wrote seal file to '/media/d1/godi_2014-07-29_144842.gobz'
-Wrote seal file to '/media/d2/godi_2014-07-29_144842.gobz'
-SEAL DONE: WC  3.761588954s |   ->READ ⌗0475 ⌗Δ0126/s ⌰407.90MiB Δ108.44MiB/s |   HASH ⌗815.81MiB Δ216.88MiB/s |   WRITE ⌗0950 ⌗Δ0252/s ⌰815.81MiB Δ216.88MiB/s (16 skipped)
-```
+![sealed-copy](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy.mov.gif)
 
 **Seal valuable data and duplicate it to two backup devices [PARANOID VERSION]**
-
-```bash
-$ godi sealed-copy --verify /path/to/data -- /media/d3 /media/d4
-[...]
-Wrote seal file to '/media/d3/godi_2014-07-29_145114.gobz'
-Wrote seal file to '/media/d4/godi_2014-07-29_145114.gobz'
-SEAL DONE: WC  3.039262074s |   ->READ ⌗0475 ⌗Δ0156/s ⌰407.90MiB Δ134.21MiB/s |   HASH ⌗815.81MiB Δ268.42MiB/s |   WRITE ⌗0950 ⌗Δ0312/s ⌰815.81MiB Δ268.42MiB/s (16 skipped)
-[...]
-VERIFY SUCCESS: None of 475 file(s) changed based on seal in '/media/d3'
-VERIFY SUCCESS: None of 475 file(s) changed based on seal in '/media/d4' [WC  2.297587367s |   ->READ ⌗0950 ⌗Δ0413/s ⌰815.81MiB Δ355.07MiB/s |   HASH ⌗  1.59GiB Δ710.15MiB/s]
-```
+![sealed-copy-verify](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy-verify.mov.gif)
 
 Read more [on the documentation page](http://byron.github.io/godi)
 

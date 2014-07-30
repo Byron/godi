@@ -33,6 +33,7 @@ $ godi seal --help
 The following sections explain which `godi` sub-command to use based on the particular problem it solves for you.
 
 ### Seal - Protect Data from Change
+![seal](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_seal.mov.gif)
 
 The *seal* sub-command produces a *seal file* which stores signatures of files. A signature is like a fingerprint, uniquely identifying the entire contents of the file. If that contents changes in any way, it's signature changes with it.
 
@@ -45,11 +46,10 @@ You can seal one or more files or directories in one go.
 $ godi seal ~/Desktop/myWeddingVideo.mov /Volumes/encrypted/taxes/2012
 ```
 
-Have a look at [this video](../mov/godi-seal.mov) to see it in action.
-
 This sub-command is affected by [input file filters](details.md#Input File-Filters), and it is possible to choose between [different seal formats](details.md#Seal Formats).
 
 ### Verify - Assure Data didn't Change
+![seal](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify.mov.gif)
 
 This operation requires a *seal file* and will let you know if the files recorded within the seal have changed on disk, have changed their size, or are missing entirely. If you do not have a seal file, you can create one using the *seal* sub-command.
 
@@ -60,9 +60,10 @@ You can specify one or more seal files to be checked at once.
 $ godi verify ~/Desktop/godi_2014-07-30_102257.gobz /Volumes/encrypted/taxes/2012/godi_2014-07-30_102259.gobz
 ```
 
-Have a look at [this video](../mov/godi-verify.mov) to see it in action, and this is how it looks if [something is not in order](../mov/godi-verify-fail.mov).
+And this is how it looks if [something is not in order](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify-fail.mov.gif).
 
 ### Sealed Copy - Seal with Duplication
+![sealed-copy](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy.mov.gif)
 
 Considering that a seal will only help you to identify undesired changes to your valuable data, the only way to restore unaltered versions of such data is to have multiple copies if it. In information technology, the safety of data is expressed in terms of redundancy, that is how many copies of data is available. There are various ways to increase the redundancy and therefore safety of data, one of which `godi` can help you with.
 
@@ -77,8 +78,6 @@ $ godi sealed-copy ~/valuables /Volumes/backup/valuables
 $ godi sealed-copy ~/valuables -- /Volumes/backup01/valuables /Volumes/backup02/valuables
 ```
 
-Have a look at [this video](../mov/godi-sealed-copy.mov) for some action.
-
 If you have the time and if you want to absolutely sure that the destination data is exactly what you expect, you can use the `--verify` flag. That way, all data will be verified right after all copy operations are finished. Please also note that this will re-read all written data, which takes additional time.
 
 ```bash
@@ -86,7 +85,7 @@ If you have the time and if you want to absolutely sure that the destination dat
 $ godi sealed-copy --verify ~/valuables /Volumes/backup/valuables
 ```
 
-Have a look at [this video](../mov/godi-sealed-copy-verify.mov) to see the `--verify` flag in action.
+Have a look at [this video](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy-verify_full.mov.gif) to see the `--verify` flag in action.
 
 This sub-command is affected by [input file filters](details.md#Input File-Filters), and subject to [atomic operations](details.md#Atomic Operation).
 

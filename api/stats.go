@@ -48,25 +48,12 @@ func (s *Stats) CopyTo(d *Stats) {
 	d.WasCancelled = s.WasCancelled
 }
 
-// Prints performance metrics as a single line full of useful information, including deltas of relevant metrics as compared
-// to the last state d. You will also give the temporal distance which separates this stat from the previous one
-// If you pass s as d, this indicates a result mode, which assumes you want the overall average throughput
-// Sep is the separator to use between fields
+// Prints performance metrics as a single line full of useful information, similar to io.Stats.DeltaString,
+// but may add additional information
 func (s *Stats) DeltaString(d *Stats, td time.Duration, sep string) string {
-	resultMode := d == s
-
-	// Embed the hashing data between read and possibly write
 	out := s.DeltaDataString(io.ElapsedData|io.ReadData, &d.Stats, td, sep)
-
-	bh := atomic.LoadUint64(&s.BytesHashed)
-	out += fmt.Sprintf("%s%sHASH %s%s%s",
-		sep,
-		s.Stats.InOut(atomic.LoadUint32(&s.NumHashers)),
-		io.SymbolHash,
-		io.BytesVolume(bh),
-		s.Stats.BytesDelta(bh, d.BytesHashed, td, resultMode),
-	)
-
+	// NOTE: We don't add hashing information, as it is always the same, considering
+	// it will just be readBytes by amount of hashers ... .
 	out += s.DeltaDataString(io.WriteData, &d.Stats, td, sep)
 
 	return out
