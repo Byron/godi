@@ -128,7 +128,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 		aggHandler := IndexTrackingResultHandlerAdapter(&indices, handler)
 
 		// and run ourselves
-		err := api.StartEngine(cmd, handler, aggHandler)
+		err := api.StartEngine(cmd, aggHandler)
 		// Make sure we don't keep logging while verification is going with its own handler
 		close(cmdDone)
 
@@ -150,7 +150,7 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 						if verifycmd.LogLevel() != api.LogDisabled {
 							handler = cli.MakeStatisticalLogHandler(&verifycmd.Stats, handler, make(chan bool))
 						}
-						err = api.StartEngine(verifycmd, handler, handler)
+						err = api.StartEngine(verifycmd, handler)
 					}
 				}
 			}

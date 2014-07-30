@@ -339,7 +339,6 @@ type Runner interface {
 // The handlers receive a result of the respective stage and may perform whichever operation
 // Returns the last error we received in either generator or aggregation stage
 func StartEngine(runner Runner,
-	generateHandler func(Result) bool,
 	aggregateHandler func(Result) bool) (err error) {
 
 	runner.Statistics().StartedAt = time.Now()
@@ -364,7 +363,6 @@ func StartEngine(runner Runner,
 			return handler(r)
 		}
 	}
-	generateHandler = mkErrPicker(generateHandler)
 	aggregateHandler = mkErrPicker(aggregateHandler)
 
 	// Let's not hot-loop over anything, instead just process asynchronously

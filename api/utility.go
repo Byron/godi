@@ -22,10 +22,8 @@ func AppendUniqueString(dest []string, elm string) []string {
 // May either be files or directories. The returned list may be shorter, as contained paths are
 // skipped automatically. Paths will be normalized.
 func ParseSources(items []string, allowFiles bool) (res []string, err error) {
-	invalidTrees := make([]string, 0, len(items))
+	var invalidTrees, noTrees, noRegularFiles []string
 	res = make([]string, len(items))
-	noTrees := make([]string, 0, len(items))
-	noRegularFiles := []string{}
 	copy(res, items)
 
 	for i, tree := range res {

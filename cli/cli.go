@@ -90,7 +90,7 @@ func RunAction(cmd api.Runner, c *cli.Context) {
 	if cmd.LogLevel() != api.LogDisabled {
 		handler = MakeStatisticalLogHandler(cmd.Statistics(), handler, make(chan bool))
 	}
-	err := api.StartEngine(cmd, handler, handler)
+	err := api.StartEngine(cmd, handler)
 	nerr := CliFinishApp(c)
 	if err != nil || nerr != nil {
 		os.Exit(1)

@@ -40,7 +40,7 @@ func TestSeal(t *testing.T) {
 	// Return true if we should break the loop
 	resHandler := testlib.ResultHandler(t, false)
 
-	if err := api.StartEngine(cmd, resHandler, resHandler); err != nil {
+	if err := api.StartEngine(cmd, resHandler); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,7 +91,7 @@ func TestSeal(t *testing.T) {
 
 	// Finally, perform the operation
 	var indices []string
-	if err := api.StartEngine(cmd, resHandler, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler)); err != nil {
+	if err := api.StartEngine(cmd, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -104,7 +104,7 @@ func TestSeal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := api.StartEngine(verifycmd, resHandler, resHandler); err != nil {
+	if err := api.StartEngine(verifycmd, resHandler); err != nil {
 		t.Fatal("Couldn't verify files that were just written")
 	}
 }

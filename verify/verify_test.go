@@ -19,7 +19,7 @@ func TestVerify(t *testing.T) {
 
 	// keeps track of created indices
 	var indices []string
-	err := api.StartEngine(sealcmd, resHandler, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler))
+	err := api.StartEngine(sealcmd, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler))
 	if err != nil {
 		t.Error(err)
 	}
@@ -30,7 +30,7 @@ func TestVerify(t *testing.T) {
 
 	verifycmd, _ := verify.NewCommand([]string{indices[0]}, 1)
 
-	err = api.StartEngine(verifycmd, resHandler, resHandler)
+	err = api.StartEngine(verifycmd, resHandler)
 	if err != nil {
 		t.Error(err)
 	}
@@ -47,14 +47,14 @@ func TestVerify(t *testing.T) {
 
 	resHandler = testlib.ResultHandler(t, true)
 	verifycmd, _ = verify.NewCommand([]string{indices[0]}, 1)
-	err = api.StartEngine(verifycmd, resHandler, resHandler)
+	err = api.StartEngine(verifycmd, resHandler)
 	if err == nil {
 		t.Error("Failed to detect file with changed byte")
 	}
 
 	os.Remove(file)
 	verifycmd, _ = verify.NewCommand([]string{indices[0]}, 1)
-	err = api.StartEngine(verifycmd, resHandler, resHandler)
+	err = api.StartEngine(verifycmd, resHandler)
 	if err == nil {
 		t.Error("Failed to detect a file was removed")
 	}
