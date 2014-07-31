@@ -1,4 +1,4 @@
-// Implements verification of seal files previously written with seal command
+// Package verify implements verification of seal files previously written with the seal command
 package verify
 
 import (
@@ -18,7 +18,7 @@ const (
 )
 
 // A type representing all arguments required to drive a Seal operation
-type VerifyCommand struct {
+type Command struct {
 	api.BasicRunner
 }
 
@@ -35,12 +35,12 @@ type treeInfo struct {
 }
 
 // NewCommand returns an initialized verify command
-func NewCommand(indices []string, nReaders int) (*VerifyCommand, error) {
-	c := VerifyCommand{}
+func NewCommand(indices []string, nReaders int) (*Command, error) {
+	c := Command{}
 	return &c, c.Init(nReaders, 0, indices, api.Info, nil)
 }
 
-func (s *VerifyCommand) Generate() <-chan api.Result {
+func (s *Command) Generate() <-chan api.Result {
 	return api.Generate(s.RootedReaders, s,
 		func(trees []string, files chan<- api.FileInfo, results chan<- api.Result) {
 			for _, index := range s.Items {
@@ -110,7 +110,7 @@ func (s *VerifyCommand) Generate() <-chan api.Result {
 		})
 }
 
-func (s *VerifyCommand) Gather(rctrl *io.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
+func (s *Command) Gather(rctrl *io.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		res := VerifyResult{
 			BasicResult: api.BasicResult{
@@ -131,7 +131,7 @@ func (s *VerifyCommand) Gather(rctrl *io.ReadChannelController, files <-chan api
 	api.Gather(files, results, &s.Stats, makeResult, rctrl, nil)
 }
 
-func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
+func (s *Command) Aggregate(results <-chan api.Result) <-chan api.Result {
 	// Associates a root with with the respective tree information
 	// This comes at the disadvantage that we can't differentiate if there are multiple seals underneath the same root.
 	treeInfoMap := make(map[string]*treeInfo)
@@ -259,7 +259,7 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	return api.Aggregate(results, s.Done, resultHandler, finalizer, &s.Stats)
 }
 
-func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
+func (s *Command) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
 	if len(items) == 0 {
 		return errors.New("Please provide at least one seal file")
 	}

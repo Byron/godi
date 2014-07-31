@@ -19,7 +19,7 @@ func TestVerify(t *testing.T) {
 
 	// keeps track of created indices
 	var indices []string
-	err := api.StartEngine(sealcmd, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler))
+	err := api.StartEngine(sealcmd, api.IndexTrackingResultHandlerAdapter(&indices, resHandler))
 	if err != nil {
 		t.Error(err)
 	}

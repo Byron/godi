@@ -19,7 +19,7 @@ func sendErrorAtRoot(results chan<- api.Result, err error, root string) {
 	}
 }
 
-func (s *SealCommand) Generate() <-chan api.Result {
+func (s *Command) Generate() <-chan api.Result {
 	generate := func(trees []string, files chan<- api.FileInfo, results chan<- api.Result) {
 		for _, tree := range trees {
 			// could also be a file
@@ -52,7 +52,7 @@ func (s *SealCommand) Generate() <-chan api.Result {
 }
 
 // Traverse recursively, return false if the caller should stop traversing due to an error
-func (s *SealCommand) traverseFilesRecursively(files chan<- api.FileInfo, results chan<- api.Result, done <-chan bool, tree string, root string) (bool, bool) {
+func (s *Command) traverseFilesRecursively(files chan<- api.FileInfo, results chan<- api.Result, done <-chan bool, tree string, root string) (bool, bool) {
 	select {
 	case <-done:
 		return true, false

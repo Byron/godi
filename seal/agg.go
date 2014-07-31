@@ -51,7 +51,7 @@ func setupIndexWriter(commonTree string, encoder codec.Codec) (chan<- api.FileIn
 	return sealFiles, results
 }
 
-func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
+func (s *Command) Aggregate(results <-chan api.Result) <-chan api.Result {
 	treeInfoMap := make(map[string]*aggregationTreeInfo)
 	isWriting := len(s.rootedWriters) > 0
 

@@ -1,3 +1,6 @@
+/*
+Package cli provides common utilities for commandline handling in conjunction with codegansta/cli
+*/
 package cli
 
 import (

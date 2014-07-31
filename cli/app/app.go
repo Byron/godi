@@ -1,3 +1,6 @@
+/*
+Package app provides a codegansta/cli.App initialized with all known godi commands.
+*/
 package app
 
 import (

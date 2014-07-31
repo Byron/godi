@@ -291,6 +291,8 @@ func (b *BasicRunner) CancelChannel() chan bool {
 	return b.Done
 }
 
+// An interface to help implementing types which read one ore more data streams, run an operation on them
+// whose result is aggregated and provided to the caller.
 type Runner interface {
 
 	// Intialize required members to deal with controlled reading and writing. numReaders and numWriters

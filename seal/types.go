@@ -58,7 +58,7 @@ func (a byLongestPathDescending) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byLongestPathDescending) Less(i, j int) bool { return len(a[i]) > len(a[j]) }
 
 // A type representing all arguments required to drive a Seal operation
-type SealCommand struct {
+type Command struct {
 	api.BasicRunner
 
 	// The type of seal operation we are supposed to perform
@@ -88,8 +88,8 @@ func (s *SealResult) FromGenerator() bool {
 }
 
 // NewCommand returns an initialized seal command
-func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
-	c := SealCommand{}
+func NewCommand(trees []string, nReaders, nWriters int) (*Command, error) {
+	c := Command{}
 	if nWriters == 0 {
 		c.Mode = ModeSeal
 	} else {
@@ -99,7 +99,7 @@ func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	return &c, err
 }
 
-func (s *SealCommand) Gather(rctrl *io.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
+func (s *Command) Gather(rctrl *io.ReadChannelController, files <-chan api.FileInfo, results chan<- api.Result) {
 	makeResult := func(f, source *api.FileInfo, err error) api.Result {
 		s := ""
 		if source != nil && source.Path != f.Path {
@@ -119,7 +119,7 @@ func (s *SealCommand) Gather(rctrl *io.ReadChannelController, files <-chan api.F
 	api.Gather(files, results, s.Statistics(), makeResult, rctrl, s.rootedWriters)
 }
 
-func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
+func (s *Command) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
 
 	if len(s.Format) == 0 {
 		s.Format = codec.GobName

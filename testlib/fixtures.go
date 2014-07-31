@@ -1,4 +1,4 @@
-// Varous utilities for testing purposes
+// Package testlib provides varous utilities for testing purposes
 package testlib
 
 import (

@@ -16,7 +16,7 @@ import (
 func TestSeal(t *testing.T) {
 	datasetTree, dataFile, _ := testlib.MakeDatasetOrPanic()
 	defer testlib.RmTree(datasetTree)
-	var cmd *seal.SealCommand
+	var cmd *seal.Command
 	var err error
 
 	_, err = seal.NewCommand([]string{dataFile}, 1, 0)
@@ -91,7 +91,7 @@ func TestSeal(t *testing.T) {
 
 	// Finally, perform the operation
 	var indices []string
-	if err := api.StartEngine(cmd, seal.IndexTrackingResultHandlerAdapter(&indices, resHandler)); err != nil {
+	if err := api.StartEngine(cmd, api.IndexTrackingResultHandlerAdapter(&indices, resHandler)); err != nil {
 		t.Fatal(err)
 	}
 

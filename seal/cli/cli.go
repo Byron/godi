@@ -1,7 +1,7 @@
 /*
-Implements the commandline interface for the SealCommand, ready for digestion by the cli.Appf
+Package cli implements the commandline interface for the Command, ready for digestion by the cli.Appf
 */
-package seal
+package cli
 
 import (
 	"fmt"
@@ -58,8 +58,8 @@ var (
 
 // return subcommands for our particular area of algorithms
 func SubCommands() []gcli.Command {
-	cmdseal := seal.SealCommand{Mode: seal.ModeSeal}
-	cmdcopy := seal.SealCommand{Mode: seal.ModeCopy}
+	cmdseal := seal.Command{Mode: seal.ModeSeal}
+	cmdcopy := seal.Command{Mode: seal.ModeCopy}
 
 	fmt := gcli.StringFlag{
 		formatFlag,
@@ -91,22 +91,7 @@ func SubCommands() []gcli.Command {
 	}
 }
 
-// Returns a handler whichasd will track seal/index files, and call the given handler aftrewards, writing the
-// into the provided slice
-func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Result) bool) func(r api.Result) bool {
-	return func(r api.Result) (res bool) {
-		res = handler(r)
-		if r == nil || r.FileInformation() == nil {
-			return
-		}
-		if r.FileInformation().Size < 0 {
-			*indices = append(*indices, r.FileInformation().Path)
-		}
-		return
-	}
-}
-
-func checkSeal(cmd *seal.SealCommand, c *gcli.Context) error {
+func checkSeal(cmd *seal.Command, c *gcli.Context) error {
 	cmd.Format = c.String(formatFlag)
 	if len(cmd.Format) > 0 {
 		valid := false
@@ -128,7 +113,7 @@ func checkSeal(cmd *seal.SealCommand, c *gcli.Context) error {
 	return nil
 }
 
-func checkSealedCopy(cmd *seal.SealCommand, c *gcli.Context) error {
+func checkSealedCopy(cmd *seal.Command, c *gcli.Context) error {
 	cmd.Verify = c.Bool(verifyAfterCopy)
 	// have to do init ourselves as we set amount of writers
 	nr, level, filters, err := cli.CheckCommonFlags(c)
@@ -144,7 +129,7 @@ func checkSealedCopy(cmd *seal.SealCommand, c *gcli.Context) error {
 	return cmd.Init(nr, nw, c.Args(), level, filters)
 }
 
-func startSealedCopy(cmd *seal.SealCommand, c *gcli.Context) {
+func startSealedCopy(cmd *seal.Command, c *gcli.Context) {
 
 	// Yes, currently the post-verification is only implemented in the CLI ...
 	// Testing needs to do similar things to set it up ...
@@ -158,7 +143,7 @@ func startSealedCopy(cmd *seal.SealCommand, c *gcli.Context) {
 		if cmd.LogLevel() != api.LogDisabled {
 			handler = cli.MakeStatisticalLogHandler(&cmd.Stats, handler, cmdDone)
 		}
-		aggHandler := IndexTrackingResultHandlerAdapter(&indices, handler)
+		aggHandler := api.IndexTrackingResultHandlerAdapter(&indices, handler)
 
 		// and run ourselves
 		err := api.StartEngine(cmd, aggHandler)

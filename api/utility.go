@@ -18,6 +18,21 @@ func AppendUniqueString(dest []string, elm string) []string {
 	return append(dest, elm)
 }
 
+// Returns a handler whichasd will track seal/index files, and call the given handler aftrewards, writing the
+// into the provided slice
+func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r Result) bool) func(r Result) bool {
+	return func(r Result) (res bool) {
+		res = handler(r)
+		if r == nil || r.FileInformation() == nil {
+			return
+		}
+		if r.FileInformation().Size < 0 {
+			*indices = append(*indices, r.FileInformation().Path)
+		}
+		return
+	}
+}
+
 // Parse all valid source items from the given list.
 // May either be files or directories. The returned list may be shorter, as contained paths are
 // skipped automatically. Paths will be normalized.

@@ -1,7 +1,7 @@
 /*
-Implements the command-line interface for the VerifyCommand, for use by the cli.App
+Package cli implements the command-line interface for the Command, for use by the cli.App
 */
-package verify
+package cli
 
 import (
 	"github.com/Byron/godi/cli"
@@ -27,7 +27,7 @@ const verifyDescription = `
 // return subcommands for our particular area of algorithms
 func SubCommands() []gcli.Command {
 	out := make([]gcli.Command, 1)
-	cmd := verify.VerifyCommand{}
+	cmd := verify.Command{}
 
 	verify := gcli.Command{
 		Name:      verify.Name,
