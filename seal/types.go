@@ -1,15 +1,27 @@
 package seal
 
 import (
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/codec"
 	"github.com/Byron/godi/io"
 )
 
 const (
 	Name = "seal"
+	Sep  = "--"
 
-	modeSeal = Name
-	modeCopy = "sealed-copy"
+	ModeSeal = Name
+	ModeCopy = "sealed-copy"
+)
+
+var (
+	usage = fmt.Sprintf(`Please specify sealed copies like so: source/ %s destination/
+	%s can be omitted if there is only one source and one destination.`, Sep, Sep)
 )
 
 type indexWriterResult struct {
@@ -50,13 +62,13 @@ type SealCommand struct {
 	api.BasicRunner
 
 	// The type of seal operation we are supposed to perform
-	mode string
+	Mode string
 
 	// If set, we are supposed to run in verify mode
-	verify bool
+	Verify bool
 
 	// The name of the seal format to use
-	format string
+	Format string
 
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
@@ -79,9 +91,9 @@ func (s *SealResult) FromGenerator() bool {
 func NewCommand(trees []string, nReaders, nWriters int) (*SealCommand, error) {
 	c := SealCommand{}
 	if nWriters == 0 {
-		c.mode = modeSeal
+		c.Mode = ModeSeal
 	} else {
-		c.mode = modeCopy
+		c.Mode = ModeCopy
 	}
 	err := c.Init(nReaders, nWriters, trees, api.Info, []api.FileFilter{api.FilterSeals})
 	return &c, err
@@ -105,4 +117,88 @@ func (s *SealCommand) Gather(rctrl *io.ReadChannelController, files <-chan api.F
 	}
 
 	api.Gather(files, results, s.Statistics(), makeResult, rctrl, s.rootedWriters)
+}
+
+func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
+
+	if len(s.Format) == 0 {
+		s.Format = codec.GobName
+	}
+
+	if s.Mode == ModeSeal {
+		if len(items) == 0 {
+			return errors.New("Please provide at least one source directory to work on")
+		}
+		items, err = api.ParseSources(items, true)
+		if err != nil {
+			return
+		}
+		s.InitBasicRunner(numReaders, items, maxLogLevel, filters)
+	} else if s.Mode == ModeCopy {
+		finishSetup := func(sources, dtrees []string) error {
+			// Make sure we don't copy onto ourselves
+			for _, stree := range sources {
+				for _, dtree := range dtrees {
+					if strings.HasPrefix(dtree+string(os.PathSeparator), stree) {
+						return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
+					}
+				}
+			}
+			s.InitBasicRunner(numReaders, sources, maxLogLevel, filters)
+
+			// build the device map with all writer destinations
+			dm := io.DeviceMap(dtrees)
+
+			// Finally, put all actual values into our list to have a deterministic iteration order.
+			// After all, we don't really care about the device from this point on
+			s.rootedWriters = make([]io.RootedWriteController, len(dm))
+			for did, trees := range dm {
+				// each device as so and so many destinations. Each destination uses the same write controller
+				s.rootedWriters[did] = io.RootedWriteController{
+					Trees: trees,
+					Ctrl:  io.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats.Stats),
+				}
+			} // for each tree set in deviceMap
+			return nil
+		} // end helper
+
+		// Parses [src, ...] -- [dst, ...]
+		err = errors.New(usage)
+		if len(items) < 2 {
+			return
+		}
+
+		for i, item := range items {
+			if item == Sep {
+				if i == 0 {
+					return
+				}
+				if i == len(items)-1 {
+					return
+				}
+				sources, e := api.ParseSources(items[:i], true)
+				if e != nil {
+					return e
+				}
+
+				dtrees, e := api.ParseSources(items[i+1:], false)
+				if e != nil {
+					return e
+				}
+
+				return finishSetup(sources, dtrees)
+			}
+		} // for each item
+
+		// So there is no separator, maybe it's source and destination ?
+		if len(items) == 2 {
+			return finishSetup(items[:1], items[1:])
+		}
+
+		// source-destination separator not found - prints usage
+		return
+	} else {
+		panic(fmt.Sprintf("Unsupported mode: %s", s.Mode))
+	}
+	return
 }

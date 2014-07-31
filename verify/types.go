@@ -3,6 +3,7 @@ package verify
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -256,4 +257,30 @@ func (s *VerifyCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 	} // end finalizer
 
 	return api.Aggregate(results, s.Done, resultHandler, finalizer, &s.Stats)
+}
+
+func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
+	if len(items) == 0 {
+		return errors.New("Please provide at least one seal file")
+	}
+
+	validItems, err := api.ParseSources(items, true)
+	if err != nil {
+		return
+	}
+
+	indexDirs := make([]string, len(validItems))
+	for i, index := range validItems {
+		if codec := codec.NewByPath(index); codec == nil {
+			return fmt.Errorf("Unknown seal file format: '%s'", index)
+		}
+		if _, err := os.Stat(index); err != nil {
+			return fmt.Errorf("Cannot access seal file at '%s'", index)
+		}
+		indexDirs[i] = filepath.Dir(index)
+	}
+
+	s.InitBasicRunner(numReaders, indexDirs, maxLogLevel, filters)
+	s.Items = validItems
+	return nil
 }

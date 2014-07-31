@@ -98,7 +98,7 @@ func (s *SealCommand) Aggregate(results <-chan api.Result) <-chan api.Result {
 			// Initialize this root
 			// Create a new go-routine which will take care of streaming file-information straight to file
 			treeInfo = &aggregationTreeInfo{}
-			treeInfo.sealFInfos, treeInfo.sealResult = setupIndexWriter(treeRoot, codec.NewByName(s.format))
+			treeInfo.sealFInfos, treeInfo.sealResult = setupIndexWriter(treeRoot, codec.NewByName(s.Format))
 			treeInfoMap[treeRoot] = treeInfo
 		}
 

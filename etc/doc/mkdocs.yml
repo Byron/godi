@@ -13,7 +13,8 @@ pages:
 - ['usage.md', 'Learn', 'How to Use Godi']
 - ['details.md', 'Learn', 'About Details']
 - ['proprietary.md', 'Learn', 'About Others']
-- ['contribute.md', 'Contribute']
+- ['contributing.md', 'Contribute', 'How to Contribute']
+- ['development.md', 'Contribute', 'From within the Machine']
 - ['license.md', 'About', 'License']
 
 theme: yeti

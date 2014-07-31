@@ -1,14 +1,11 @@
+/*
+Implements the command-line interface for the VerifyCommand, for use by the cli.App
+*/
 package verify
 
 import (
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-
-	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
-	"github.com/Byron/godi/codec"
+	"github.com/Byron/godi/verify"
 
 	gcli "github.com/codegangsta/cli"
 )
@@ -30,10 +27,10 @@ const verifyDescription = `
 // return subcommands for our particular area of algorithms
 func SubCommands() []gcli.Command {
 	out := make([]gcli.Command, 1)
-	cmd := VerifyCommand{}
+	cmd := verify.VerifyCommand{}
 
 	verify := gcli.Command{
-		Name:      Name,
+		Name:      verify.Name,
 		ShortName: "",
 		Usage:     verifyDescription,
 		Action:    func(c *gcli.Context) { cli.RunAction(&cmd, c) },
@@ -42,30 +39,4 @@ func SubCommands() []gcli.Command {
 
 	out[0] = verify
 	return out
-}
-
-func (s *VerifyCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
-	if len(items) == 0 {
-		return errors.New("Please provide at least one seal file")
-	}
-
-	validItems, err := api.ParseSources(items, true)
-	if err != nil {
-		return
-	}
-
-	indexDirs := make([]string, len(validItems))
-	for i, index := range validItems {
-		if codec := codec.NewByPath(index); codec == nil {
-			return fmt.Errorf("Unknown seal file format: '%s'", index)
-		}
-		if _, err := os.Stat(index); err != nil {
-			return fmt.Errorf("Cannot access seal file at '%s'", index)
-		}
-		indexDirs[i] = filepath.Dir(index)
-	}
-
-	s.InitBasicRunner(numReaders, indexDirs, maxLogLevel, filters)
-	s.Items = validItems
-	return nil
 }

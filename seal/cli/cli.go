@@ -1,7 +1,9 @@
+/*
+Implements the commandline interface for the SealCommand, ready for digestion by the cli.Appf
+*/
 package seal
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,14 +11,13 @@ import (
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/cli"
 	"github.com/Byron/godi/codec"
-	"github.com/Byron/godi/io"
+	"github.com/Byron/godi/seal"
 	"github.com/Byron/godi/verify"
 
 	gcli "github.com/codegangsta/cli"
 )
 
 const (
-	Sep                    = "--"
 	verifyAfterCopy        = "verify"
 	streamsPerOutputDevice = "streams-per-output-device"
 	formatFlag             = "format"
@@ -47,8 +48,6 @@ const (
 )
 
 var (
-	usage = fmt.Sprintf(`Please specify sealed copies like so: source/ %s destination/
-	%s can be omitted if there is only one source and one destination.`, Sep, Sep)
 	formatDescription = fmt.Sprintf(`The format of the produced seal file, one of %s
 	%s: is a compressed binary seal format, which is temper-proof and highly efficient, 
 	handling millions of files easily.
@@ -59,8 +58,8 @@ var (
 
 // return subcommands for our particular area of algorithms
 func SubCommands() []gcli.Command {
-	cmdseal := SealCommand{mode: modeSeal}
-	cmdcopy := SealCommand{mode: modeCopy}
+	cmdseal := seal.SealCommand{Mode: seal.ModeSeal}
+	cmdcopy := seal.SealCommand{Mode: seal.ModeCopy}
 
 	fmt := gcli.StringFlag{
 		formatFlag,
@@ -70,7 +69,7 @@ func SubCommands() []gcli.Command {
 
 	return []gcli.Command{
 		gcli.Command{
-			Name:      modeSeal,
+			Name:      seal.ModeSeal,
 			ShortName: "",
 			Usage:     sealDescription,
 			Action:    func(c *gcli.Context) { cli.RunAction(&cmdseal, c) },
@@ -78,7 +77,7 @@ func SubCommands() []gcli.Command {
 			Flags:     []gcli.Flag{fmt},
 		},
 		gcli.Command{
-			Name:      modeCopy,
+			Name:      seal.ModeCopy,
 			ShortName: "",
 			Usage:     sealedCopyDescription,
 			Action:    func(c *gcli.Context) { startSealedCopy(&cmdcopy, c) },
@@ -107,18 +106,18 @@ func IndexTrackingResultHandlerAdapter(indices *[]string, handler func(r api.Res
 	}
 }
 
-func checkSeal(cmd *SealCommand, c *gcli.Context) error {
-	cmd.format = c.String(formatFlag)
-	if len(cmd.format) > 0 {
+func checkSeal(cmd *seal.SealCommand, c *gcli.Context) error {
+	cmd.Format = c.String(formatFlag)
+	if len(cmd.Format) > 0 {
 		valid := false
 		for _, name := range codec.Names() {
-			if name == cmd.format {
+			if name == cmd.Format {
 				valid = true
 				break
 			}
 		}
 		if !valid {
-			return fmt.Errorf("Invalid seal format '%s', must be one of %s", cmd.format, strings.Join(codec.Names(), ", "))
+			return fmt.Errorf("Invalid seal format '%s', must be one of %s", cmd.Format, strings.Join(codec.Names(), ", "))
 		}
 	}
 
@@ -129,8 +128,8 @@ func checkSeal(cmd *SealCommand, c *gcli.Context) error {
 	return nil
 }
 
-func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
-	cmd.verify = c.Bool(verifyAfterCopy)
+func checkSealedCopy(cmd *seal.SealCommand, c *gcli.Context) error {
+	cmd.Verify = c.Bool(verifyAfterCopy)
 	// have to do init ourselves as we set amount of writers
 	nr, level, filters, err := cli.CheckCommonFlags(c)
 	if err != nil {
@@ -145,11 +144,11 @@ func checkSealedCopy(cmd *SealCommand, c *gcli.Context) error {
 	return cmd.Init(nr, nw, c.Args(), level, filters)
 }
 
-func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
+func startSealedCopy(cmd *seal.SealCommand, c *gcli.Context) {
 
 	// Yes, currently the post-verification is only implemented in the CLI ...
 	// Testing needs to do similar things to set it up ...
-	if cmd.verify {
+	if cmd.Verify {
 		// Setup a aggregation result handler which tracks produced indices
 		var indices []string
 		cmdDone := make(chan bool)
@@ -198,88 +197,4 @@ func startSealedCopy(cmd *SealCommand, c *gcli.Context) {
 		// copy without verify
 		cli.RunAction(cmd, c)
 	}
-}
-
-func (s *SealCommand) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
-
-	if len(s.format) == 0 {
-		s.format = codec.GobName
-	}
-
-	if s.mode == modeSeal {
-		if len(items) == 0 {
-			return errors.New("Please provide at least one source directory to work on")
-		}
-		items, err = api.ParseSources(items, true)
-		if err != nil {
-			return
-		}
-		s.InitBasicRunner(numReaders, items, maxLogLevel, filters)
-	} else if s.mode == modeCopy {
-		finishSetup := func(sources, dtrees []string) error {
-			// Make sure we don't copy onto ourselves
-			for _, stree := range sources {
-				for _, dtree := range dtrees {
-					if strings.HasPrefix(dtree+string(os.PathSeparator), stree) {
-						return fmt.Errorf("Cannot copy '%s' into it's own subdirectory or itself at '%s'", stree, dtree)
-					}
-				}
-			}
-			s.InitBasicRunner(numReaders, sources, maxLogLevel, filters)
-
-			// build the device map with all writer destinations
-			dm := io.DeviceMap(dtrees)
-
-			// Finally, put all actual values into our list to have a deterministic iteration order.
-			// After all, we don't really care about the device from this point on
-			s.rootedWriters = make([]io.RootedWriteController, len(dm))
-			for did, trees := range dm {
-				// each device as so and so many destinations. Each destination uses the same write controller
-				s.rootedWriters[did] = io.RootedWriteController{
-					Trees: trees,
-					Ctrl:  io.NewWriteChannelController(numWriters, numWriters*len(trees), &s.Stats.Stats),
-				}
-			} // for each tree set in deviceMap
-			return nil
-		} // end helper
-
-		// Parses [src, ...] -- [dst, ...]
-		err = errors.New(usage)
-		if len(items) < 2 {
-			return
-		}
-
-		for i, item := range items {
-			if item == Sep {
-				if i == 0 {
-					return
-				}
-				if i == len(items)-1 {
-					return
-				}
-				sources, e := api.ParseSources(items[:i], true)
-				if e != nil {
-					return e
-				}
-
-				dtrees, e := api.ParseSources(items[i+1:], false)
-				if e != nil {
-					return e
-				}
-
-				return finishSetup(sources, dtrees)
-			}
-		} // for each item
-
-		// So there is no separator, maybe it's source and destination ?
-		if len(items) == 2 {
-			return finishSetup(items[:1], items[1:])
-		}
-
-		// source-destination separator not found - prints usage
-		return
-	} else {
-		panic(fmt.Sprintf("Unsupported mode: %s", s.mode))
-	}
-	return
 }
