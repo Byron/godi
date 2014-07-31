@@ -77,8 +77,19 @@
             
             
             
-                <li >
-                    <a href="contribute/">Contribute</a>
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">Contribute <b class="caret"></b></a>
+                    <ul class="dropdown-menu">
+                    
+                        <li >
+                            <a href="contributing/">How to Contribute</a>
+                        </li>
+                    
+                        <li >
+                            <a href="development/">From within the Machine</a>
+                        </li>
+                    
+                    </ul>
                 </li>
             
             
@@ -182,8 +193,8 @@
 <ul>
 <li>protect your data against unnoticed and silent corruption</li>
 <li><a href="http://en.wikipedia.org/wiki/Atomic_operation">atomically</a> duplicate data to one or more locations while protecting it against corruption, without fearing to overwrite existing files.</li>
-<li>use all available device bandwidth and CPU cores to finish your work <em>much</em> faster</li>
-<li>runs on all major and minor platforms</li>
+<li>use all <a href="details/#Performance%20Considerations">available device bandwidth and CPU cores</a> to finish your work <em>much</em> faster</li>
+<li>runs on all major and minor <a href="http://golang.org/doc/install#requirements">platforms and architectures</a></li>
 </ul>
 <h2 id="installation">Installation</h2>
 <ul>
