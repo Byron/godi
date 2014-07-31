@@ -46,7 +46,7 @@ You can seal one or more files or directories in one go.
 $ godi seal ~/Desktop/myWeddingVideo.mov /Volumes/encrypted/taxes/2012
 ```
 
-This sub-command is affected by [input file filters](details.md#Input File-Filters), and it is possible to choose between [different seal formats](details.md#Seal Formats).
+This sub-command is affected by [input file filters](details.md#Input File-Filters), and it is possible to choose between [different seal formats](details.md#Seal Formats). You may also be interested in information about [error handling policy](details.md#Error Handling)
 
 ### Verify - Assure Data didn't Change
 ![seal](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify.mov.gif)
@@ -61,6 +61,8 @@ $ godi verify ~/Desktop/godi_2014-07-30_102257.gobz /Volumes/encrypted/taxes/201
 ```
 
 And this is how it looks if [something is not in order](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify-fail.mov.gif).
+
+If a source file cannot be read, *verify* will continue with other files to provide as much information to you as possible.
 
 ### Sealed Copy - Seal with Duplication
 ![sealed-copy](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy.mov.gif)
@@ -87,7 +89,7 @@ $ godi sealed-copy --verify ~/valuables /Volumes/backup/valuables
 
 Have a look at [this video](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy-verify_full.mov.gif) to see the `--verify` flag in action.
 
-This sub-command is affected by [input file filters](details.md#Input File-Filters), and subject to [atomic operations](details.md#Atomic Operation).
+This sub-command is affected by [input file filters](details.md#Input File-Filters), and subject to [atomic operations](details.md#Atomic Operation). You may also be interested to learn how it deals with [errors](details.md#Error Handling) while writing to a destination.
 
 `godi` will *never* overwrite existing files, as shown [in this video](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_fail-write.mov.gif).
 
