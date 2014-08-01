@@ -73,7 +73,7 @@ func NewGodiApp() *cli.App {
 			excludePatternsDescription,
 		},
 	}
-	app.Version = "v0.9.0"
+	app.Version = "v1.0.0"
 	app.Author = "Sebastian Thiel & Contributors"
 
 	gocli.AddAdditinalFlags(app)
