@@ -1,3 +1,6 @@
+/*
+For high-level developer documentation, please see http://byron.github.io/godi/development/
+*/
 package main
 
 import (
