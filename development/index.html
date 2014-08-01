@@ -146,6 +146,14 @@
         <li class="main "><a href="#architecture">Architecture</a></li>
         
     
+        <li class="main "><a href="#about-parallelism">About Parallelism</a></li>
+        
+            <li><a href="#parallel-io">Parallel IO</a></li>
+        
+    
+        <li class="main "><a href="#communication-and-error-handling">Communication and Error Handling</a></li>
+        
+    
     </ul>
 </div></div>
             <div class="col-md-9" role="main">
@@ -157,7 +165,80 @@
 <p>As you can see, the <em>api</em>, <em>utility</em> and <em>io</em> packages are rather standalone and don't require much to work, whereas the highest level packge dealing with the command-line interface, <em>cli</em>, directly and indirectly uses all packages underneath.</p>
 <p>For further reading, you can have a look at the respective <a href="http://godoc.org/github.com/Byron/godi">godoc site</a>.</p>
 <h2 id="architecture">Architecture</h2>
-<p>What's far more interesting than the package structure is the architecture </p>
+<p>What's far more interesting than the package structure is the architecture. At the heart, <code>godi</code> sets up a pipeline between three components</p>
+<ul>
+<li><strong>generator</strong> (<em>producer</em>)</li>
+<li><strong>gather</strong> (<em>worker</em>)</li>
+<li><strong>aggregator</strong> (<em>fan-in/reducer</em>)</li>
+</ul>
+<p>Let's have a look at a more complex commandline to see which components will be set up:</p>
+<pre class="prettyprint well"><code class="bash">godi seal /media/A/A /media/A/B /media/B
+</code></pre>
+
+<p>As there are two volumes, each being it's own device, there will be two generators. From <code>/Volume/A</code> we will read two distinct directories, which will be handled by only one generator.</p>
+<p>Each generator reads file stats on a respective tree and transmits them to the connected <strong>gather</strong> node, which will do the hard thinking and produce hashes accordingly.</p>
+<p>The information produced by the <strong>gather</strong> nodes is fed to a single <strong>aggregator</strong>, which acts like a fan-in gateway. It processes the <strong>gather</strong> results, and may pass them on unchanged or changed, it may also generate its own results.</p>
+<p>All <strong>aggregator</strong> results are then passed to the one who initially requested the work for digestion, which would be to log it in case of the command-line application.</p>
+<h2 id="about-parallelism">About Parallelism</h2>
+<p><code>godi</code> sets up a highly parallel pipeline, which starts working in the moment the machine is started. There is no caching or pre-computation.</p>
+<p>Let's have a look at a more complex command-line and see what happens internally:</p>
+<pre class="prettyprint well"><code class="bash">godi -spid 2 sealed-copy -spod 2 /media/A /media/B -- /mnt/D /mnt/E
+</code></pre>
+
+<ul>
+<li>2 <strong>generators</strong> feed file information into</li>
+<li>2*2 <strong>gatherers</strong><ul>
+<li><em>input</em><ul>
+<li>2 gatherers read from /media/A</li>
+<li>2 gatherers read from /media/B</li>
+<li>4 read parallel reads</li>
+</ul>
+</li>
+<li><em>processing</em><ul>
+<li>Each read operation yields a buffer with data (<em>input buffer</em>). While it's used, the reader has to wait.</li>
+<li>The buffer is handed concurrently to<ul>
+<li>SHA1 Hasher</li>
+<li>MD5 Hasher</li>
+<li>Writer to /media/A (at most 2 writes at the same time, to 4 different open files)</li>
+<li>Writer to /media/B (as above, but only for files on /media/B)</li>
+</ul>
+</li>
+<li>When all of the above are done processing, the buffer is reused for reading the next piece of the input, until the input file was read completely.</li>
+<li>Produce a gather result which is handed to the aggregator</li>
+<li>Obtain the next file information and repeat</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>1 <strong>aggregator</strong><ul>
+<li>collects all results it receives from <strong>generator</strong> and <strong>gather</strong> nodes, process them, and pass them on as final output.</li>
+<li><em>serialization</em><ul>
+<li>2 open <em>gobz</em> files, which are passed the file information as they reach the aggregator. They are serialized into the file right away.</li>
+</ul>
+</li>
+<li><em>finalization</em><ul>
+<li>When there are no more gather results to process, serialization of gather results finishes.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>If values for <code>-spid</code> and <code>-spod</code> (*streams-per-input|output-device) would be 1, there would just we two gathers, which write at most 1 files in parallel per output device, with 2 files opened per output device at a time.</p>
+<p>The following diagram attempts to visualize the text above, but with <code>-spid</code> and <code>-spod</code> at 1 to reduce clutter. The big vertical lines can be seen as unix pipes. Thus, in a pipeline like <code>a|b|c</code>, the nodes <em>a</em>, <em>b</em>, and <em>c</em> are running concurrently.</p>
+<p>Each node that parallelizes tasks internally shows each task as lane indicates by <code>XXXX</code>. Each lane represents the work done on a single buffer, whereas the longest lane dictates to wall clock time taken. Thus, the slowest tasks determine how fast the operation finishes.</p>
+<p><img alt="architecture" src="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/png/lanes.txt.png" /></p>
+<h3 id="parallel-io">Parallel IO</h3>
+<p>The image above may only provide an approximation of what really happens regarding the input and output of device data. It tries to indicate that there are in fact Nodes which are to read and write data and deal with gating requests to assure there are never more parallel reads or writes than configured.</p>
+<p>This may mean that <strong>gather</strong> nodes have to wait for IO, as writes in particular may be blocking.</p>
+<p>The types behind it are called <code>ReadChannelController</code> and <code>WriteChannelController</code>. When reading, it will always read a whole file sequentially and pass the result to a single <strong>gather</strong> node.</p>
+<p>When writing, it will write individual buffers to (possible) multiple files at the same time, buffer by buffer. Even though pseudo-random writes to multiple open files in parallel might not be optimal, it's something we require as we don't do any caching ourselves. Additionally, device caches usually handle that kind of load well and serialize writes automatically.</p>
+<h2 id="communication-and-error-handling">Communication and Error Handling</h2>
+<p>It's quite easy to have everything run in parallel without dealing with anything. Nonetheless, it's very important to react properly to error occurring anywhere in the machine.</p>
+<p><code>godi</code> will react to and handle to any error it sees and judges the error's impact to decide if it can recover. If not, it is possible for <strong>gather</strong> and <em>aggregator<strong> to communicate to the </strong>generator</em>* to stop working, for example.</p>
+<p>Additionally, there is a shared <em>done</em> channel which is used to signal an interrupt request by the user or some other entity, which has a similar effect as an error.</p>
+<p>As the pipeline is dependent on the <strong>generator</strong> nodes as well as on the device reader, these are the only ones which shut down. This is all that's needed to stop the machine, as <strong>gather</strong> and <strong>aggregate</strong> are depending on their input entirely.</p>
+<p>This also means that no error or shutdown request will fall under the table.</p>
+<p>The current implementation provides a highly responsive program, which will always produce a deterministic result, on error as well as on cancel request, and respond to these without noticeable delay.</p>
 </div>
         </div>
 
