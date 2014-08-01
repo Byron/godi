@@ -55,9 +55,6 @@ func (h *HashStatAdapter) Sum(b []byte) []byte {
 // Creates a Result using makeResult() and sends it down the results channel.
 // If wctrls is set, we will setup parallel writer which writes the bytes used for hashing
 // to all controllers at the same time, which will be as slow as the slowest device
-// TODO(st) wctrls must be device mapping. That way, we can parallelize writes per device.
-// Right now we have a slow brute-force approach, which will make random writes to X files, but only Y at a time.
-// What we want is at max Y files being written continuously at a time
 func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrl *gio.ReadChannelController,

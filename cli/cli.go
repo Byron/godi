@@ -69,7 +69,7 @@ func MakeStatisticalLogHandler(stats *api.Stats, handler func(api.Result) bool, 
 	}
 }
 
-func MakeLogHandler(maxLogLevel api.Priority) func(r api.Result) bool {
+func MakeLogHandler(maxLogLevel api.Importance) func(r api.Result) bool {
 	return func(r api.Result) bool {
 		info, prio := r.Info()
 		if !maxLogLevel.MayLog(prio) {
@@ -101,14 +101,14 @@ func RunAction(cmd api.Runner, c *cli.Context) {
 }
 
 // As CheckCommonFlagsAndInit, but will return all parsed and verified common values, including an optional error
-func CheckCommonFlags(c *cli.Context) (nr int, level api.Priority, filters []api.FileFilter, err error) {
+func CheckCommonFlags(c *cli.Context) (nr int, level api.Importance, filters []api.FileFilter, err error) {
 	// Put parsed args in cmd and sanitize it
 	nr = c.GlobalInt(StreamsPerInputDeviceFlagName)
 	if nr < 1 {
 		return 0, level, filters, fmt.Errorf("--%v must not be smaller than 1", StreamsPerInputDeviceFlagName)
 	}
 
-	level, err = api.PriorityFromString(c.GlobalString(LogLevelFlagName))
+	level, err = api.ImportanceFromString(c.GlobalString(LogLevelFlagName))
 	if err != nil {
 		return
 	}

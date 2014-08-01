@@ -119,7 +119,7 @@ func (s *Command) Gather(rctrl *io.ReadChannelController, files <-chan api.FileI
 	api.Gather(files, results, s.Statistics(), makeResult, rctrl, s.rootedWriters)
 }
 
-func (s *Command) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
+func (s *Command) Init(numReaders, numWriters int, items []string, maxLogLevel api.Importance, filters []api.FileFilter) (err error) {
 
 	if len(s.Format) == 0 {
 		s.Format = codec.GobName

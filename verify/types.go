@@ -259,7 +259,7 @@ func (s *Command) Aggregate(results <-chan api.Result) <-chan api.Result {
 	return api.Aggregate(results, s.Done, resultHandler, finalizer, &s.Stats)
 }
 
-func (s *Command) Init(numReaders, numWriters int, items []string, maxLogLevel api.Priority, filters []api.FileFilter) (err error) {
+func (s *Command) Init(numReaders, numWriters int, items []string, maxLogLevel api.Importance, filters []api.FileFilter) (err error) {
 	if len(items) == 0 {
 		return errors.New("Please provide at least one seal file")
 	}

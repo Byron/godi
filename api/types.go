@@ -143,11 +143,10 @@ func (f *FileInfo) Root() string {
 	return f.Path[:len(f.Path)-len(f.RelaPath)-1]
 }
 
-// TODO(st): Should be named 'Importance'
-type Priority uint8
+type Importance uint8
 
 const (
-	Progress Priority = iota
+	Progress Importance = iota
 	Info
 	Warn
 	Error
@@ -157,7 +156,7 @@ const (
 
 // MayLog returns true if the given priority may be logged as seen from our log-level.
 // Results may always be logged
-func (p Priority) MayLog(op Priority) bool {
+func (p Importance) MayLog(op Importance) bool {
 	if p == LogDisabled {
 		return false
 	}
@@ -168,7 +167,7 @@ func (p Priority) MayLog(op Priority) bool {
 	return op >= p
 }
 
-func (p Priority) String() string {
+func (p Importance) String() string {
 	switch {
 	case p == Progress:
 		return "progress"
@@ -188,8 +187,8 @@ func (p Priority) String() string {
 }
 
 // Parse a priority from the given string. error will be set if this fails
-func PriorityFromString(p string) (Priority, error) {
-	for _, t := range [...]Priority{Progress, Info, Warn, Error, Valuable, LogDisabled} {
+func ImportanceFromString(p string) (Importance, error) {
+	for _, t := range [...]Importance{Progress, Info, Warn, Error, Valuable, LogDisabled} {
 		if t.String() == p {
 			return t, nil
 		}
@@ -200,7 +199,7 @@ func PriorityFromString(p string) (Priority, error) {
 type Result interface {
 	// Return a string indicating the result, which can can also state an error
 	// The priority show the kind of result messgae, allowing you to filter them effectively
-	Info() (string, Priority)
+	Info() (string, Importance)
 
 	// Return an error instance indicating what exactly when wrong
 	Error() error
@@ -215,10 +214,10 @@ type BasicResult struct {
 	Finfo FileInfo
 	Msg   string
 	Err   error
-	Prio  Priority
+	Prio  Importance
 }
 
-func (s *BasicResult) Info() (string, Priority) {
+func (s *BasicResult) Info() (string, Importance) {
 	if s.Err != nil {
 		msg := s.Err.Error()
 		if len(s.Msg) > 0 {
@@ -252,12 +251,12 @@ type BasicRunner struct {
 	// The maximum log-level. We just keep this value here because the cli makes a difference between CHECK and RUN !
 	// This member shouldn't be needed as logging is not done by the runner anyway - it's all done by result handlers.
 	// Only they are concerned, which is a function of the CLI entirely
-	// TODO(st) Fork CLI and make the fix, use the fork from that point on ... .
-	Level   Priority
+	// TODO(st) Fork codegangsa/CLI and make the fix, use the fork from that point on ... .
+	Level   Importance
 	Filters []FileFilter
 }
 
-func (b *BasicRunner) LogLevel() Priority {
+func (b *BasicRunner) LogLevel() Importance {
 	return b.Level
 }
 
@@ -273,7 +272,7 @@ func (b *BasicRunner) NumChannels() int {
 }
 
 // Initialize our Readers and items with the given information, including our cannel
-func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Priority, filters []FileFilter) {
+func (b *BasicRunner) InitBasicRunner(numReaders int, items []string, maxLogLevel Importance, filters []FileFilter) {
 	b.Items = items
 	b.Done = make(chan bool)
 	b.RootedReaders = io.NewDeviceReadControllers(numReaders, items, &b.Stats.Stats, b.Done)
@@ -299,14 +298,14 @@ type Runner interface {
 	// can be assumed to be valid
 	// Sets the items we are supposed to be working on - must be checked by implementation, as they are
 	// very generic in nature
-	Init(numReaders, numWriters int, items []string, maxLogLevel Priority, filters []FileFilter) error
+	Init(numReaders, numWriters int, items []string, maxLogLevel Importance, filters []FileFilter) error
 
 	// Return the amount of io-channels the runner may be using in parallel per device
 	NumChannels() int
 
 	// Return the minimum allowed level for logging
 	// TODO(st): get rid of this method !
-	LogLevel() Priority
+	LogLevel() Importance
 
 	// Statistics returns the commands shared statistics structure
 	Statistics() *Stats
