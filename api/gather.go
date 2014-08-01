@@ -58,7 +58,7 @@ func (h *HashStatAdapter) Sum(b []byte) []byte {
 func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 	makeResult func(*FileInfo, *FileInfo, error) Result,
 	rctrl *gio.ReadChannelController,
-	wctrls []gio.RootedWriteController) {
+	wctrls gio.RootedWriteControllers) {
 	if rctrl == nil {
 		panic("ReadChannelController and WaitGroup must be set")
 	}
@@ -68,7 +68,7 @@ func Gather(files <-chan FileInfo, results chan<- Result, stats *Stats,
 	const nHashes = 2
 	atomic.AddUint32(&stats.NumHashers, uint32(nHashes))
 	isWriting := len(wctrls) > 0
-	numDestinations := gio.WriteChannelDeviceMapTrees(wctrls)
+	numDestinations := wctrls.Trees()
 	// The hgher this number, the less syscall and communication overhead we will have.
 	// As we expect mostly larger files, we go for bigger buffers
 	var buf [512 * 1024]byte

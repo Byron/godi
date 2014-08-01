@@ -32,8 +32,9 @@ type indexWriterResult struct {
 // Some information we store per root of files we seal
 type aggregationTreeInfo struct {
 	// Paths to files we have written so far - only used in sealed-copy mode
-	// TODO(st): don't track these files in memory, but re-read them from the written seal file !
+	// TODO(st): don't track these files in memory, but have a mode to just clear out the entire destination
 	// That way, we don't rely on any limited resource except for disk space
+	// See https://github.com/Byron/godi/issues/26
 	writtenFiles []string
 
 	// A channel to send file-infos to the attached seal serializer. Close it to finish the seal operation
@@ -72,7 +73,7 @@ type Command struct {
 
 	// A map of writers - there may just be one writer per device.
 	// Map may be unset if we are not in write mode
-	rootedWriters []io.RootedWriteController
+	rootedWriters io.RootedWriteControllers
 }
 
 // A result which is also able to hold information about the source of a file
@@ -151,7 +152,7 @@ func (s *Command) Init(numReaders, numWriters int, items []string, maxLogLevel a
 
 			// Finally, put all actual values into our list to have a deterministic iteration order.
 			// After all, we don't really care about the device from this point on
-			s.rootedWriters = make([]io.RootedWriteController, len(dm))
+			s.rootedWriters = make(io.RootedWriteControllers, len(dm))
 			for did, trees := range dm {
 				// each device as so and so many destinations. Each destination uses the same write controller
 				s.rootedWriters[did] = io.RootedWriteController{

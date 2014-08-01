@@ -241,7 +241,7 @@ type BasicRunner struct {
 	// Items we work on
 	Items []string
 	// A map of readers which maps from a root to the reader to use to read files that share the same root
-	RootedReaders []io.RootedReadController
+	RootedReaders io.RootedReadControllers
 	// A channel to let everyone know we should finish as soon as possible - this is done by closing the channel
 	Done chan bool
 
@@ -268,7 +268,7 @@ func (b *BasicRunner) NumChannels() int {
 	if len(b.RootedReaders) == 0 {
 		panic("NumChannels called before InitBasicRunner()")
 	}
-	return io.ReadChannelDeviceMapStreams(b.RootedReaders)
+	return b.RootedReaders.Streams()
 }
 
 // Initialize our Readers and items with the given information, including our cannel

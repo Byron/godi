@@ -269,9 +269,10 @@ func (w *WriteChannelController) Streams() int {
 	return cap(w.c)
 }
 
+type RootedWriteControllers []RootedWriteController
+
 // Returns the amount of Trees/Destinations we can write to in total
-// TODO(st): objectify
-func WriteChannelDeviceMapTrees(wm []RootedWriteController) (n int) {
+func (wm RootedWriteControllers) Trees() (n int) {
 	for _, rctrl := range wm {
 		n += len(rctrl.Trees)
 	}

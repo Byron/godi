@@ -242,10 +242,12 @@ func NewReadChannelController(nprocs int, stats *Stats, done <-chan bool) ReadCh
 	return ctrl
 }
 
+type RootedReadControllers []RootedReadController
+
 // A new list of Controllers, one per device it handles, which is associated with the tree's it can handle
-func NewDeviceReadControllers(nprocs int, trees []string, stats *Stats, done <-chan bool) []RootedReadController {
+func NewDeviceReadControllers(nprocs int, trees []string, stats *Stats, done <-chan bool) RootedReadControllers {
 	dm := DeviceMap(trees)
-	res := make([]RootedReadController, len(dm))
+	res := make(RootedReadControllers, len(dm))
 
 	for did, trees := range dm {
 		// each device as so and so many sources. Each source uses the same read controller
@@ -260,8 +262,7 @@ func NewDeviceReadControllers(nprocs int, trees []string, stats *Stats, done <-c
 
 // NOTE: Can this be a custom type, with just a function ? I think so !
 // Return the number of streams being handled in parallel
-// TODO(st) objectify
-func ReadChannelDeviceMapStreams(rctrls []RootedReadController) int {
+func (rctrls RootedReadControllers) Streams() int {
 	if len(rctrls) == 0 {
 		panic("Input map was empty")
 	}

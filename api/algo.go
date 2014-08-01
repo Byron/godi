@@ -8,7 +8,7 @@ import (
 
 // Generate does all boilerplate required to be a valid generator
 // Will produce as many generators as there are devices, each is handed a list of trees to handle
-func Generate(rctrls []io.RootedReadController,
+func Generate(rctrls io.RootedReadControllers,
 	runner Runner,
 	generate func([]string, chan<- FileInfo, chan<- Result)) <-chan Result {
 

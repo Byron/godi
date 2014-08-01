@@ -124,8 +124,6 @@ func (s *Command) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 			// The seal can fail anytime, for instance on permission issues or when there
 			// This select will block until something happens, usually this means
-			// TODO(st): As we don't expect to inrease performance with this async operation,
-			// it would be good to use a begin/do[,...]/end style serialization pattern
 			select {
 			case lsr, ok := <-treeInfo.sealResult:
 				if ok {
@@ -149,7 +147,7 @@ func (s *Command) Aggregate(results <-chan api.Result) <-chan api.Result {
 
 						maxTrees := 0
 						if isWriting {
-							maxTrees = io.WriteChannelDeviceMapTrees(s.rootedWriters)
+							maxTrees = s.rootedWriters.Trees()
 						} else {
 							for _, rctrl := range s.RootedReaders {
 								maxTrees += len(rctrl.Trees)
