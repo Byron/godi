@@ -49,6 +49,11 @@ Read more [on the documentation page](http://byron.github.io/godi)
 
 If you are using godi more regularly, it is adviced to put it into your shell's [executable search path](http://en.wikipedia.org/wiki/PATH_(variable))
 
+## Videos
+
+[![Godi Performance Video](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/png/godi_performance-thumb.png)](https://vimeo.com/102326726)
+[![Godi Usage Video](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/png/godi_usage-thumb.png)](http://vimeo.com/user3503356/godi-usage)
+
 ## Development Status
 
 [![Build Status](https://travis-ci.org/Byron/godi.svg?branch=master)](https://travis-ci.org/Byron/godi)
