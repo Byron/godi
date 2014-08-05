@@ -43,7 +43,7 @@ var (
 	%-5s: shows all of the above, and detailed progress information,
 	might be too verbose when handling many small files`,
 		api.Info, api.Error, api.LogDisabled,
-		api.Info, api.Error, api.LogDisabled)
+		api.LogDisabled, api.Error, api.Info)
 )
 
 // Builds a Cli app from all commands we know and returns it
@@ -73,7 +73,7 @@ func NewGodiApp() *cli.App {
 			excludePatternsDescription,
 		},
 	}
-	app.Version = "v1.0.0"
+	app.Version = "v1.0.1"
 	app.Author = "Sebastian Thiel & Contributors"
 
 	gocli.AddAdditinalFlags(app)
