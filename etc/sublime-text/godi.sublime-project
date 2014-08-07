@@ -14,7 +14,8 @@
 				"cover",
 				"git/ext",
 				"pages",
-				"doc"
+				"doc",
+				"node_modules",
 			]
 		},
 	]

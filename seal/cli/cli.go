@@ -43,8 +43,7 @@ const (
 
 	[arguments ...] specify the source file(s) or directories, as well as the destination(s), for example
 	godi sealed-copy s/ /Volumes/a
-	godi sealed-copy s1/ s2/ -- /Volumes/a /Volumes/b
-	`
+	godi sealed-copy s1/ s2/ -- /Volumes/a /Volumes/b`
 )
 
 var (

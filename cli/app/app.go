@@ -10,6 +10,7 @@ import (
 	gocli "github.com/Byron/godi/cli"
 	scli "github.com/Byron/godi/seal/cli"
 	vcli "github.com/Byron/godi/verify/cli"
+	wcli "github.com/Byron/godi/web/cli"
 
 	"github.com/codegangsta/cli"
 )
@@ -54,6 +55,7 @@ func NewGodiApp() *cli.App {
 	cmds := []cli.Command{}
 	cmds = append(cmds, scli.SubCommands()...)
 	cmds = append(cmds, vcli.SubCommands()...)
+	cmds = append(cmds, wcli.SubCommands()...)
 
 	app.Usage = `Verify data integrity and transfer data securely at highest speeds.
 
