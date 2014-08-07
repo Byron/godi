@@ -4,6 +4,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -33,7 +34,7 @@ You may also specify any IP assigned to an interface to restrict availability.`,
 )
 
 type serverInfo struct {
-	srv     *server.Server
+	mux     *http.ServeMux
 	addr    string
 	mayOpen bool
 }
@@ -74,23 +75,29 @@ func before(c *gcli.Context, info *serverInfo) error {
 	}
 
 	info.mayOpen = !c.Bool(noOpenFlagName)
-	info.srv = server.New(info.addr)
+	info.mux = server.NewHandler()
 	return nil
 }
 
 func action(c *gcli.Context, info *serverInfo) {
-	if !strings.HasPrefix(info.addr, httpProtocol) {
-		info.addr = httpProtocol + info.addr
+	addr := info.addr
+	if !strings.HasPrefix(addr, httpProtocol) {
+		addr = httpProtocol + info.addr
 	}
 
-	fmt.Println("About to listen on ", info.addr)
+	fmt.Println("About to listen on ", addr)
 	if info.mayOpen {
-		if err := open.Start(info.addr); err != nil {
+		if err := open.Start(addr); err != nil {
 			fmt.Fprint(os.Stderr, err)
 		}
 	}
 
-	err := info.srv.Run()
+	s := http.Server{
+		Addr:    info.addr,
+		Handler: info.mux,
+	}
+
+	err := s.ListenAndServe()
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
 		os.Exit(3)

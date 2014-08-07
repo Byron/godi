@@ -108,14 +108,14 @@ func CheckCommonFlags(c *cli.Context) (nr int, level api.Importance, filters []a
 		return 0, level, filters, fmt.Errorf("--%v must not be smaller than 1", StreamsPerInputDeviceFlagName)
 	}
 
-	level, err = api.ImportanceFromString(c.GlobalString(LogLevelFlagName))
+	level, err = api.ParseImportance(c.GlobalString(LogLevelFlagName))
 	if err != nil {
 		return
 	}
 
 	filterStr := c.GlobalString(FileExcludePatternFlagName)
 	for _, fstr := range strings.Split(filterStr, ",") {
-		if f, e := api.FileFilterFromString(fstr); e != nil {
+		if f, e := api.ParseFileFilter(fstr); e != nil {
 			err = e
 			return
 		} else {

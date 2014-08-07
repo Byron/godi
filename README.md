@@ -57,6 +57,7 @@ If you are using godi more regularly, it is adviced to put it into your shell's 
 ## Development Status
 
 [![Build Status](https://travis-ci.org/Byron/godi.svg?branch=master)](https://travis-ci.org/Byron/godi)
+[![GoDoc](https://godoc.org/github.com/Byron/godi?status.png)](http://godoc.org/github.com/Byron/godi)
 
 Latest releases [can be found here](https://github.com/Byron/godi/releases).
 Developer docs can be found at [godoc.org](http://godoc.org/github.com/Byron/godi)

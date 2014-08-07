@@ -7,21 +7,9 @@ import (
 	"github.com/elazarl/go-bindata-assetfs"
 )
 
-// Return a new server instance which is initialized with the given data
-type Server struct {
-	srv http.Server
-}
-
-// Initialize the server to serve on the given address
-func New(address string) *Server {
+// Returns a handler suitable to provide a godi web frontend
+func NewHandler() *http.ServeMux {
 	mux := http.NewServeMux()
-
-	s := Server{
-		srv: http.Server{
-			Addr:    address,
-			Handler: mux,
-		},
-	}
 
 	mux.Handle("/", http.FileServer(
 		&assetfs.AssetFS{
@@ -31,12 +19,7 @@ func New(address string) *Server {
 		},
 	))
 
-	return &s
-}
+	mux.Handle("/api/v1/state", new(restHandler))
 
-// Start the server to listen from the address it was initialized with.
-// Will not return unless abort is requested
-// Error may occur if network resources couldn't be used
-func (s *Server) Run() error {
-	return s.srv.ListenAndServe()
+	return mux
 }

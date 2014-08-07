@@ -94,7 +94,7 @@ func (f *FileFilter) Matches(name string, mode os.FileMode) bool {
 // Return a new FileFilter matching the given string.
 // Every string which is not a special kind of filter will be interpreted as fnmatch filter. Err is returned if
 // the glob is invalid
-func FileFilterFromString(name string) (FileFilter, error) {
+func ParseFileFilter(name string) (FileFilter, error) {
 	for _, f := range [...]FileFilter{FilterSymlinks, FilterHidden, FilterSeals, FilterVolatile} {
 		if f.String() == name {
 			return f, nil
@@ -187,7 +187,7 @@ func (p Importance) String() string {
 }
 
 // Parse a priority from the given string. error will be set if this fails
-func ImportanceFromString(p string) (Importance, error) {
+func ParseImportance(p string) (Importance, error) {
 	for _, t := range [...]Importance{Progress, Info, Warn, Error, Valuable, LogDisabled} {
 		if t.String() == p {
 			return t, nil
@@ -337,7 +337,8 @@ type Runner interface {
 }
 
 // Runner Init must have been called beforehand as we don't know the values here
-// The handlers receive a result of the respective stage and may perform whichever operation
+// The handlers receive a result of the respective stage and may perform whichever operation. It returns true if
+// it used the result it obtained, false otherwise.
 // Returns the last error we received in either generator or aggregation stage
 func StartEngine(runner Runner,
 	aggregateHandler func(Result) bool) (err error) {
