@@ -63,14 +63,19 @@ func NewGodiApp() *cli.App {
 
 	// general flags
 	app.Flags = []cli.Flag{
-		cli.IntFlag{gocli.StreamsPerInputDeviceFlagName + ", spid", 1, inputStreamsDescription},
-		cli.StringFlag{gocli.LogLevelFlagName,
-			api.Error.String(),
-			verbosityDescription,
+		cli.IntFlag{
+			Name:  gocli.StreamsPerInputDeviceFlagName + ", spid",
+			Value: 1,
+			Usage: inputStreamsDescription},
+		cli.StringFlag{
+			Name:  gocli.LogLevelFlagName,
+			Value: api.Error.String(),
+			Usage: verbosityDescription,
 		},
-		cli.StringFlag{gocli.FileExcludePatternFlagName,
-			api.FilterVolatile.String(),
-			excludePatternsDescription,
+		cli.StringFlag{
+			Name:  gocli.FileExcludePatternFlagName,
+			Value: api.FilterVolatile.String(),
+			Usage: excludePatternsDescription,
 		},
 	}
 	app.Version = "v1.0.1"

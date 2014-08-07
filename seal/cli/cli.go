@@ -62,9 +62,9 @@ func SubCommands() []gcli.Command {
 	cmdcopy := seal.Command{Mode: seal.ModeCopy}
 
 	fmt := gcli.StringFlag{
-		formatFlag,
-		codec.GobName,
-		formatDescription,
+		Name:  formatFlag,
+		Value: codec.GobName,
+		Usage: formatDescription,
 	}
 
 	return []gcli.Command{
@@ -83,8 +83,13 @@ func SubCommands() []gcli.Command {
 			Action:    func(c *gcli.Context) { startSealedCopy(&cmdcopy, c) },
 			Before:    func(c *gcli.Context) error { return checkSealedCopy(&cmdcopy, c) },
 			Flags: []gcli.Flag{
-				gcli.BoolFlag{verifyAfterCopy, "Run `godi verify` on all produced seals when copy is finished"},
-				gcli.IntFlag{streamsPerOutputDevice + ", spod", 1, "Amount of parallel streams per output device"},
+				gcli.BoolFlag{
+					Name:  verifyAfterCopy,
+					Usage: "Run `godi verify` on all produced seals when copy is finished"},
+				gcli.IntFlag{
+					Name:  streamsPerOutputDevice + ", spod",
+					Value: 1,
+					Usage: "Amount of parallel streams per output device"},
 				fmt,
 			},
 		},
