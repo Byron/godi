@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"time"
 
-	"code.google.com/p/go.net/websocket"
-
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/io"
+
+	"code.google.com/p/go.net/websocket"
 )
 
 const (
@@ -94,7 +94,8 @@ func (w *webSocketHandler) eventHandler() {
 					wc, err := w.pmw.WriterAtIndex(wid)
 					if err != nil {
 						// NOTE: We should log this somewhere ...
-						wc.(io.WriteCloser).Close()
+						println("SERVER ERR", err.Error())
+						wc.(*webClient).Close()
 						w.pmw.SetWriterAtIndex(wid, nil)
 					}
 				}
@@ -131,7 +132,10 @@ type webClient struct {
 
 func (w *webClient) Write(b []byte) (int, error) {
 	w.c.SetWriteDeadline(time.Now().Add(writeTimeout))
+	println("SERV PRE WRITE", len(b))
 	n, err := w.c.Write(b)
+	println("SERV WRITE DONE", n)
+
 	// there is no need to check the error - the websocketHandler takes care
 	// of dealing with is, closing the connection if needed
 	w.c.SetWriteDeadline(time.Time{})

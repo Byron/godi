@@ -14,25 +14,55 @@ import (
 	"github.com/Byron/godi/codec"
 	"github.com/Byron/godi/seal"
 	"github.com/Byron/godi/testlib"
+
+	"code.google.com/p/go.net/websocket"
 )
 
 const (
 	plain     = plainct
 	delay     = 50 * time.Millisecond
 	apiURL    = "/api"
-	socketURL = apiURL + "/socket"
+	socketURL = "/socket"
 )
 
 func TestRESTState(t *testing.T) {
 	mux := http.NewServeMux()
 
-	ws := NewWebSocketHandler()
-	mux.Handle("/socket", ws.handler())
-	mux.Handle("/api", NewRestHandler(ws.restStateHandler, socketURL))
+	wsh := NewWebSocketHandler()
+	mux.Handle(socketURL, wsh.handler())
+	mux.Handle(apiURL, NewRestHandler(wsh.restStateHandler, socketURL))
 
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	url := srv.URL + apiURL
+
+	ws, err := websocket.Dial("ws://"+srv.URL[len("http://"):]+socketURL, "", srv.URL+"/")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		defer ws.Close()
+	}
+
+	numWSReceives := 0
+	// just consume, and count to see if something is coming through
+	go func(ws *websocket.Conn) {
+		var b [512]byte
+		for {
+			// m := jsonMessage{}
+			println("READ")
+			n, err := ws.Read(b[:])
+			println("READ DONE", n)
+			if err != nil {
+				println("READ ERR", err.Error())
+				break
+			}
+			// if err := websocket.JSON.Receive(ws, &m); err != nil {
+			// 	// println("RECEIVE ERROR", err.Error())
+			// 	break
+			// }
+			numWSReceives += 1
+		}
+	}(ws)
 
 	checkReq := func(req *http.Request, stat int, ct string, msg string) *http.Response {
 		if res, err := http.DefaultClient.Do(req); err != nil {
@@ -146,5 +176,11 @@ func TestRESTState(t *testing.T) {
 		t.Fatal("Cancellation should turn out as 'Error'")
 	} else {
 		t.Log("Cancellation created named: %s", s.LastError)
+	}
+
+	if numWSReceives == 0 {
+		t.Fatal("Didn't consume any websocket event")
+	} else {
+		t.Logf("Consumed %d websocket events", numWSReceives)
 	}
 }
