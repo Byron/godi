@@ -36,7 +36,7 @@ func TestRESTState(t *testing.T) {
 	defer srv.Close()
 	url := srv.URL + apiURL
 
-	ws, err := websocket.Dial("ws://"+srv.URL[len("http://"):]+socketURL, "", srv.URL+"/")
+	ws, err := websocket.Dial("ws://"+srv.URL[len("http://"):]+socketURL, "", srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -48,18 +48,10 @@ func TestRESTState(t *testing.T) {
 	go func(ws *websocket.Conn) {
 		var b [512]byte
 		for {
-			// m := jsonMessage{}
-			println("READ")
-			n, err := ws.Read(b[:])
-			println("READ DONE", n)
-			if err != nil {
-				println("READ ERR", err.Error())
+			m := jsonMessage{}
+			if err := websocket.JSON.Receive(ws, &m); err != nil {
 				break
 			}
-			// if err := websocket.JSON.Receive(ws, &m); err != nil {
-			// 	// println("RECEIVE ERROR", err.Error())
-			// 	break
-			// }
 			numWSReceives += 1
 		}
 	}(ws)
