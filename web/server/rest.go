@@ -33,6 +33,7 @@ type state struct {
 	Destinations []string `json:destinations` // The destinations of sealed-copy
 	Verify       string   `json:verify`       // if non-empty, verification is done after a sealed copy
 	Format       string   `json:format`       // The serialization format of seals
+	SocketURL    string   `json:socketURL`    // read-only URL of the web-socket people can connect to
 	IsRunning    bool     `json:status`       // read-only, true if an operation is in progress
 
 	LastError string `json:executionError` // error result of the last operation
@@ -163,6 +164,22 @@ type restHandler struct {
 	o               string     //IP of original requester
 	cancelRequested bool
 	l               sync.RWMutex
+	cb              func(bool, api.Result) // a callback to allow others to stay informed
+}
+
+// Returns a usable REST handler.
+// The callback allows to respond to state-changes, calls to it are synchronized and thus serial only.
+// f(isEnd, result) - isEnd is True only when the operation is now finished, result is nil in that case
+func NewRestHandler(onStateChange func(bool, api.Result), socketURL string) http.Handler {
+	if onStateChange == nil {
+		panic("Callback must be set")
+	}
+	return &restHandler{
+		cb: onStateChange,
+		st: state{
+			SocketURL: socketURL,
+		},
+	}
 }
 
 // Returns empty string on error
@@ -299,26 +316,26 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 	return "", http.StatusOK
 }
 
-func (r *restHandler) aggregateHandler(res api.Result) bool {
-	// TODO(st) implementation
-	// Communicate state through handler ... maybe this one should be controller by someone else !
-	return true
-}
-
 // An async handler for an entire godi operation
 func (r *restHandler) handleOperation(runner api.Runner) {
-	err := api.StartEngine(runner, r.aggregateHandler)
+
+	err := api.StartEngine(runner, func(res api.Result) bool { r.cb(false, res); return true })
 	r.l.Lock()
-	defer r.l.Unlock()
 
-	// Reset our state and store result. Reset owner
-	r.r = nil
-	r.st.LastError = err.Error()
-	r.st.IsRunning = false
-	r.cancelRequested = false
-	r.o = ""
+	{
+		// Reset our state and store result. Reset owner
+		r.r = nil
+		r.st.LastError = err.Error()
+		r.st.IsRunning = false
+		r.cancelRequested = false
+		r.o = ""
+	}
 
-	// TODO: communicate we are done through a handler
+	r.l.Unlock()
+
+	// inform that we are done - we do that after our state has changed just
+	// to assure rest calls will definitely have the expected result
+	r.cb(true, nil)
 }
 
 func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {

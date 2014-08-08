@@ -17,14 +17,22 @@ import (
 )
 
 const (
-	plain = plainct
-	delay = 50 * time.Millisecond
+	plain     = plainct
+	delay     = 50 * time.Millisecond
+	apiURL    = "/api"
+	socketURL = apiURL + "/socket"
 )
 
 func TestRESTState(t *testing.T) {
-	srv := httptest.NewServer(new(restHandler))
+	mux := http.NewServeMux()
+
+	ws := webSocketHandler{}
+	mux.Handle("/socket", ws.handler())
+	mux.Handle("/api", NewRestHandler(ws.restStateHandler, socketURL))
+
+	srv := httptest.NewServer(mux)
 	defer srv.Close()
-	url := srv.URL + "/"
+	url := srv.URL + apiURL
 
 	checkReq := func(req *http.Request, stat int, ct string, msg string) *http.Response {
 		if res, err := http.DefaultClient.Do(req); err != nil {
