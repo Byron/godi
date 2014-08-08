@@ -26,7 +26,7 @@ const (
 func TestRESTState(t *testing.T) {
 	mux := http.NewServeMux()
 
-	ws := webSocketHandler{}
+	ws := NewWebSocketHandler()
 	mux.Handle("/socket", ws.handler())
 	mux.Handle("/api", NewRestHandler(ws.restStateHandler, socketURL))
 

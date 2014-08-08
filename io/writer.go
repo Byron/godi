@@ -57,6 +57,33 @@ func (p *ParallelMultiWriter) SetWriterAtIndex(i int, w io.Writer) {
 	p.results[i] = nil
 }
 
+// Append the given writer, expanding our internal structures as needed
+// As this is not thread-safe, you must assure we are not writing while locking
+// return the index at which the new writer was appended
+func (p *ParallelMultiWriter) AppendWriter(w io.Writer) int {
+	p.writers = append(p.writers, w)
+	p.results = append(p.results, nil)
+	return len(p.writers) - 1
+}
+
+// Insert the given writer at the first free slot and return it's index.
+// Will append if necesary
+func (p *ParallelMultiWriter) AutoInsert(w io.Writer) int {
+	for wid, ew := range p.writers {
+		if ew == nil {
+			p.writers[wid] = w
+			// result can be assumed to be nil too
+			return wid
+		}
+	}
+	return p.AppendWriter(w)
+}
+
+// Return amount of writers we can store at max, useful for iterating with WriterAtIndex()
+func (p *ParallelMultiWriter) Capacity() int {
+	return len(p.writers)
+}
+
 // Return the writer at the given index, and the first error it might have caused when writing
 // to it. We perform no bounds checking
 func (p *ParallelMultiWriter) WriterAtIndex(i int) (io.Writer, error) {

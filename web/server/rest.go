@@ -170,6 +170,7 @@ type restHandler struct {
 // Returns a usable REST handler.
 // The callback allows to respond to state-changes, calls to it are synchronized and thus serial only.
 // f(isEnd, result) - isEnd is True only when the operation is now finished, result is nil in that case
+// If isEnd is false and result is nil, this indicates that our state changed
 func NewRestHandler(onStateChange func(bool, api.Result), socketURL string) http.Handler {
 	if onStateChange == nil {
 		panic("Callback must be set")
@@ -313,6 +314,8 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 		return err.Error(), http.StatusBadRequest
 	}
 
+	// Inform people about the change
+	r.cb(false, nil)
 	return "", http.StatusOK
 }
 
