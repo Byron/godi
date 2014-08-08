@@ -2,12 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/io"
 
-	"code.google.com/p/go.net/websocket"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -58,19 +59,27 @@ type webSocketHandler struct {
 
 	// This gates new clients
 	newClients chan webClient
+
+	// Used to generate websockets
+	upgrader websocket.Upgrader
 }
 
-func NewWebSocketHandler() webSocketHandler {
+func NewWebSocketHandler() *webSocketHandler {
 	wsh := webSocketHandler{
 		io.NewParallelMultiWriter(nil),
 		// Yes, we block if too much is going on, which might slow down the entire operation
 		make(chan string),
 		make(chan webClient),
+
+		websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
 	}
 
 	go wsh.eventHandler()
 
-	return wsh
+	return &wsh
 }
 
 // To be run as go-loop to process our requests
@@ -104,12 +113,13 @@ func (w *webSocketHandler) eventHandler() {
 }
 
 // Returns a handler suited to listen on a particular web URL
-func (w *webSocketHandler) handler() websocket.Handler {
-	return websocket.Handler(w.handleConnection)
-}
-
-func (w *webSocketHandler) handleConnection(ws *websocket.Conn) {
-	w.newClients <- webClient{ws}
+func (w *webSocketHandler) ServeHTTP(rw http.ResponseWriter, rq *http.Request) {
+	conn, err := w.upgrader.Upgrade(rw, rq, nil)
+	if err != nil {
+		// We have to reply with an error here, according to gorilla docs
+		http.Error(rw, err.Error(), http.StatusServiceUnavailable)
+	}
+	w.newClients <- webClient{conn}
 }
 
 // This one runs synchronously too
@@ -131,7 +141,8 @@ type webClient struct {
 
 func (w *webClient) Write(b []byte) (int, error) {
 	w.c.SetWriteDeadline(time.Now().Add(writeTimeout))
-	n, err := w.c.Write(b)
+	n := len(b)
+	err := w.c.WriteMessage(websocket.TextMessage, b)
 
 	// there is no need to check the error - the websocketHandler takes care
 	// of dealing with is, closing the connection if needed

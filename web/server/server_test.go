@@ -15,7 +15,7 @@ import (
 	"github.com/Byron/godi/seal"
 	"github.com/Byron/godi/testlib"
 
-	"code.google.com/p/go.net/websocket"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -29,14 +29,14 @@ func TestRESTState(t *testing.T) {
 	mux := http.NewServeMux()
 
 	wsh := NewWebSocketHandler()
-	mux.Handle(socketURL, wsh.handler())
+	mux.Handle(socketURL, wsh)
 	mux.Handle(apiURL, NewRestHandler(wsh.restStateHandler, socketURL))
 
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	url := srv.URL + apiURL
 
-	ws, err := websocket.Dial("ws://"+srv.URL[len("http://"):]+socketURL, "", srv.URL)
+	ws, _, err := websocket.DefaultDialer.Dial("ws://"+srv.URL[len("http://"):]+socketURL, nil)
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -46,10 +46,9 @@ func TestRESTState(t *testing.T) {
 	numWSReceives := 0
 	// just consume, and count to see if something is coming through
 	go func(ws *websocket.Conn) {
-		var b [512]byte
 		for {
 			m := jsonMessage{}
-			if err := websocket.JSON.Receive(ws, &m); err != nil {
+			if err := ws.ReadJSON(&m); err != nil {
 				break
 			}
 			numWSReceives += 1
