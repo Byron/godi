@@ -18,13 +18,12 @@ import (
 const (
 	ctkey     = "Content-Type"
 	jsonct    = "application/json"
+	plainct   = "text/plain"
 	isrwparam = "X-is-RW"
 )
 
 // A struct for json serialization and deserialization
 type state struct {
-	runner api.Runner // our runner in case something is going on, nil otherwise
-
 	Mode         string   `json:mode`
 	Verbosity    string   `json:verbosity`
 	Spid         int      `json:spid`         // streams per input device
@@ -34,18 +33,14 @@ type state struct {
 	Destinations []string `json:destinations` // The destinations of sealed-copy
 	Verify       string   `json:verify`       // if non-empty, verification is done after a sealed copy
 	Format       string   `json:format`       // The serialization format of seals
+	IsRunning    bool     `json:status`       // read-only, true if an operation is in progress
 
-	OpResult string `json:opresult` // result of the last operation
+	LastError string `json:executionError` // error result of the last operation
 }
 
 // Write ourselves to w as json
 func (s *state) json(w io.Writer) error {
 	return json.NewEncoder(w).Encode(s)
-}
-
-// Return true if we are doing something
-func (s *state) isInProgress() bool {
-	return s.runner != nil
 }
 
 // instantiate ourselves from json. Automatically verifies ourselves to assure we are a valid state
@@ -83,6 +78,9 @@ func (s *state) verify(checkNullValue bool) error {
 		if checkNullValue && len(s.Destinations) == 0 {
 			return errors.New("Need to provide at least one destination")
 		}
+	}
+
+	if s.Mode != verify.Name {
 		// defaults to something useful, so it's optional here
 		if len(s.Format) > 0 && codec.NewByName(s.Format) == nil {
 			return fmt.Errorf("invalid output format: '%s'", s.Format)
@@ -144,6 +142,7 @@ func (s *state) apply(o state) error {
 		ns.Format = o.Format
 	}
 
+	// Actually this shouldn't be needed here as o is already checked, but better save than sorry
 	if err := ns.verify(false); err != nil {
 		return err
 	}
@@ -159,9 +158,11 @@ func (s *state) apply(o state) error {
 // POST allows to change the state, and returns a token indicating the owner of the status change
 // DELETE stop current operations, only valid if the user matches the one that started the operation
 type restHandler struct {
-	st state
-	o  string //IP of original requester
-	l  sync.RWMutex
+	st              state
+	r               api.Runner // our runner in case something is going on, nil otherwise
+	o               string     //IP of original requester
+	cancelRequested bool
+	l               sync.RWMutex
 }
 
 // Returns empty string on error
@@ -171,6 +172,11 @@ func remoteToOwner(remoteAddr string) (string, error) {
 	} else {
 		return host, nil
 	}
+}
+
+// Return true if we are doing something
+func (r *restHandler) isInProgress() bool {
+	return r.r != nil
 }
 
 // Set our owner to something representing the given remoteAddress.
@@ -194,7 +200,7 @@ func (r *restHandler) isOwner(remoteAddr string) bool {
 
 // Returns true if the given remoteAddr may change our state
 func (r *restHandler) CanWrite(remoteAddr string) bool {
-	return len(r.o) != 0 && !r.isOwner(remoteAddr)
+	return len(r.o) == 0 || r.isOwner(remoteAddr)
 }
 
 // Execute the state we currently have
@@ -205,7 +211,7 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 	defer r.l.Unlock()
 
 	// If something is in progress, request a delete
-	if r.st.isInProgress() {
+	if r.isInProgress() {
 		return "Cannot change state if something is currently inprogress. Abort it using the DELETE method", http.StatusPreconditionFailed
 	}
 
@@ -227,12 +233,12 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 	switch r.st.Mode {
 	case verify.Name:
 		{
-			r.st.runner = &verify.Command{}
+			r.r = &verify.Command{}
 		}
 	case seal.ModeSeal, seal.ModeCopy:
 		{
 			scmd := seal.Command{Mode: r.st.Mode}
-			r.st.runner = &scmd
+			r.r = &scmd
 			if r.st.Mode == seal.ModeCopy {
 				items = append(items, seal.Sep)
 				items = append(items, r.st.Destinations...)
@@ -255,12 +261,15 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 	}
 
 	level, _ := api.ParseImportance(r.st.Verbosity)
-	if err := r.st.runner.Init(r.st.Spid, r.st.Spod, items, level, ff); err != nil {
+	if err := r.r.Init(r.st.Spid, r.st.Spod, items, level, ff); err != nil {
 		// This shouldn't be happening here - we verified beforehand.
 		return err.Error(), http.StatusInternalServerError
 	}
 
-	go r.handleOperation()
+	// Clear previous results, we are getting a new one
+	r.st.LastError = ""
+	r.st.IsRunning = true
+	go r.handleOperation(r.r)
 	return "", http.StatusOK
 }
 
@@ -274,8 +283,12 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 		return "Changing values not permitted", http.StatusUnauthorized
 	}
 
+	if r.isInProgress() {
+		return "Operation already in progress", http.StatusPreconditionFailed
+	}
+
 	if err := r.st.apply(ns); err != nil {
-		return err.Error(), http.StatusBadRequest
+		return err.Error(), http.StatusPreconditionFailed
 	}
 
 	// make sure we allow remoteAddr to take ownership
@@ -293,14 +306,16 @@ func (r *restHandler) aggregateHandler(res api.Result) bool {
 }
 
 // An async handler for an entire godi operation
-func (r *restHandler) handleOperation() {
-	err := api.StartEngine(r.st.runner, r.aggregateHandler)
+func (r *restHandler) handleOperation(runner api.Runner) {
+	err := api.StartEngine(runner, r.aggregateHandler)
 	r.l.Lock()
 	defer r.l.Unlock()
 
-	// Reset our state and store result
-	r.st.runner = nil
-	r.st.OpResult = err.Error()
+	// Reset our state and store result. Reset owner
+	r.r = nil
+	r.st.LastError = err.Error()
+	r.st.IsRunning = false
+	r.cancelRequested = false
 	r.o = ""
 
 	// TODO: communicate we are done through a handler
@@ -309,41 +324,79 @@ func (r *restHandler) handleOperation() {
 func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 	w.Header().Set(ctkey, jsonct)
 
+	// UTILITIES
+	/////////////
+	doWriteState := func() {
+		r.l.RLock()
+		r.st.json(w)
+		r.l.RUnlock()
+	}
+
+	doPut := func(writeState bool) (res bool) {
+		var newState state
+		if err := newState.fromJson(rq.Body); err != nil && err != io.EOF {
+			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+		} else if msg, status := r.applyState(newState, rq.RemoteAddr); status != http.StatusOK {
+			http.Error(w, msg, status)
+		} else {
+			// on success, return the current state
+			if writeState {
+				doWriteState()
+			}
+			res = true
+		}
+		return
+	}
+
+	// METHOD HANDLER
+	///////////////////
 	switch rq.Method {
 	case "GET":
 		{
 			r.l.RLock()
-			if err := r.st.json(w); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+			{
+				// post if remote has RW access !
+				w.Header().Set(isrwparam, fmt.Sprint(r.CanWrite(rq.RemoteAddr)))
+				if err := r.st.json(w); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
 			}
-
-			// post if remote has RW access !
-			w.Header().Set(isrwparam, fmt.Sprint(r.CanWrite(rq.RemoteAddr)))
 			r.l.RUnlock()
 		}
 	case "PUT":
 		{
-			var newState state
-			if err := newState.fromJson(rq.Body); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			// Otherwise, it's valid and we just apply it
-			if msg, status := r.applyState(newState, rq.RemoteAddr); status != http.StatusOK {
-				http.Error(w, msg, status)
-			}
+			doPut(true)
 		}
 	case "POST":
 		{
+			// For convenience, we allow PUT-like behaviour, in case people post all at once
+			// Also saves a request
+			if !doPut(false) {
+				return
+			}
+
 			// Execute the current state
 			if msg, status := r.execute(rq.RemoteAddr); status != http.StatusOK {
 				http.Error(w, msg, status)
+			} else {
+				doWriteState()
 			}
 		}
 	case "DELETE":
 		{
-			// TODO:
+			r.l.Lock()
+			{
+				if !r.isInProgress() {
+					http.Error(w, "No operation is currently in progress", http.StatusPreconditionFailed)
+				} else if !r.cancelRequested {
+					// we are idempotent if the delete operation is called multiple times, waiting for the operation
+					// to actually shut down
+					close(r.r.CancelChannel())
+					r.cancelRequested = true
+				}
+				w.Header().Set(ctkey, plainct)
+			}
+			r.l.Unlock()
 		}
 	default:
 		{
