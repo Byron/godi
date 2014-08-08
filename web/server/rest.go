@@ -1,8 +1,6 @@
 package server
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,25 +10,32 @@ import (
 	"sync"
 
 	"github.com/Byron/godi/api"
+	"github.com/Byron/godi/codec"
 	"github.com/Byron/godi/seal"
 	"github.com/Byron/godi/verify"
 )
 
 const (
-	ctkey  = "Content-Type"
-	jsonct = "application/json"
+	ctkey     = "Content-Type"
+	jsonct    = "application/json"
+	isrwparam = "X-is-RW"
 )
 
 // A struct for json serialization and deserialization
 type state struct {
-	runner    api.Runner // our runner in case something is going on, nil otherwise
-	Mode      string     `json:mode`
-	Verbosity string     `json:verbosity`
-	Spid      int        `json:spid`     // streams per input device
-	Spod      int        `json:spod`     // streams per output device
-	Fep       []string   `json:fep`      // file exclude patterns
-	Items     []string   `json:items`    // The sources (and destinations)
-	OpResult  string     `json:opresult` // result of the last operation
+	runner api.Runner // our runner in case something is going on, nil otherwise
+
+	Mode         string   `json:mode`
+	Verbosity    string   `json:verbosity`
+	Spid         int      `json:spid`         // streams per input device
+	Spod         int      `json:spod`         // streams per output device
+	Fep          []string `json:fep`          // file exclude patterns
+	Sources      []string `json:sources`      // The sources for verify and seal
+	Destinations []string `json:destinations` // The destinations of sealed-copy
+	Verify       string   `json:verify`       // if non-empty, verification is done after a sealed copy
+	Format       string   `json:format`       // The serialization format of seals
+
+	OpResult string `json:opresult` // result of the last operation
 }
 
 // Write ourselves to w as json
@@ -50,25 +55,38 @@ func (s *state) fromJson(r io.Reader) error {
 		return err
 	}
 
-	return s.verify()
+	return s.verify(false)
 }
 
 // Check our own consistency and return an error if something is wrong.
-// Will be nil otherwise
-func (s *state) verify() error {
-	if s.Mode != verify.Name && s.Mode != seal.ModeCopy && s.Mode != seal.ModeSeal {
+// Will be nil otherwise.
+// All values must be set if 'non-null-only' is true
+func (s *state) verify(checkNullValue bool) error {
+	if (len(s.Mode) > 0 || checkNullValue) && s.Mode != verify.Name && s.Mode != seal.ModeCopy && s.Mode != seal.ModeSeal {
 		return fmt.Errorf("Invalid mode: '%s'", s.Mode)
 	}
 
-	if _, err := api.ParseImportance(s.Verbosity); err != nil {
-		return err
+	if len(s.Verbosity) > 0 || checkNullValue {
+		if _, err := api.ParseImportance(s.Verbosity); err != nil {
+			return err
+		}
 	}
 
-	if s.Spid == 0 {
+	if checkNullValue && s.Spid == 0 {
 		return errors.New("streams per input device must be larger than 0")
 	}
-	if s.Mode == seal.ModeCopy && s.Spod == 0 {
-		return errors.New("streams per output device must be larger than 0")
+
+	if s.Mode == seal.ModeCopy {
+		if checkNullValue && s.Spod == 0 {
+			return errors.New("streams per output device must be larger than 0")
+		}
+		if checkNullValue && len(s.Destinations) == 0 {
+			return errors.New("Need to provide at least one destination")
+		}
+		// defaults to something useful, so it's optional here
+		if len(s.Format) > 0 && codec.NewByName(s.Format) == nil {
+			return fmt.Errorf("invalid output format: '%s'", s.Format)
+		}
 	}
 
 	var filterErr string
@@ -85,10 +103,53 @@ func (s *state) verify() error {
 		return errors.New(filterErr)
 	}
 
-	if len(s.Items) == 0 {
-		return errors.New("Didn't provide a single source or destination")
+	if checkNullValue && len(s.Sources) == 0 {
+		return errors.New("Didn't provide a single source")
 	}
 
+	return nil
+}
+
+// Apply the given, possibly partial state, ignoring all null values
+// Return an error if one of the new values is invalid
+func (s *state) apply(o state) error {
+	ns := *s
+
+	// Set each value if it is not null
+	if len(o.Mode) > 0 {
+		ns.Mode = o.Mode
+	}
+	if len(o.Verbosity) > 0 {
+		ns.Verbosity = o.Verbosity
+	}
+	if o.Spid > 0 {
+		ns.Spid = o.Spid
+	}
+	if o.Spod > 0 {
+		ns.Spod = o.Spod
+	}
+	if len(o.Fep) > 0 {
+		ns.Fep = o.Fep
+	}
+	if len(o.Sources) > 0 {
+		ns.Sources = o.Sources
+	}
+	if len(o.Destinations) > 0 {
+		ns.Destinations = o.Destinations
+	}
+	if len(o.Verify) > 0 {
+		ns.Verify = o.Verify
+	}
+	if len(o.Format) > 0 {
+		ns.Format = o.Format
+	}
+
+	if err := ns.verify(false); err != nil {
+		return err
+	}
+
+	// finally replace our own values
+	*s = ns
 	return nil
 }
 
@@ -104,19 +165,18 @@ type restHandler struct {
 }
 
 // Returns empty string on error
-func remoteToHash(remoteAddr string) (string, error) {
+func remoteToOwner(remoteAddr string) (string, error) {
 	if host, _, err := net.SplitHostPort(remoteAddr); err != nil {
 		return "", err
 	} else {
-		res := md5.Sum([]byte(host))
-		return hex.EncodeToString(res[:]), nil
+		return host, nil
 	}
 }
 
 // Set our owner to something representing the given remoteAddress.
 // If a new owner is set to a value we cannot understand, we will return an error as well.
 func (r *restHandler) setOwner(remoteAddr string) error {
-	if newOwner, err := remoteToHash(remoteAddr); err != nil {
+	if newOwner, err := remoteToOwner(remoteAddr); err != nil {
 		return err
 	} else {
 		r.o = newOwner
@@ -128,34 +188,59 @@ func (r *restHandler) setOwner(remoteAddr string) error {
 // Returns true if the given remote address is our owner.
 // If the remote addr is invalid for some reason, it's always false
 func (r *restHandler) isOwner(remoteAddr string) bool {
-	o, err := remoteToHash(remoteAddr)
+	o, err := remoteToOwner(remoteAddr)
 	return err == nil && o == r.o
 }
 
-// Make the given state our own.
-// Return error string and status code
-func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
+// Returns true if the given remoteAddr may change our state
+func (r *restHandler) CanWrite(remoteAddr string) bool {
+	return len(r.o) != 0 && !r.isOwner(remoteAddr)
+}
+
+// Execute the state we currently have
+// Return error string and status code. If there is no error, status will be StatusOK
+// The new state may be partial, and contain zero values which will just be ignored
+func (r *restHandler) execute(remoteAddr string) (string, int) {
 	r.l.Lock()
 	defer r.l.Unlock()
 
-	// If we are already owned, reject any change
-	if len(r.o) != 0 && !r.isOwner(remoteAddr) {
-		return "State is already owned by someone else and cannot be written", http.StatusUnauthorized
-	}
-
 	// If something is in progress, request a delete
 	if r.st.isInProgress() {
-		return "Cannot change state if something is currently inprogress. Abort it using the DELETE method", http.StatusBadRequest
+		return "Cannot change state if something is currently inprogress. Abort it using the DELETE method", http.StatusPreconditionFailed
 	}
 
-	switch ns.Mode {
+	if err := r.st.verify(true); err != nil {
+		return err.Error(), http.StatusPreconditionFailed
+	}
+
+	// if we are not owned anymore, lets take ownership
+	if len(r.o) == 0 {
+		r.setOwner(remoteAddr)
+	}
+
+	// At this point, we expect remoteAddr to be the owner
+	if !r.isOwner(remoteAddr) {
+		return "You must own the state to be allowed to execute it", http.StatusUnauthorized
+	}
+
+	items := r.st.Sources
+	switch r.st.Mode {
 	case verify.Name:
 		{
-			ns.runner = &verify.Command{}
+			r.st.runner = &verify.Command{}
 		}
 	case seal.ModeSeal, seal.ModeCopy:
 		{
-			ns.runner = &seal.Command{Mode: ns.Mode}
+			scmd := seal.Command{Mode: r.st.Mode}
+			r.st.runner = &scmd
+			if r.st.Mode == seal.ModeCopy {
+				items = append(items, seal.Sep)
+				items = append(items, r.st.Destinations...)
+
+				scmd.Verify = len(r.st.Verify) > 0
+			}
+
+			scmd.Format = r.st.Format
 		}
 	default:
 		{
@@ -163,21 +248,40 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 		}
 	}
 
-	ff := make([]api.FileFilter, len(ns.Fep))
-	for fid, fep := range ns.Fep {
+	ff := make([]api.FileFilter, len(r.st.Fep))
+	for fid, fep := range r.st.Fep {
 		// verify() would have detected invalid filters, no need to check again
 		ff[fid], _ = api.ParseFileFilter(fep)
 	}
 
-	level, _ := api.ParseImportance(ns.Verbosity)
-	if err := ns.runner.Init(ns.Spid, ns.Spod, ns.Items, level, ff); err != nil {
+	level, _ := api.ParseImportance(r.st.Verbosity)
+	if err := r.st.runner.Init(r.st.Spid, r.st.Spod, items, level, ff); err != nil {
+		// This shouldn't be happening here - we verified beforehand.
+		return err.Error(), http.StatusInternalServerError
+	}
+
+	go r.handleOperation()
+	return "", http.StatusOK
+}
+
+// Apply the given (partial) state to our own.
+// On error, return a string and a non-OK status code
+func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
+	r.l.Lock()
+	defer r.l.Unlock()
+
+	if !r.CanWrite(remoteAddr) {
+		return "Changing values not permitted", http.StatusUnauthorized
+	}
+
+	if err := r.st.apply(ns); err != nil {
 		return err.Error(), http.StatusBadRequest
 	}
 
-	// So far so good, replace our state and state and start the engine
-	r.setOwner(remoteAddr)
-	r.st = ns
-	go r.handleOperation()
+	// make sure we allow remoteAddr to take ownership
+	if err := r.setOwner(remoteAddr); err != nil {
+		return err.Error(), http.StatusBadRequest
+	}
 
 	return "", http.StatusOK
 }
@@ -205,19 +309,19 @@ func (r *restHandler) handleOperation() {
 func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 	w.Header().Set(ctkey, jsonct)
 
-	switch {
-	case rq.Method == "GET":
+	switch rq.Method {
+	case "GET":
 		{
 			r.l.RLock()
 			if err := r.st.json(w); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
-			r.l.RUnlock()
 
 			// post if remote has RW access !
-			w.Header().Set("X-is-RW", fmt.Sprint(len(r.o) == 0))
+			w.Header().Set(isrwparam, fmt.Sprint(r.CanWrite(rq.RemoteAddr)))
+			r.l.RUnlock()
 		}
-	case rq.Method == "POST":
+	case "PUT":
 		{
 			var newState state
 			if err := newState.fromJson(rq.Body); err != nil {
@@ -225,12 +329,19 @@ func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 				return
 			}
 
-			// Otherwise, it's valid and we act on it.
-			if err, status := r.applyState(newState, rq.RemoteAddr); status != http.StatusOK {
-				http.Error(w, err, status)
+			// Otherwise, it's valid and we just apply it
+			if msg, status := r.applyState(newState, rq.RemoteAddr); status != http.StatusOK {
+				http.Error(w, msg, status)
 			}
 		}
-	case rq.Method == "DELETE":
+	case "POST":
+		{
+			// Execute the current state
+			if msg, status := r.execute(rq.RemoteAddr); status != http.StatusOK {
+				http.Error(w, msg, status)
+			}
+		}
+	case "DELETE":
 		{
 			// TODO:
 		}

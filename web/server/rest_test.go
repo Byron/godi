@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	// "github.com/Byron/godi/seal"
+	"github.com/Byron/godi/testlib"
 )
 
 func TestRESTState(t *testing.T) {
@@ -37,9 +40,17 @@ func TestRESTState(t *testing.T) {
 	req, _ = http.NewRequest("GET", url, nil)
 	res := checkReq(req, http.StatusOK, jsonct, "Managed to get status")
 
-	// POST: Invalid
+	// POST: Invalid state makes us fail the precondition
 	req, _ = http.NewRequest("POST", url, res.Body)
-	checkReq(req, http.StatusBadRequest, "text/plain", "It detected a totally invalid status")
+	checkReq(req, http.StatusPreconditionFailed, "text/plain", "We didn't modify anything yet, and don't own the state")
+
+	// // Make a change
+	// ns := state{
+	// 	Mode: seal.ModeSeal,
+	// }
+
+	datasetTree, _, _ := testlib.MakeDatasetOrPanic()
+	defer testlib.RmTree(datasetTree)
 
 	// POST: Valid
 	// TODO
