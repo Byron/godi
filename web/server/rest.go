@@ -164,14 +164,14 @@ type restHandler struct {
 	o               string     //IP of original requester
 	cancelRequested bool
 	l               sync.RWMutex
-	cb              func(bool, api.Result) // a callback to allow others to stay informed
+	cb              func(bool, bool, api.Result) // a callback to allow others to stay informed
 }
 
 // Returns a usable REST handler.
 // The callback allows to respond to state-changes, calls to it are synchronized and thus serial only.
 // f(isEnd, result) - isEnd is True only when the operation is now finished, result is nil in that case
 // If isEnd is false and result is nil, this indicates that our state changed
-func NewRestHandler(onStateChange func(bool, api.Result), socketURL string) http.Handler {
+func NewRestHandler(onStateChange func(bool, bool, api.Result), socketURL string) http.Handler {
 	if onStateChange == nil {
 		panic("Callback must be set")
 	}
@@ -315,7 +315,7 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 	}
 
 	// Inform people about the change
-	r.cb(false, nil)
+	r.cb(false, false, nil)
 	return "", http.StatusOK
 }
 
@@ -323,7 +323,8 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 func (r *restHandler) handleOperation(runner api.Runner) {
 
 	// We will filter out TimedStatistics here
-	err := api.StartEngine(runner, func(res api.Result) { r.cb(false, res) })
+	r.cb(true, false, nil)
+	err := api.StartEngine(runner, func(res api.Result) { r.cb(false, false, res) })
 	r.l.Lock()
 
 	{
@@ -339,7 +340,7 @@ func (r *restHandler) handleOperation(runner api.Runner) {
 
 	// inform that we are done - we do that after our state has changed just
 	// to assure rest calls will definitely have the expected result
-	r.cb(true, nil)
+	r.cb(false, true, nil)
 }
 
 func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {

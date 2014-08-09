@@ -21,6 +21,7 @@ type MessageState uint8
 const (
 	StateChanged MessageState = iota
 	StateResult
+	StateBegin
 	StateFinished
 )
 
@@ -129,7 +130,12 @@ func (w *webSocketHandler) ServeHTTP(rw http.ResponseWriter, rq *http.Request) {
 }
 
 // This one runs synchronously too
-func (w *webSocketHandler) restStateHandler(isEnd bool, res api.Result) {
+func (w *webSocketHandler) restStateHandler(isStart, isEnd bool, res api.Result) {
+	if isStart {
+		// init the filter to allow it to work correctly
+		w.statsFilter.LastResultShownAt = time.Now()
+	}
+
 	// ignore this one if it is no OK to show it
 	if res != nil {
 		if _, prio := res.Info(); !w.statsFilter.OK(prio) {
@@ -140,7 +146,9 @@ func (w *webSocketHandler) restStateHandler(isEnd bool, res api.Result) {
 	}
 
 	m := jsonMessage{}
-	if isEnd {
+	if isStart {
+		m.State = StateBegin
+	} else if isEnd {
 		m.State = StateFinished
 	} else {
 		m.fromResult(res)
