@@ -146,10 +146,10 @@ func (f *FileInfo) Root() string {
 type Importance uint8
 
 const (
-	Progress Importance = iota
-	Info
+	Info Importance = iota
 	Warn
 	Error
+	PeriodicalStatistics // We just make it very important to assure it's always shown basically, unless logging is off
 	Valuable
 	LogDisabled
 )
@@ -169,8 +169,8 @@ func (p Importance) MayLog(op Importance) bool {
 
 func (p Importance) String() string {
 	switch {
-	case p == Progress:
-		return "progress"
+	case p == PeriodicalStatistics:
+		return "statistics"
 	case p == Info:
 		return "info"
 	case p == Warn:
@@ -188,7 +188,7 @@ func (p Importance) String() string {
 
 // Parse a priority from the given string. error will be set if this fails
 func ParseImportance(p string) (Importance, error) {
-	for _, t := range [...]Importance{Progress, Info, Warn, Error, Valuable, LogDisabled} {
+	for _, t := range [...]Importance{PeriodicalStatistics, Info, Warn, Error, Valuable, LogDisabled} {
 		if t.String() == p {
 			return t, nil
 		}
@@ -341,7 +341,7 @@ type Runner interface {
 // it used the result it obtained, false otherwise.
 // Returns the last error we received in either generator or aggregation stage
 func StartEngine(runner Runner,
-	aggregateHandler func(Result) bool) (err error) {
+	aggregateHandler func(Result)) (err error) {
 
 	runner.Statistics().StartedAt = time.Now()
 
@@ -357,12 +357,12 @@ func StartEngine(runner Runner,
 
 	accumResult := runner.Generate()
 
-	mkErrPicker := func(handler func(r Result) bool) func(r Result) bool {
-		return func(r Result) bool {
+	mkErrPicker := func(handler func(r Result)) func(r Result) {
+		return func(r Result) {
 			if r.Error() != nil {
 				err = r.Error()
 			}
-			return handler(r)
+			handler(r)
 		}
 	}
 	aggregateHandler = mkErrPicker(aggregateHandler)

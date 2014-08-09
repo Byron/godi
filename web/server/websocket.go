@@ -62,6 +62,9 @@ type webSocketHandler struct {
 
 	// Used to generate websockets
 	upgrader websocket.Upgrader
+
+	// Helps to prune out statistical messages
+	statsFilter api.StatisticsFilter
 }
 
 func NewWebSocketHandler() *webSocketHandler {
@@ -74,6 +77,9 @@ func NewWebSocketHandler() *webSocketHandler {
 		websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
+		},
+		api.StatisticsFilter{
+			FirstStatisticsAfter: 125 * time.Millisecond,
 		},
 	}
 
@@ -124,6 +130,15 @@ func (w *webSocketHandler) ServeHTTP(rw http.ResponseWriter, rq *http.Request) {
 
 // This one runs synchronously too
 func (w *webSocketHandler) restStateHandler(isEnd bool, res api.Result) {
+	// ignore this one if it is no OK to show it
+	if res != nil {
+		if _, prio := res.Info(); !w.statsFilter.OK(prio) {
+			return
+		}
+		// we only care about actual results, and not other events we get, like state changes
+		w.statsFilter.LastResultShownAt = time.Now()
+	}
+
 	m := jsonMessage{}
 	if isEnd {
 		m.State = StateFinished

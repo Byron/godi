@@ -2,8 +2,15 @@ package api
 
 import (
 	"sync"
+	"time"
 
 	"github.com/Byron/godi/io"
+)
+
+const (
+	StatisticalResultInterval  = 125 * time.Millisecond
+	StatisticalLoggingInterval = 1 * time.Second
+	TimeEpsilon                = 40 * time.Millisecond
 )
 
 // Generate does all boilerplate required to be a valid generator
@@ -49,12 +56,39 @@ func Aggregate(results <-chan Result, done <-chan bool,
 	stats *Stats) <-chan Result {
 	accumResult := make(chan Result)
 
+	// For time-dependent insertion of results
+	lastStat := *stats
+	lastTimeResult := time.Now()
+
+	// An observer, producing results with statistics after acertain interval
+	// We set this value to be quite responsive
+	ticker := time.NewTicker(StatisticalResultInterval)
+	go func() {
+		for now := range ticker.C {
+			select {
+			case <-done:
+				ticker.Stop()
+			default:
+			}
+
+			// Otherwise, prepare statistics
+			accumResult <- &BasicResult{
+				Msg:  stats.DeltaString(&lastStat, now.Sub(lastTimeResult), io.StatsClientSep) + " " + stats.String(),
+				Prio: PeriodicalStatistics,
+			}
+			lastTimeResult = time.Now()
+
+			stats.CopyTo(&lastStat)
+		}
+	}()
+
 	go func() {
 		defer close(accumResult)
 
 		// ACCUMULATE PATHS INFO
 		/////////////////////////
 		for r := range results {
+
 			// Be sure we take note of cancellation.
 			// If this happens, soon our results will be drained and we leave naturally
 			select {
@@ -76,4 +110,32 @@ func Aggregate(results <-chan Result, done <-chan bool,
 	}()
 
 	return accumResult
+}
+
+// Utility type to determine if a Statistical result should be shown
+// Assign the last time you used any result to this instance
+type StatisticsFilter struct {
+	LastResultShownAt    time.Time     // time at which you have used a result, whichever prio
+	FirstStatisticsAfter time.Duration // time after which the first message will show
+}
+
+// Returns true if we can use the statistical information. You have to check if
+// your result messsage has the right prio
+func (s *StatisticsFilter) OK(prio Importance) bool {
+	if prio != PeriodicalStatistics {
+		s.FirstStatisticsAfter = StatisticalLoggingInterval
+		return true
+	}
+
+	// Prune out timed messages - we only want to see them if there was nothing else
+	td := time.Now().Sub(s.LastResultShownAt) // temporal distance
+	if td+TimeEpsilon < s.FirstStatisticsAfter {
+		s.FirstStatisticsAfter = StatisticalLoggingInterval
+		return false
+	}
+
+	// The first time a log should be there faster to feel more responsive
+	// From that point on, messages can come in more slowly
+	s.FirstStatisticsAfter = StatisticalLoggingInterval
+	return true
 }

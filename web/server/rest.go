@@ -322,7 +322,8 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 // An async handler for an entire godi operation
 func (r *restHandler) handleOperation(runner api.Runner) {
 
-	err := api.StartEngine(runner, func(res api.Result) bool { r.cb(false, res); return true })
+	// We will filter out TimedStatistics here
+	err := api.StartEngine(runner, func(res api.Result) { r.cb(false, res) })
 	r.l.Lock()
 
 	{
