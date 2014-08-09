@@ -327,10 +327,15 @@ func (r *restHandler) handleOperation(runner api.Runner) {
 	err := api.StartEngine(runner, func(res api.Result) { r.cb(false, false, res) })
 	r.l.Lock()
 
+	errMsg := ""
+	if err != nil {
+		errMsg = err.Error()
+	}
+
 	{
 		// Reset our state and store result. Reset owner
 		r.r = nil
-		r.st.LastError = err.Error()
+		r.st.LastError = errMsg
 		r.st.IsRunning = false
 		r.cancelRequested = false
 		r.o = ""
