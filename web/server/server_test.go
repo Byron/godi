@@ -150,7 +150,6 @@ func TestRESTState(t *testing.T) {
 	}
 
 	// DELETE: abort operation - idempotent
-	okSeen := false
 	for i := 0; i < 2; i++ {
 		req, _ = http.NewRequest("DELETE", url, nil)
 		res, err := http.DefaultClient.Do(req)
@@ -158,21 +157,14 @@ func TestRESTState(t *testing.T) {
 			t.Fatal(err)
 		}
 		if res.StatusCode == http.StatusOK {
-			okSeen = true
+			// expected and ok
 		} else if res.StatusCode == http.StatusPreconditionFailed {
-			// it could take a moment for the operation to begin, or it's done already. Give it some time
-			// NOTE: Dealing with time like that is prone to fail on different hardware due to different
-			// performance characteristics. If it becomes an issue, we have to remove this check or make it
-			// far more flexible
-			time.Sleep(50 * time.Millisecond)
+			// This means we are already done
+			break
 		} else {
 			t.Fatalf("Unexpected Status Code: %d", res.StatusCode)
 		}
 		t.Logf("DELETE on running application, attempt %d, status %d", i, res.StatusCode)
-	}
-
-	if !okSeen {
-		t.Fatal("Didn't manage to abort a running operation, not even once")
 	}
 
 	// CHECK STATUS - have to wait for it to finish (TODO: wait for websocket notification)
