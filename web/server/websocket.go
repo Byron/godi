@@ -27,11 +27,11 @@ const (
 
 // A JSON serializable struct to inform about what's going on
 type jsonMessage struct {
-	Message    string         `json:message`
-	Error      string         `json:error`
-	Importance api.Importance `json:importance`
+	Message    string         `json:"message"`
+	Error      string         `json:"error"`
+	Importance api.Importance `json:"importance"`
 
-	State MessageState `json:state`
+	State MessageState `json:"state"`
 }
 
 func (m *jsonMessage) fromResult(r api.Result) {

@@ -125,47 +125,57 @@ func (s *state) verify(checkNullValue bool) error {
 }
 
 // Apply the given, possibly partial state, ignoring all null values
-// Return an error if one of the new values is invalid
-func (s *state) apply(o state) error {
+// Return an error if one of the new values is invalid. Boolean signals that we actually changed
+func (s *state) apply(o state) (bool, error) {
 	ns := *s
+	changed := false
 
 	// Set each value if it is not null
 	if len(o.Mode) > 0 {
+		changed = true
 		ns.Mode = o.Mode
 	}
 	if len(o.Verbosity) > 0 {
+		changed = true
 		ns.Verbosity = o.Verbosity
 	}
 	if o.Spid > 0 {
+		changed = true
 		ns.Spid = o.Spid
 	}
 	if o.Spod > 0 {
+		changed = true
 		ns.Spod = o.Spod
 	}
 	if len(o.Fep) > 0 {
+		changed = true
 		ns.Fep = o.Fep
 	}
 	if len(o.Sources) > 0 {
+		changed = true
 		ns.Sources = o.Sources
 	}
 	if len(o.Destinations) > 0 {
+		changed = true
 		ns.Destinations = o.Destinations
 	}
 	if len(o.Verify) > 0 {
+		changed = true
 		ns.Verify = o.Verify
 	}
 	if len(o.Format) > 0 {
+		changed = true
 		ns.Format = o.Format
 	}
 
 	// Actually this shouldn't be needed here as o is already checked, but better save than sorry
 	if err := ns.verify(false); err != nil {
-		return err
+		return changed, err
 	}
 
 	// finally replace our own values
 	*s = ns
-	return nil
+	return changed, nil
 }
 
 // An http handler to manage our simplistic rest API.
@@ -193,6 +203,12 @@ func NewRestHandler(onStateChange func(bool, bool, api.Result), socketURL string
 	return &restHandler{
 		cb: onStateChange,
 		st: state{
+			// replicate defaults used by CLI
+			Mode: verify.Name,
+			Spid: 1,
+			// Fep:       []string{api.FilterVolatile.String()}, // DEBUG - enable this
+			Format:    codec.GobName,
+			Verbosity: api.Error.String(),
 			SocketURL: socketURL,
 		},
 	}
@@ -311,6 +327,7 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 	r.l.Lock()
 	defer r.l.Unlock()
+	changed := false
 
 	if !r.CanWrite(remoteAddr) {
 		return "Changing values not permitted", http.StatusUnauthorized
@@ -320,17 +337,20 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 		return "Operation already in progress", http.StatusPreconditionFailed
 	}
 
-	if err := r.st.apply(ns); err != nil {
+	var err error
+	if changed, err = r.st.apply(ns); err != nil {
 		return err.Error(), http.StatusPreconditionFailed
 	}
 
 	// make sure we allow remoteAddr to take ownership
-	if err := r.setOwner(remoteAddr); err != nil {
+	if err = r.setOwner(remoteAddr); err != nil {
 		return err.Error(), http.StatusBadRequest
 	}
 
 	// Inform people about the change
-	r.cb(false, false, nil)
+	if changed {
+		r.cb(false, false, nil)
+	}
 	return "", http.StatusOK
 }
 

@@ -32,21 +32,36 @@
 
     <div ng-view></div>
 
-    <div>
-    <form>
-        <span ng-repeat="mode in default.modes" ><input type="radio" ng-model="state.mode" value="{{mode}}">  {{mode}}<br></span>
+    <!-- MODE SELECT -->
+    <div id="mode-select">
+        <h2>Operation</h2>
+        <span ng-repeat="mode in default.modes">
+            <input type="radio" ng-model="state.mode" value="{{mode}}" ng-disabled="stateReadOnly">{{mode}}
+            <br>
+        </span>
         <!-- <span ng-repeat="mode in default.modes"> {{mode}} {{state.mode}} </span> -->
-    </form>
     </div>
+
+    <!-- VERBOSITY-SELECT -->
+    <div id="verbosity-select">
+        <h2>Verbosity</h2>
+        <span ng-repeat="level in default.verbosities">
+            <input type="radio" ng-model="state.verbosity" value="{{level}}" ng-disabled="stateReadOnly">{{level}}
+            <br>
+        </span>
+    </div>
+
+
 
     <div>Angular seed app: v
         <span app-version></span>
-        <br>{{state}}<br>
-        {{default}}
+        <br>{{state}}
+        <br>{{default}}
     </div>
 
     <div ng-show="isUpdating">Fetching data - please wait.</div>
-    <div ng-show="updateFailed">ERROR Fetching data</div>
+    <div ng-show="and(updateFailed, !stateReadOnly)">ERROR Putting data</div>
+    <div ng-hide="stateReadOnly">WRITE MODE</div>
 
     <!-- In production use:
   <script src="//ajax.googleapis.com/ajax/libs/angularjs/x.x.x/angular.min.js"></script>

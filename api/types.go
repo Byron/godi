@@ -95,7 +95,7 @@ func (f *FileFilter) Matches(name string, mode os.FileMode) bool {
 // Every string which is not a special kind of filter will be interpreted as fnmatch filter. Err is returned if
 // the glob is invalid
 func ParseFileFilter(name string) (FileFilter, error) {
-	for _, f := range [...]FileFilter{FilterSymlinks, FilterHidden, FilterSeals, FilterVolatile} {
+	for _, f := range [...]FileFilter{FilterVolatile, FilterHidden, FilterSymlinks, FilterSeals} {
 		if f.String() == name {
 			return f, nil
 		}
