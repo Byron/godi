@@ -130,11 +130,10 @@ func (w *webSocketHandler) ServeHTTP(rw http.ResponseWriter, rq *http.Request) {
 	if err != nil {
 		// We have to reply with an error here, according to gorilla docs.
 		// Actually, that depends ... it seems to write the header already
-		println("UPGRADE ERROR", rq.RemoteAddr, err.Error(), rq.Header["Origin"][0])
 		// http.Error(rw, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	println("GOT CONNECTION", conn.RemoteAddr().String())
+
 	conn.UnderlyingConn()
 	w.newClients <- webClient{conn}
 }
