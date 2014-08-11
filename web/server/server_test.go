@@ -150,6 +150,7 @@ func TestRESTState(t *testing.T) {
 	}
 
 	// DELETE: abort operation - idempotent
+	hasCancelled := false
 	for i := 0; i < 2; i++ {
 		req, _ = http.NewRequest("DELETE", url, nil)
 		res, err := http.DefaultClient.Do(req)
@@ -158,6 +159,7 @@ func TestRESTState(t *testing.T) {
 		}
 		if res.StatusCode == http.StatusOK {
 			// expected and ok
+			hasCancelled = true
 		} else if res.StatusCode == http.StatusPreconditionFailed {
 			// This means we are already done
 			break
@@ -179,7 +181,7 @@ func TestRESTState(t *testing.T) {
 	if time.Now().Sub(startedAt) < delay {
 		t.Fatal("Finished way to early - did it run for sure ?")
 	}
-	if s.LastError == "" {
+	if hasCancelled && s.LastError == "" {
 		t.Fatal("Cancellation should turn out as 'Error'")
 	} else {
 		t.Log("Cancellation created named: %s", s.LastError)
