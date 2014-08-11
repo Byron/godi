@@ -39,6 +39,21 @@ type state struct {
 	LastError string `json:executionError` // error result of the last operation
 }
 
+// A struct keeping valid values for certain constants
+type defaults struct {
+	Modes       []string `json:modes`
+	Verbosities []string `json:verbosities`
+	Feps        []string `json:feps`
+	Formats     []string `json:formats`
+}
+
+var valueDefaults = defaults{
+	Modes:       []string{verify.Name, seal.ModeSeal, seal.ModeCopy},
+	Verbosities: []string{api.Info.String(), api.Error.String()},
+	Feps:        []string{api.FilterHidden.String(), api.FilterSeals.String(), api.FilterSymlinks.String(), api.FilterVolatile.String()},
+	Formats:     codec.Names(),
+}
+
 // Write ourselves to w as json
 func (s *state) json(w io.Writer) error {
 	return json.NewEncoder(w).Encode(s)
@@ -407,6 +422,12 @@ func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 				http.Error(w, msg, status)
 			} else {
 				doWriteState()
+			}
+		}
+	case "DEFAULTS":
+		{
+			if err := json.NewEncoder(w).Encode(&valueDefaults); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}
 	case "DELETE":
