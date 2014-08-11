@@ -78,6 +78,11 @@ func NewWebSocketHandler() *webSocketHandler {
 		websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
+			// at least when testing, origin checks failed as host is 127.0.0.1, which
+			// is compared with 'localhost'
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
 		},
 		api.StatisticsFilter{
 			FirstStatisticsAfter: 125 * time.Millisecond,
@@ -123,9 +128,14 @@ func (w *webSocketHandler) eventHandler() {
 func (w *webSocketHandler) ServeHTTP(rw http.ResponseWriter, rq *http.Request) {
 	conn, err := w.upgrader.Upgrade(rw, rq, nil)
 	if err != nil {
-		// We have to reply with an error here, according to gorilla docs
-		http.Error(rw, err.Error(), http.StatusServiceUnavailable)
+		// We have to reply with an error here, according to gorilla docs.
+		// Actually, that depends ... it seems to write the header already
+		println("UPGRADE ERROR", rq.RemoteAddr, err.Error(), rq.Header["Origin"][0])
+		// http.Error(rw, err.Error(), http.StatusServiceUnavailable)
+		return
 	}
+	println("GOT CONNECTION", conn.RemoteAddr().String())
+	conn.UnderlyingConn()
 	w.newClients <- webClient{conn}
 }
 

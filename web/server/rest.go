@@ -24,27 +24,27 @@ const (
 
 // A struct for json serialization and deserialization
 type state struct {
-	Mode         string   `json:mode`
-	Verbosity    string   `json:verbosity`
-	Spid         int      `json:spid`         // streams per input device
-	Spod         int      `json:spod`         // streams per output device
-	Fep          []string `json:fep`          // file exclude patterns
-	Sources      []string `json:sources`      // The sources for verify and seal
-	Destinations []string `json:destinations` // The destinations of sealed-copy
-	Verify       string   `json:verify`       // if non-empty, verification is done after a sealed copy
-	Format       string   `json:format`       // The serialization format of seals
-	SocketURL    string   `json:socketURL`    // read-only URL of the web-socket people can connect to
-	IsRunning    bool     `json:status`       // read-only, true if an operation is in progress
+	Mode         string   `json:"mode"`
+	Verbosity    string   `json:"verbosity"`
+	Spid         int      `json:"spid"`         // streams per input device
+	Spod         int      `json:"spod"`         // streams per output device
+	Fep          []string `json:"fep"`          // file exclude patterns
+	Sources      []string `json:"sources"`      // The sources for verify and seal
+	Destinations []string `json:"destinations"` // The destinations of sealed-copy
+	Verify       string   `json:"verify"`       // if non-empty, verification is done after a sealed copy
+	Format       string   `json:"format"`       // The serialization format of seals
+	SocketURL    string   `json:"socketURL"`    // read-only URL of the web-socket people can connect to
+	IsRunning    bool     `json:"status"`       // read-only, true if an operation is in progress
 
 	LastError string `json:executionError` // error result of the last operation
 }
 
 // A struct keeping valid values for certain constants
 type defaults struct {
-	Modes       []string `json:modes`
-	Verbosities []string `json:verbosities`
-	Feps        []string `json:feps`
-	Formats     []string `json:formats`
+	Modes       []string `json:"modes"`
+	Verbosities []string `json:"verbosities"`
+	Feps        []string `json:"feps"`
+	Formats     []string `json:"formats"`
 }
 
 var valueDefaults = defaults{
