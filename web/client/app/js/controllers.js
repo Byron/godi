@@ -28,7 +28,7 @@ controller('GodiController', ['$scope', '$location', '$resource',
             if ($scope.stateReadOnly && header("x-is-rw") == 'true') {
                 $scope.stateReadOnly = false;
             }
-        }
+        };
 
         // These variables are kind of competing with each other if there are multple requests at once
         var updateDone = function(_, header) {
@@ -87,7 +87,7 @@ controller("FilterController", ["$scope",
         // tracks whether a default is selected, one per default
         // We need this info to be part of the model, otherwise updates are difficult to handle
         $scope.fepDefaultSelections = [];
-        ctrl = this;
+        var ctrl = this;
 
         // Called when a checkbox changes
         ctrl.onchange = function changed(name, add) {
@@ -120,7 +120,15 @@ controller("FilterController", ["$scope",
             return $scope.default.feps.indexOf(filter) > -1;
         };
 
-        $scope.$watch('state.fep', function() {
+        ctrl.isNoDefault = function isNoDefault(filter) {
+            return !ctrl.isDefault(filter);
+        };
+
+        ctrl.replace = function replace(index, nval) {
+            $scope.state.fep[index] = nval;
+        };
+
+        $scope.$watch('state.fep', function fepChanged(nval) {
             if (!$scope.default.feps) {
                 return;
             }

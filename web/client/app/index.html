@@ -36,7 +36,7 @@
     <div id="mode-select" ng-hide="!default.modes">
         <h2>Operation</h2>
         <span ng-repeat="mode in default.modes">
-            <input type="radio" ng-model="state.mode" value="{{mode}}" ng-disabled="stateReadOnly">{{mode}}
+            <input type="radio" ng-model="state.mode" value="{{mode}}" ng-disabled="stateReadOnly" />{{mode}}
             <br>
         </span>
         <!-- <span ng-repeat="mode in default.modes"> {{mode}} {{state.mode}} </span> -->
@@ -46,22 +46,37 @@
     <div id="verbosity-select" ng-hide="!default.verbosities">
         <h2>Verbosity</h2>
         <span ng-repeat="level in default.verbosities">
-            <input type="radio" ng-model="state.verbosity" value="{{level}}" ng-disabled="stateReadOnly">{{level}}
+            <input type="radio" ng-model="state.verbosity" value="{{level}}" ng-disabled="stateReadOnly" />{{level}}
             <br>
         </span>
     </div>
 
     <!-- INPUT FILTERING -->
-    <div id"input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
+    <div id "input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
         <h2>Input Filtering</h2>
-        <!-- list all default filters -->
+        <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
         <span ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" ng-init="filter=default.feps[$index]">
-            {{filter}} <input type="checkbox" ng-model="isSelected" ng-change="fctrl.onchange(filter, isSelected)">
+            {{filter|lowercase}}
+            <input type="checkbox" ng-model="isSelected" ng-change="fctrl.onchange(filter, isSelected)" />
         </span>
+        <!-- user filters -->
+        <br>
+        <span ng-repeat="filter in state.fep | filter:fctrl.isNoDefault track by $index">
+            <input type="text" ng-model="filter" unique-and-no-fep-default ng-change="fctrl.replace($index, filter)"/>
+            <br>
+        </span>
+        <!-- New user filtesr -->
+        <br/>
+        <form name="form">
+            <input ng-hide="!default.feps" type="text" ng-model="filter" name="filter" required placeholder="enter filter like *.mov" unique-and-no-fep-default />
+            <button ng-click="fctrl.onchange(filter, true)" ng-disabled="form.$invalid">add</button>
+        </form>
     </div>
 
 
-
+    <br>
+    <br>
+    <br>
     <div>Angular seed app: v
         <span app-version></span>
         <br>{{state}}
