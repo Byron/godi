@@ -25,9 +25,9 @@ controller('GodiController', ['$scope', '$location', '$resource',
         });
 
         var updateReadOnly = function(header) {
-        	if ($scope.stateReadOnly && header("x-is-rw") == 'true') {
-        		$scope.stateReadOnly = false;
-        	}
+            if ($scope.stateReadOnly && header("x-is-rw") == 'true') {
+                $scope.stateReadOnly = false;
+            }
         }
 
         // These variables are kind of competing with each other if there are multple requests at once
@@ -58,8 +58,8 @@ controller('GodiController', ['$scope', '$location', '$resource',
                     if (d) {
                         if (d.state === 0) { // state change
                             $scope.state.$get(null, function(val, header) {
-                            	// NOTE: We are currently triggered by our own changes.
-                            	// Prevent this by passing along some sort of client ID that we can compare to.
+                                // NOTE: We are currently triggered by our own changes.
+                                // Prevent this by passing along some sort of client ID that we can compare to.
                                 console.log("WS FETCHED");
                                 updateReadOnly(header);
                             });
@@ -75,10 +75,28 @@ controller('GodiController', ['$scope', '$location', '$resource',
         $scope.state = State.get({}, firstStateHandler, updateFailed);
 
         // Automatically put all changes, right when they happen
-        $scope.$watchCollection('state', function(nval, oval) {
+        $scope.$watch('state', function(nval, oval) {
             nval.$update({}, updateDone, updateFailed);
-        });
+        }, true);
 
         return this;
+    }
+]).
+controller("FilterController", ["$scope",
+    function FilterController($scope) {
+        this.onchange = function changed(name, add) {
+            // We may be depending on the initial value coming from godi, lets be sure it has a value
+            if (!$scope.state.fep) {
+                $scope.state.fep = [];
+            }
+            if (add) {
+                $scope.state.fep.push(name);
+            } else {
+                var idx = $scope.state.fep.indexOf(name);
+                if (idx > -1) {
+                    $scope.state.fep.splice(idx, 1);
+                }
+            }
+        };
     }
 ]);

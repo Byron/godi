@@ -204,9 +204,9 @@ func NewRestHandler(onStateChange func(bool, bool, api.Result), socketURL string
 		cb: onStateChange,
 		st: state{
 			// replicate defaults used by CLI
-			Mode: verify.Name,
-			Spid: 1,
-			// Fep:       []string{api.FilterVolatile.String()}, // DEBUG - enable this
+			Mode:      verify.Name,
+			Spid:      1,
+			Fep:       []string{api.FilterVolatile.String()},
 			Format:    codec.GobName,
 			Verbosity: api.Error.String(),
 			SocketURL: socketURL,

@@ -33,7 +33,7 @@
     <div ng-view></div>
 
     <!-- MODE SELECT -->
-    <div id="mode-select">
+    <div id="mode-select" ng-hide="!default.modes">
         <h2>Operation</h2>
         <span ng-repeat="mode in default.modes">
             <input type="radio" ng-model="state.mode" value="{{mode}}" ng-disabled="stateReadOnly">{{mode}}
@@ -43,11 +43,19 @@
     </div>
 
     <!-- VERBOSITY-SELECT -->
-    <div id="verbosity-select">
+    <div id="verbosity-select" ng-hide="!default.verbosities">
         <h2>Verbosity</h2>
         <span ng-repeat="level in default.verbosities">
             <input type="radio" ng-model="state.verbosity" value="{{level}}" ng-disabled="stateReadOnly">{{level}}
             <br>
+        </span>
+    </div>
+
+    <!-- INPUT FILTERING -->
+    <div id"input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
+        <h2>Input Filtering</h2>
+        <span ng-repeat="filter in default.feps">
+            {{filter}} <input type="checkbox" ng-model="fep$index" ng-change="fctrl.onchange(filter, fep$index)">
         </span>
     </div>
 
