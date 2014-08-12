@@ -75,7 +75,7 @@ controller('GodiController', ['$scope', '$location', '$resource',
         $scope.state = State.get({}, firstStateHandler, updateFailed);
 
         // Automatically put all changes, right when they happen
-        $scope.$watch('state', function(nval, oval) {
+        $scope.$watch('state', function(nval) {
             nval.$update({}, updateDone, updateFailed);
         }, true);
 
@@ -84,7 +84,13 @@ controller('GodiController', ['$scope', '$location', '$resource',
 ]).
 controller("FilterController", ["$scope",
     function FilterController($scope) {
-        this.onchange = function changed(name, add) {
+        // tracks whether a default is selected, one per default
+        // We need this info to be part of the model, otherwise updates are difficult to handle
+        $scope.fepDefaultSelections = [];
+        ctrl = this;
+
+        // Called when a checkbox changes
+        ctrl.onchange = function changed(name, add) {
             // We may be depending on the initial value coming from godi, lets be sure it has a value
             if (!$scope.state.fep) {
                 $scope.state.fep = [];
@@ -98,5 +104,29 @@ controller("FilterController", ["$scope",
                 }
             }
         };
+
+        
+        ctrl.isSelected = function isSelected(filter) {
+            if (!$scope.state.fep) {
+                return false;
+            }
+            return $scope.state.fep.indexOf(filter) > -1;
+        };
+
+        ctrl.isDefault = function isDefault(filter) {
+            if (!$scope.default.feps) {
+                return false;
+            }
+            return $scope.default.feps.indexOf(filter) > -1;
+        };
+
+        $scope.$watch('state.fep', function() {
+            if (!$scope.default.feps) {
+                return;
+            }
+            for (var i = 0; i < $scope.default.feps.length; i++) {
+                $scope.fepDefaultSelections[i] = ctrl.isSelected($scope.default.feps[i]);
+            }
+        }, true);
     }
 ]);

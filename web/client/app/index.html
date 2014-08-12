@@ -54,8 +54,9 @@
     <!-- INPUT FILTERING -->
     <div id"input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
         <h2>Input Filtering</h2>
-        <span ng-repeat="filter in default.feps">
-            {{filter}} <input type="checkbox" ng-model="fep$index" ng-change="fctrl.onchange(filter, fep$index)">
+        <!-- list all default filters -->
+        <span ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" ng-init="filter=default.feps[$index]">
+            {{filter}} <input type="checkbox" ng-model="isSelected" ng-change="fctrl.onchange(filter, isSelected)">
         </span>
     </div>
 
