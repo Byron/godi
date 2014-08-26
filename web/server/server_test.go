@@ -56,6 +56,7 @@ func TestRESTState(t *testing.T) {
 	}(ws)
 
 	checkReq := func(req *http.Request, stat int, ct string, msg string) *http.Response {
+		req.Header.Set("Client-ID", "testClient")
 		if res, err := http.DefaultClient.Do(req); err != nil {
 			t.Fatal(err)
 		} else if res.StatusCode != stat {

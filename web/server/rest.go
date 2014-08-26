@@ -189,14 +189,14 @@ type restHandler struct {
 	o               string     //IP of original requester
 	cancelRequested bool
 	l               sync.RWMutex
-	cb              func(bool, bool, api.Result) // a callback to allow others to stay informed
+	cb              func(bool, bool, api.Result, string) // a callback to allow others to stay informed
 }
 
 // Returns a usable REST handler.
 // The callback allows to respond to state-changes, calls to it are synchronized and thus serial only.
 // f(isEnd, result) - isEnd is True only when the operation is now finished, result is nil in that case
 // If isEnd is false and result is nil, this indicates that our state changed
-func NewRestHandler(onStateChange func(bool, bool, api.Result), socketURL string) http.Handler {
+func NewRestHandler(onStateChange func(bool, bool, api.Result, string), socketURL string) http.Handler {
 	if onStateChange == nil {
 		panic("Callback must be set")
 	}
@@ -324,7 +324,7 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 
 // Apply the given (partial) state to our own.
 // On error, return a string and a non-OK status code
-func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
+func (r *restHandler) applyState(ns state, remoteAddr, clientID string) (string, int) {
 	r.l.Lock()
 	defer r.l.Unlock()
 	changed := false
@@ -349,7 +349,7 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 
 	// Inform people about the change
 	if changed {
-		r.cb(false, false, nil)
+		r.cb(false, false, nil, clientID)
 	}
 	return "", http.StatusOK
 }
@@ -358,8 +358,8 @@ func (r *restHandler) applyState(ns state, remoteAddr string) (string, int) {
 func (r *restHandler) handleOperation(runner api.Runner) {
 
 	// We will filter out TimedStatistics here
-	r.cb(true, false, nil)
-	err := api.StartEngine(runner, func(res api.Result) { r.cb(false, false, res) })
+	r.cb(true, false, nil, "")
+	err := api.StartEngine(runner, func(res api.Result) { r.cb(false, false, res, "") })
 	r.l.Lock()
 
 	errMsg := ""
@@ -380,7 +380,7 @@ func (r *restHandler) handleOperation(runner api.Runner) {
 
 	// inform that we are done - we do that after our state has changed just
 	// to assure rest calls will definitely have the expected result
-	r.cb(false, true, nil)
+	r.cb(false, true, nil, "")
 }
 
 func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
@@ -398,7 +398,7 @@ func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 		var newState state
 		if err := newState.fromJson(rq.Body); err != nil && err != io.EOF {
 			http.Error(w, err.Error(), http.StatusPreconditionFailed)
-		} else if msg, status := r.applyState(newState, rq.RemoteAddr); status != http.StatusOK {
+		} else if msg, status := r.applyState(newState, rq.RemoteAddr, rq.Header.Get("Client-ID")); status != http.StatusOK {
 			http.Error(w, msg, status)
 		} else {
 			// on success, return the current state

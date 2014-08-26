@@ -2,26 +2,31 @@
 
 /* Controllers */
 
-angular.module('godiwi.controllers', [])
-    .controller('MyCtrl1', ['$scope',
-        function($scope) {
-
-        }
-    ])
-    .controller('MyCtrl2', ['$scope',
-        function($scope) {
-
-        }
-    ]).
-controller('GodiController', ['$scope', '$location', '$resource',
-    function NewGodiController($scope, $location, $resource) {
+angular.module('godiwi.controllers', []).
+controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
+    function NewGodiController($scope, $location, $resource, clientID) {
+        var header = {"Client-ID": clientID};
         var State = $resource('/api/v1/state', null, {
             defaults: {
-                method: "DEFAULTS"
+                method: "DEFAULTS",
+                headers: header,
             },
             update: {
-                method: "PUT"
-            }
+                method: "PUT",
+                headers: header,
+            },
+            get: {
+                method: "GET",
+                headers: header,
+            },
+            post: {
+                method: "POST",
+                headers: header,
+            },
+            "delete": {
+                method: "DELETE",
+                headers: header,
+            },
         });
 
         var updateReadOnly = function(header) {
@@ -56,11 +61,11 @@ controller('GodiController', ['$scope', '$location', '$resource',
                 conn.onmessage = function(val) {
                     var d = angular.fromJson(val.data);
                     if (d) {
-                        if (d.state === 0) { // state change
+                        if (d.state === 0 && d.clientID != clientID) { // state change
                             $scope.state.$get(null, function(val, header) {
                                 // NOTE: We are currently triggered by our own changes.
                                 // Prevent this by passing along some sort of client ID that we can compare to.
-                                console.log("WS FETCHED");
+                                console.log("WS FETCHED", clientID, d.clientID);
                                 updateReadOnly(header);
                             });
                         }

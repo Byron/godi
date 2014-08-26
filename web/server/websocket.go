@@ -31,7 +31,13 @@ type jsonMessage struct {
 	Error      string         `json:"error"`
 	Importance api.Importance `json:"importance"`
 
-	State MessageState `json:"state"`
+	ClientID string       `json:"clientID"` // the client who triggered the change - only used with StateChanged events
+	State    MessageState `json:"state"`
+}
+
+type broadcastMessage struct {
+	message        string // the mssage to broadcase
+	sourceClientID string // id of the client who triggered the message. May be unset to broadcast to everyone
 }
 
 func (m *jsonMessage) fromResult(r api.Result) {
@@ -134,12 +140,11 @@ func (w *webSocketHandler) ServeHTTP(rw http.ResponseWriter, rq *http.Request) {
 		return
 	}
 
-	conn.UnderlyingConn()
 	w.newClients <- webClient{conn}
 }
 
 // This one runs synchronously too
-func (w *webSocketHandler) restStateHandler(isStart, isEnd bool, res api.Result) {
+func (w *webSocketHandler) restStateHandler(isStart, isEnd bool, res api.Result, clientID string) {
 	if isStart {
 		// init the filter to allow it to work correctly
 		w.statsFilter.LastResultShownAt = time.Now()
@@ -154,7 +159,7 @@ func (w *webSocketHandler) restStateHandler(isStart, isEnd bool, res api.Result)
 		w.statsFilter.LastResultShownAt = time.Now()
 	}
 
-	m := jsonMessage{}
+	m := jsonMessage{ClientID: clientID}
 	if isStart {
 		m.State = StateBegin
 	} else if isEnd {
