@@ -19,10 +19,13 @@ directive('uniqueAndNoFepDefault', function() {
                 var isValid = false;
                 if (viewValue) {
                     isValid = scope.default.feps.indexOf(viewValue.toUpperCase()) < 0;
-                    for (var val in scope.state.fep) {
-                        if (val == viewValue) {
-                            isValid = false;
-                            break;
+                    if (isValid) {
+                        // it's not a default value - check if it's already in the file exclude patterns list
+                        for (var idx in scope.state.fep) {
+                            if (scope.state.fep[idx].toLowerCase() == viewValue.toLowerCase()) {
+                                isValid = false;
+                                break;
+                            }
                         }
                     }
                 }

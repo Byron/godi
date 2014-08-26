@@ -139,7 +139,7 @@ controller("FilterController", ["$scope",
         ctrl.replace = function replace(index, nval) {
             $scope.state.fep[index] = nval;
         };
-
+        
         $scope.$watch('state.fep', function fepChanged(nval) {
             if (!$scope.default.feps) {
                 return;

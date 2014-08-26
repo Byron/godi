@@ -53,21 +53,22 @@
 
     <!-- INPUT FILTERING -->
     <div id "input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
-        <h2>Input Filtering</h2>
+        <h2>File Exclude Patterns</h2>
         <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
         <span ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" ng-init="filter=default.feps[$index]">
             {{filter|lowercase}}
-            <input type="checkbox" ng-model="isSelected" ng-change="fctrl.onchange(filter, isSelected)" />
+            <input ng-disabled="stateReadOnly" type="checkbox" ng-model="isSelected" ng-change="fctrl.onchange(filter, isSelected)" />
         </span>
-        <!-- user filters -->
+        <!-- display user filters -->
         <br>
         <span ng-repeat="filter in state.fep | filter:fctrl.isNoDefault track by $index">
-            <input type="text" ng-model="filter" unique-and-no-fep-default ng-change="fctrl.replace($index, filter)"/>
+            <input ng-disabled="stateReadOnly" type="text" ng-model="filter" ng-change="fctrl.replace($index, filter)"/>
+            <button ng-click="fctrl.onchange(filter, false)" ng-hide="stateReadOnly">X</button>
             <br>
         </span>
-        <!-- New user filtesr -->
+        <!-- New user filters form -->
         <br/>
-        <form name="form">
+        <form name="form" ng-hide="stateReadOnly">
             <input ng-hide="!default.feps" type="text" ng-model="filter" name="filter" required placeholder="enter filter like *.mov" unique-and-no-fep-default />
             <button ng-click="fctrl.onchange(filter, true)" ng-disabled="form.$invalid">add</button>
         </form>
