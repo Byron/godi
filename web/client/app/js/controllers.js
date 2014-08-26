@@ -30,9 +30,10 @@ controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
         });
 
         var updateReadOnly = function(header) {
-            if ($scope.stateReadOnly && header("x-is-rw") == 'true') {
-                $scope.stateReadOnly = false;
+            if (!header("x-is-rw")){
+                return;
             }
+            $scope.stateReadOnly = header("x-is-rw") != 'true';
         };
 
         // These variables are kind of competing with each other if there are multple requests at once
@@ -54,7 +55,7 @@ controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
 
         // Will load up the websocket once we know the address, the first time we receive the state
         this.skipNextUpdate = false;
-        parent = this;
+        var parent = this;
         var firstStateHandler = function(state, header) {
             updateDone(null, header);
 
@@ -66,8 +67,6 @@ controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
                         if (d.state === 0 && d.clientID != clientID) { // state change
                             parent.skipNextUpdate = true;
                             $scope.state.$get(null, function(val, header) {
-                                // NOTE: We are currently triggered by our own changes.
-                                // Prevent this by passing along some sort of client ID that we can compare to.
                                 console.log("WS FETCHED", clientID, d.clientID);
                                 updateReadOnly(header);
                             });
@@ -139,7 +138,7 @@ controller("FilterController", ["$scope",
         ctrl.replace = function replace(index, nval) {
             $scope.state.fep[index] = nval;
         };
-        
+
         $scope.$watch('state.fep', function fepChanged(nval) {
             if (!$scope.default.feps) {
                 return;

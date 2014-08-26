@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/Byron/godi/api"
 	"github.com/Byron/godi/codec"
@@ -16,10 +17,12 @@ import (
 )
 
 const (
-	ctkey     = "Content-Type"
-	jsonct    = "application/json"
-	plainct   = "text/plain"
-	isrwparam = "X-is-RW"
+	ctkey         = "Content-Type"
+	jsonct        = "application/json"
+	plainct       = "text/plain"
+	isrwparam     = "X-is-RW"
+	maxInactivity = 5 * time.Minute
+	// maxInactivity = 5 * time.Second
 )
 
 // A struct for json serialization and deserialization
@@ -190,6 +193,7 @@ type restHandler struct {
 	cancelRequested bool
 	l               sync.RWMutex
 	cb              func(bool, bool, api.Result, string) // a callback to allow others to stay informed
+	lmat            time.Time                            // time at which we were modified
 }
 
 // Returns a usable REST handler.
@@ -200,7 +204,7 @@ func NewRestHandler(onStateChange func(bool, bool, api.Result, string), socketUR
 	if onStateChange == nil {
 		panic("Callback must be set")
 	}
-	return &restHandler{
+	handler := restHandler{
 		cb: onStateChange,
 		st: state{
 			// replicate defaults used by CLI
@@ -211,7 +215,13 @@ func NewRestHandler(onStateChange func(bool, bool, api.Result, string), socketUR
 			Verbosity: api.Error.String(),
 			SocketURL: socketURL,
 		},
+		lmat: time.Now(),
 	}
+
+	// assure that we reset the owner after inactivity
+	go handler.handleInactivity()
+
+	return &handler
 }
 
 // Returns empty string on error
@@ -223,14 +233,32 @@ func remoteToOwner(remoteAddr string) (string, error) {
 	}
 }
 
+// Make sure we reset the owner after inactivity
+// Needs to be run as go-routine
+func (r *restHandler) handleInactivity() {
+	for tick := range time.Tick(1 * time.Second) {
+		if tick.Sub(r.lmat) >= maxInactivity && len(r.o) != 0 {
+			r.setOwner("")
+			r.lmat = tick
+			// signal the change
+			r.cb(false, false, nil, "")
+		}
+	} // every second
+}
+
 // Return true if we are doing something
 func (r *restHandler) isInProgress() bool {
 	return r.r != nil
 }
 
-// Set our owner to something representing the given remoteAddress.
+// Set our owner to something representing the given remoteAddress. Using "" will reset the owner.
 // If a new owner is set to a value we cannot understand, we will return an error as well.
 func (r *restHandler) setOwner(remoteAddr string) error {
+	if remoteAddr == "" {
+		r.o = ""
+		return nil
+	}
+
 	if newOwner, err := remoteToOwner(remoteAddr); err != nil {
 		return err
 	} else {
@@ -349,6 +377,7 @@ func (r *restHandler) applyState(ns state, remoteAddr, clientID string) (string,
 
 	// Inform people about the change
 	if changed {
+		r.lmat = time.Now()
 		r.cb(false, false, nil, clientID)
 	}
 	return "", http.StatusOK
