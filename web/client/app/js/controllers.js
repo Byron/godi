@@ -53,6 +53,8 @@ controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
         };
 
         // Will load up the websocket once we know the address, the first time we receive the state
+        this.skipNextUpdate = false;
+        parent = this;
         var firstStateHandler = function(state, header) {
             updateDone(null, header);
 
@@ -62,6 +64,7 @@ controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
                     var d = angular.fromJson(val.data);
                     if (d) {
                         if (d.state === 0 && d.clientID != clientID) { // state change
+                            parent.skipNextUpdate = true;
                             $scope.state.$get(null, function(val, header) {
                                 // NOTE: We are currently triggered by our own changes.
                                 // Prevent this by passing along some sort of client ID that we can compare to.
@@ -81,6 +84,10 @@ controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
 
         // Automatically put all changes, right when they happen
         $scope.$watch('state', function(nval) {
+            if (parent.skipNextUpdate) {
+                parent.skipNextUpdate = false;
+                return;
+            }
             nval.$update({}, updateDone, updateFailed);
         }, true);
 
