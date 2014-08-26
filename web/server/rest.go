@@ -17,12 +17,12 @@ import (
 )
 
 const (
-	ctkey         = "Content-Type"
-	jsonct        = "application/json"
-	plainct       = "text/plain"
-	isrwparam     = "X-is-RW"
-	maxInactivity = 5 * time.Minute
-	// maxInactivity = 5 * time.Second
+	ctkey     = "Content-Type"
+	jsonct    = "application/json"
+	plainct   = "text/plain"
+	isrwparam = "X-is-RW"
+	// maxInactivity = 5 * time.Minute
+	maxInactivity = 5 * time.Second
 )
 
 // A struct for json serialization and deserialization
@@ -238,10 +238,12 @@ func remoteToOwner(remoteAddr string) (string, error) {
 func (r *restHandler) handleInactivity() {
 	for tick := range time.Tick(1 * time.Second) {
 		if tick.Sub(r.lmat) >= maxInactivity && len(r.o) != 0 {
+			r.l.Lock()
 			r.setOwner("")
 			r.lmat = tick
 			// signal the change
 			r.cb(false, false, nil, "")
+			r.l.Unlock()
 		}
 	} // every second
 }
@@ -388,7 +390,12 @@ func (r *restHandler) handleOperation(runner api.Runner) {
 
 	// We will filter out TimedStatistics here
 	r.cb(true, false, nil, "")
-	err := api.StartEngine(runner, func(res api.Result) { r.cb(false, false, res, "") })
+	err := api.StartEngine(runner, func(res api.Result) {
+		r.l.Lock()
+		r.lmat = time.Now()
+		r.cb(false, false, res, "")
+		r.l.Unlock()
+	})
 	r.l.Lock()
 
 	errMsg := ""
