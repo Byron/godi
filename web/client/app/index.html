@@ -56,13 +56,13 @@
         <h2>File Exclude Patterns</h2>
         <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
         <span ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" ng-init="filter=default.feps[$index]">
-            {{filter|lowercase}}
             <input ng-disabled="stateReadOnly" type="checkbox" ng-model="isSelected" ng-change="fctrl.onchange(filter, isSelected)" />
+            {{filter|lowercase}}
         </span>
         <!-- display user filters -->
         <br>
         <span ng-repeat="filter in state.fep | filter:fctrl.isNoDefault track by $index">
-            <input ng-disabled="stateReadOnly" type="text" ng-model="filter" ng-change="fctrl.replace($index, filter)"/>
+            <input ng-disabled="stateReadOnly" type="text" ng-model="filter" ng-blur="fctrl.replace($index, filter)" ng-keypress="fctrl.keyHandler($event, $index, filter)"/>
             <button ng-click="fctrl.onchange(filter, false)" ng-hide="stateReadOnly">X</button>
             <br>
         </span>

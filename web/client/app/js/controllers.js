@@ -139,6 +139,12 @@ controller("FilterController", ["$scope",
             $scope.state.fep[index] = nval;
         };
 
+        ctrl.keyHandler = function keyPress(event, index, nval) {
+            if (event.keyIdentifier == "Enter") {
+                ctrl.replace(index, nval);
+            }
+        };
+
         $scope.$watch('state.fep', function fepChanged(nval) {
             if (!$scope.default.feps) {
                 return;
