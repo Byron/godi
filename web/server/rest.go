@@ -17,12 +17,11 @@ import (
 )
 
 const (
-	ctkey     = "Content-Type"
-	jsonct    = "application/json"
-	plainct   = "text/plain"
-	isrwparam = "X-is-RW"
-	// maxInactivity = 5 * time.Minute
-	maxInactivity = 5 * time.Second
+	ctkey         = "Content-Type"
+	jsonct        = "application/json"
+	plainct       = "text/plain"
+	isrwparam     = "X-is-RW"
+	maxInactivity = 5 * time.Minute
 )
 
 // A struct for json serialization and deserialization
@@ -127,6 +126,21 @@ func (s *state) verify(checkNullValue bool) error {
 	return nil
 }
 
+// compare the slices and return true if they differ
+func hasChanged(lhs, rhs []string) bool {
+	if len(lhs) != len(rhs) {
+		return true
+	}
+
+	for i := 0; i < len(lhs); i++ {
+		if lhs[i] != rhs[i] {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Apply the given, possibly partial state, ignoring all null values
 // Return an error if one of the new values is invalid. Boolean signals that we actually changed
 func (s *state) apply(o state) (bool, error) {
@@ -150,15 +164,15 @@ func (s *state) apply(o state) (bool, error) {
 		changed = true
 		ns.Spod = o.Spod
 	}
-	if len(o.Fep) > 0 {
+	if o.Fep != nil && hasChanged(ns.Fep, o.Fep) {
 		changed = true
 		ns.Fep = o.Fep
 	}
-	if len(o.Sources) > 0 {
+	if o.Sources != nil && hasChanged(ns.Sources, o.Sources) {
 		changed = true
 		ns.Sources = o.Sources
 	}
-	if len(o.Destinations) > 0 {
+	if o.Destinations != nil && hasChanged(ns.Destinations, o.Destinations) {
 		changed = true
 		ns.Destinations = o.Destinations
 	}
