@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -77,7 +78,7 @@ func (f *FileFilter) Matches(name string, mode os.FileMode) bool {
 	case filterModeSeals:
 		return reIsIndexPath.Match([]byte(name))
 	case filterModeVolatile:
-		return ((mode&os.ModeSymlink != os.ModeSymlink) && !mode.IsRegular()) || name == ".DS_Store"
+		return ((!mode.IsDir() && mode&os.ModeSymlink != os.ModeSymlink) && !mode.IsRegular()) || name == ".DS_Store" || ((mode&os.ModeDir == os.ModeDir) && (strings.HasPrefix(name, ".Trash") || name == ".fseventsd" || name == ".TemporaryItems" || strings.HasPrefix(name, ".DocumentRevisions") || name == "lost+found" || strings.HasPrefix(name, ".Spotlight") || name == "System Volume Information" || name == "$Recycle.Bin"))
 	case filterModeFnMatch:
 		{
 			// We assume the patten was already checked for correctness

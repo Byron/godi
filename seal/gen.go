@@ -73,7 +73,30 @@ func (s *Command) traverseFilesRecursively(files chan<- api.FileInfo, results ch
 		return false, true
 	}
 
+	shouldExclude := func(tree string, fi os.FileInfo, dirOnly bool) (bool, string) {
+		if (fi.Mode()&os.ModeDir != os.ModeDir) == dirOnly {
+			return true, ""
+		}
+
+		path := filepath.Join(tree, fi.Name())
+		for _, excludeFilter := range s.Filters {
+			if excludeFilter.Matches(fi.Name(), fi.Mode()) {
+				atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
+				results <- &SealResult{
+					BasicResult: api.BasicResult{
+						Msg:   fmt.Sprintf("Ignoring '%s' at '%s'", excludeFilter, path),
+						Prio:  api.Info,
+						Finfo: api.FileInfo{Path: root},
+					},
+				}
+				return true, ""
+			}
+		}
+		return false, path
+	} // func shouldExclude()
+
 	// first generate infos
+	const fileOnly = false
 toNextFile:
 	for _, fi := range dirInfos {
 
@@ -83,39 +106,31 @@ toNextFile:
 			return false, true
 		}
 
-		if !fi.IsDir() {
-			path := filepath.Join(tree, fi.Name())
+		exclude, path := shouldExclude(tree, fi, fileOnly)
+		if exclude {
+			continue toNextFile
+		}
 
-			for _, excludeFilter := range s.Filters {
-				if excludeFilter.Matches(fi.Name(), fi.Mode()) {
-					atomic.AddUint32(&s.Stats.NumSkippedFiles, 1)
-					results <- &SealResult{
-						BasicResult: api.BasicResult{
-							Msg:   fmt.Sprintf("Ignoring '%s' at '%s'", excludeFilter, path),
-							Prio:  api.Info,
-							Finfo: api.FileInfo{Path: root},
-						},
-					}
-					continue toNextFile
-				}
-			}
-
-			files <- api.FileInfo{
-				Path:     path,
-				RelaPath: path[len(root)+1:],
-				Mode:     fi.Mode(),
-				Size:     fi.Size(),
-			}
+		files <- api.FileInfo{
+			Path:     path,
+			RelaPath: path[len(root)+1:],
+			Mode:     fi.Mode(),
+			Size:     fi.Size(),
 		}
 	}
 
-	// then recurse
+	// then recurse into directories, apply a filter though
+	const dirOnly = !fileOnly
+toNextDir:
 	for _, fi := range dirInfos {
-		if fi.IsDir() {
-			cancelled, treeError := s.traverseFilesRecursively(files, results, done, filepath.Join(tree, fi.Name()), root)
-			if cancelled || treeError {
-				return cancelled, treeError
-			}
+		exclude, path := shouldExclude(tree, fi, dirOnly)
+		if exclude {
+			continue toNextDir
+		}
+
+		cancelled, treeError := s.traverseFilesRecursively(files, results, done, path, root)
+		if cancelled || treeError {
+			return cancelled, treeError
 		}
 	}
 

@@ -47,7 +47,7 @@ Read more [on the documentation page](http://byron.github.io/godi)
 * Download and extract the multi-platform archive from the [latest release](https://github.com/Byron/godi/releases)
 * Typing `godi/<platform>/godi` in a [terminal](http://en.wikipedia.org/wiki/Terminal_emulator) from the extraction point displays help on the respective platform.
 
-If you are using godi more regularly, it is adviced to put it into your shell's [executable search path](http://en.wikipedia.org/wiki/PATH_(variable))
+If you are using godi more regularly, it is advised to put it into your shell's [executable search path](http://en.wikipedia.org/wiki/PATH_(variable))
 
 ## Videos
 
