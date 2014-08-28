@@ -6,11 +6,13 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "angular": "1.2.x",
+    "angular": "1.2.23",
     "angular-route": "1.2.x",
     "angular-loader": "1.2.x",
     "angular-mocks": "~1.2.x",
     "angular-resource": "~1.2.x",
-    "html5-boilerplate": "~4.3.0"
+    "html5-boilerplate": "~4.3.0",
+    "angular-touch": "~1.2.1",
+    "venturocket-angular-slider": "0.3.0"
   }
 }

@@ -7,6 +7,7 @@ angular.module('godiwi', [
   'ngRoute',
   'ngResource',
   'ui.bootstrap',
+  'vr.directives.slider',
   'godiwi.filters',
   'godiwi.services',
   'godiwi.directives',

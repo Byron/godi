@@ -9,12 +9,12 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Godi Web Frontend</title>
+    <title>Godi Web</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="bower_components/html5-boilerplate/css/normalize.css">
     <link rel="stylesheet" href="bower_components/html5-boilerplate/css/main.css">
-    <link rel="stylesheet" href="css/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/bootstrap/css/bootstrap.css">
     <link rel="stylesheet" href="css/app.css" />
     <script src="bower_components/html5-boilerplate/js/vendor/modernizr-2.6.2.min.js"></script>
 </head>
@@ -51,7 +51,7 @@
     </div>
 
     <!-- INPUT FILTERING -->
-    <div id "input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
+    <div id="input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
         <h2>File Exclude Patterns</h2>
         <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
         <span ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" ng-init="filter=default.feps[$index]">
@@ -61,7 +61,7 @@
         <!-- display user filters -->
         <br>
         <span ng-repeat="filter in state.fep track by $index" ng-show="fctrl.isNoDefault(filter)">
-            <input ng-disabled="stateReadOnly" type="text" ng-model="filter" ng-blur="fctrl.replace($index, filter)" ng-keypress="fctrl.keyHandler($event, $index, filter)"/>
+            <input ng-disabled="stateReadOnly" type="text" ng-model="filter" ng-blur="fctrl.replace($index, filter)" ng-keypress="fctrl.keyHandler($event, $index, filter)" required unique-and-no-fep-default/>
             <button ng-click="fctrl.onchange(filter, false)" ng-hide="stateReadOnly">X</button>
             <br>
         </span>
@@ -71,6 +71,28 @@
             <input ng-hide="!default.feps" type="text" ng-model="filter" name="filter" required placeholder="enter filter like *.mov" unique-and-no-fep-default />
             <button ng-click="fctrl.onchange(filter, true);filter=''" ng-disabled="form.$invalid">add</button>
         </form>
+    </div>
+
+    <!-- STREAMS -->
+    <div id="streams" ng-hide="isUpdating">
+        <h2>Streams</h2>
+        <slider
+            ng-model="state.spid"
+            floor="1"
+            ceiling="4"
+            precision="0"
+            step="1"
+            stretch="1"
+            ng-disabled="stateReadOnly"></slider>
+        <!-- <span>
+        Output Streams
+        <slider
+            ng-model="state.spod"
+            floor="1"
+            ceiling="4"
+            precision="0"
+            ng-disabled="stateReadOnly"></slider>
+        </span> -->
     </div>
 
 
@@ -94,6 +116,8 @@
     <script src="js/ui-bootstrap-tpls-0.11.0.js"></script>
     <script src="bower_components/angular-route/angular-route.js"></script>
     <script src="bower_components/angular-resource/angular-resource.js"></script>
+    <script src="bower_components/angular-touch/angular-touch.js"></script>
+    <script src="bower_components/venturocket-angular-slider/build/angular-slider.min.js"></script>
     <script src="js/app.js"></script>
     <script src="js/services.js"></script>
     <script src="js/controllers.js"></script>
