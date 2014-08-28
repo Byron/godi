@@ -34,7 +34,7 @@
     <div ng-view></div>
 
     <!-- MODE SELECT -->
-    <div id="mode-select" ng-hide="!default.modes">
+    <div id="mode-select" ng-hide="isUpdating">
         <h2>Operation</h2>
         <div class="btn-group">
             <label class="btn btn-primary" ng-repeat="mode in default.modes" ng-model="state.mode" btn-radio="'{{mode}}'" ng-disabled="stateReadOnly">{{mode}}</label>
@@ -42,8 +42,17 @@
         <!-- <span ng-repeat="mode in default.modes"> {{mode}} {{state.mode}} </span> -->
     </div>
 
+    <!-- FORMAT SELECT -->
+    <div id="format-select" ng-hide="isUpdating || state.mode == 'verify'">
+        <h2>Seal Format</h2>
+        <div class="btn-group">
+            <label class="btn btn-primary" ng-repeat="format in default.formats" ng-model="state.format" btn-radio="'{{format}}'" ng-disabled="stateReadOnly">{{format}}</label>
+        </div>
+        <!-- <span ng-repeat="mode in default.modes"> {{mode}} {{state.mode}} </span> -->
+    </div>
+
     <!-- VERBOSITY-SELECT -->
-    <div id="verbosity-select" ng-hide="!default.verbosities">
+    <div id="verbosity-select" ng-hide="isUpdating">
         <h2>Verbosity</h2>
         <div class="btn-group">
             <label class="btn btn-primary" ng-repeat="level in default.verbosities" ng-model="state.verbosity" btn-radio="'{{level}}'" ng-disabled="stateReadOnly">{{level}}</label>
@@ -51,7 +60,7 @@
     </div>
 
     <!-- INPUT FILTERING -->
-    <div id="input-filters" ng-hide="!default.feps" ng-controller="FilterController as fctrl">
+    <div id="input-filters" ng-hide="isUpdating" ng-controller="FilterController as fctrl">
         <h2>File Exclude Patterns</h2>
         <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
         <span ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" ng-init="filter=default.feps[$index]">
@@ -82,7 +91,8 @@
            ng-model="state.spid"
            min="1"
            max="5"
-           required="1">
+           required="1"
+           ng-disabled="stateReadOnly">
        </span>
         <span ng-show="state.mode == 'sealed-copy'">
         Output Streams
@@ -90,7 +100,8 @@
            ng-model="state.spod"
            min="1"
            max="5"
-           required="1">
+           required="1"
+           ng-disabled="stateReadOnly">
        </span>
     </div>
 
