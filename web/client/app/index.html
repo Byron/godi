@@ -33,13 +33,25 @@
 
     <div ng-view></div>
 
+    <!-- COMMANDLINE -->
+    <div id="commandline" ng-hide="isUpdating">
+        <code>
+        godi 
+        <span ng-show="state.spid > 1">-spid {{state.spid}}</span>
+        <span ng-show="state.verbosity != 'error'">--verbosity={{state.verbosity}}</span>
+        <span ng-hide="state.fep.length == 1 && state.fep[0] == 'VOLATILE'">--file-exclude-patterns={{state.fep.length == 0 ? '' : '"'}}<span ng-repeat="fep in state.fep">{{fep}}{{$last ? '"' : ','}}</span></span>
+        <span>{{state.mode}}</span>
+        <span ng-show="state.mode != 'verify' && state.format != 'gob'">--format={{state.format}}</span>
+        <span ng-show="state.mode == 'sealed-copy' && state.spod > 1">-spod {{state.spod}}</span>
+        </code>        
+    </div>
+
     <!-- MODE SELECT -->
     <div id="mode-select" ng-hide="isUpdating">
         <h2>Operation</h2>
         <div class="btn-group">
             <label class="btn btn-primary" ng-repeat="mode in default.modes" ng-model="state.mode" btn-radio="'{{mode}}'" ng-disabled="stateReadOnly">{{mode}}</label>
         </div>
-        <!-- <span ng-repeat="mode in default.modes"> {{mode}} {{state.mode}} </span> -->
     </div>
 
     <!-- FORMAT SELECT -->
@@ -48,7 +60,6 @@
         <div class="btn-group">
             <label class="btn btn-primary" ng-repeat="format in default.formats" ng-model="state.format" btn-radio="'{{format}}'" ng-disabled="stateReadOnly">{{format}}</label>
         </div>
-        <!-- <span ng-repeat="mode in default.modes"> {{mode}} {{state.mode}} </span> -->
     </div>
 
     <!-- VERBOSITY-SELECT -->
