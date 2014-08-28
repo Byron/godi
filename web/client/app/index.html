@@ -8,7 +8,26 @@
 
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" ng-init="tt = {
+        'verify': 'Compare stored disk-data with seal to detect changes',
+        'seal': 'Generate a seal for one ore more directories to allow them to be verified later',
+        'sealed-copy': 'Seal one or more directories and copy their contents to one or more destinations',
+
+        'gob' : 'compressed binary seal format, which is temper-proof and highly efficient',
+        'mhl' : 'human-readable XML format understood by mediahashlist.org, which will be inefficient for large amount of files',
+
+        'error': 'shows only errors and result',
+        'info' : 'shows errors, results and detailed progress information',
+
+        'SYMLINK' : 'Ignore all symbolic links',
+        'HIDDEN'  : 'Ignore all hidden files. Only files starting with a period are hidden',
+        'SEALS'   : 'Ignore all godi seal files. They are matched by their default name',
+        'VOLATILE': 'Ignore files which change a lot or are expendable',
+
+        'spid': 'Amount of parallel streams per input device',
+        'spod': 'Amount of parallel streams per output device',
+    }
+    ">
     <title>Godi Web</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -37,12 +56,16 @@
     <div id="commandline" ng-hide="isUpdating">
         <code>
         godi 
-        <span ng-show="state.spid > 1">-spid {{state.spid}}</span>
-        <span ng-show="state.verbosity != 'error'">--verbosity={{state.verbosity}}</span>
-        <span ng-hide="state.fep.length == 1 && state.fep[0] == 'VOLATILE'">--file-exclude-patterns={{state.fep.length == 0 ? '' : '"'}}<span ng-repeat="fep in state.fep">{{fep}}{{$last ? '"' : ','}}</span></span>
-        <span>{{state.mode}}</span>
-        <span ng-show="state.mode != 'verify' && state.format != 'gob'">--format={{state.format}}</span>
-        <span ng-show="state.mode == 'sealed-copy' && state.spod > 1">-spod {{state.spod}}</span>
+            <span ng-show="state.spid > 1" tooltip="{{tt['spid']}}">-spid {{state.spid}}</span>
+            <span ng-show="state.verbosity != 'error'" 
+                tooltip="{{tt[state.verbosity]}}">--verbosity={{state.verbosity}}</span>
+            <span ng-hide="state.fep.length == 1 && state.fep[0] == 'VOLATILE'">--file-exclude-patterns={{state.fep.length == 0 ? '' : '"'}} <span
+                                ng-repeat="fep in state.fep"
+                                tooltip="{{tt[fep] || 'Ignore all files matching glob \'fep\''}}">{{fep}}{{$last ? '"' : ','}}</span>
+            </span>
+            <span tooltip="{{tt[state.mode]}}">{{state.mode}} </span>
+            <span ng-show="state.mode != 'verify' && state.format != 'gob'" tooltip="{{tt[state.format]}}">--format={{state.format}}</span>
+            <span ng-show="state.mode == 'sealed-copy' && state.spod > 1" tooltip="{{tt['spod']}}">-spod {{state.spod}}</span>
         </code>        
     </div>
 
@@ -50,7 +73,12 @@
     <div id="mode-select" ng-hide="isUpdating">
         <h2>Operation</h2>
         <div class="btn-group">
-            <label class="btn btn-primary" ng-repeat="mode in default.modes" ng-model="state.mode" btn-radio="'{{mode}}'" ng-disabled="stateReadOnly">{{mode}}</label>
+            <label class="btn btn-primary" 
+                ng-repeat="mode in default.modes" 
+                ng-model="state.mode" 
+                btn-radio="'{{mode}}'" 
+                ng-disabled="stateReadOnly" 
+                tooltip="{{tt[mode]}}">{{mode}}</label>
         </div>
     </div>
 
@@ -58,7 +86,12 @@
     <div id="format-select" ng-hide="isUpdating || state.mode == 'verify'">
         <h2>Seal Format</h2>
         <div class="btn-group">
-            <label class="btn btn-primary" ng-repeat="format in default.formats" ng-model="state.format" btn-radio="'{{format}}'" ng-disabled="stateReadOnly">{{format}}</label>
+            <label class="btn btn-primary" 
+                ng-repeat="format in default.formats" 
+                ng-model="state.format" 
+                btn-radio="'{{format}}'" 
+                ng-disabled="stateReadOnly" 
+                tooltip="{{tt[format]}}">{{format}}</label>
         </div>
     </div>
 
@@ -66,7 +99,12 @@
     <div id="verbosity-select" ng-hide="isUpdating">
         <h2>Verbosity</h2>
         <div class="btn-group">
-            <label class="btn btn-primary" ng-repeat="level in default.verbosities" ng-model="state.verbosity" btn-radio="'{{level}}'" ng-disabled="stateReadOnly">{{level}}</label>
+            <label class="btn btn-primary" 
+                ng-repeat="level in default.verbosities" 
+                ng-model="state.verbosity" 
+                btn-radio="'{{level}}'" 
+                ng-disabled="stateReadOnly"
+                tooltip="{{tt[level]}}">{{level}}</label>
         </div>
     </div>
 
@@ -74,21 +112,43 @@
     <div id="input-filters" ng-hide="isUpdating" ng-controller="FilterController as fctrl">
         <h2>File Exclude Patterns</h2>
         <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
-        <span ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" ng-init="filter=default.feps[$index]">
-            <input ng-disabled="stateReadOnly" type="checkbox" ng-model="isSelected" ng-change="fctrl.onchange(filter, isSelected)" />
+        <span 
+            ng-repeat="isSelected in fepDefaultSelections track by default.feps[$index]" 
+            ng-init="filter=default.feps[$index]">
+            <input 
+                ng-disabled="stateReadOnly" 
+                type="checkbox" 
+                ng-model="isSelected" 
+                ng-change="fctrl.onchange(filter, isSelected)" 
+                tooltip="{{tt[filter]}}"/>
             {{filter|lowercase}}
         </span>
         <!-- display user filters -->
         <br>
-        <span ng-repeat="filter in state.fep track by $index" ng-show="fctrl.isNoDefault(filter)">
-            <input ng-disabled="stateReadOnly" type="text" ng-model="filter" ng-blur="fctrl.replace($index, filter)" ng-keypress="fctrl.keyHandler($event, $index, filter)" required unique-and-no-fep-default/>
+        <span 
+            ng-repeat="filter in state.fep track by $index"ng-show="fctrl.isNoDefault(filter)">
+            <input 
+                ng-disabled="stateReadOnly" 
+                type="text" 
+                ng-model="filter" 
+                ng-blur="fctrl.replace($index, filter)" 
+                ng-keypress="fctrl.keyHandler($event, $index, filter)" 
+                required
+                tooltip="Ignore all files matching glob '{{filter}}'"/>
             <button ng-click="fctrl.onchange(filter, false)" ng-hide="stateReadOnly">X</button>
             <br>
         </span>
         <!-- New user filters form -->
         <br/>
         <form name="form" ng-hide="stateReadOnly">
-            <input ng-hide="!default.feps" type="text" ng-model="filter" name="filter" required placeholder="enter filter like *.mov" unique-and-no-fep-default />
+            <input 
+                ng-hide="isUpdating" 
+                type="text" 
+                ng-model="filter" 
+                name="filter" 
+                required
+                unique-and-no-fep-default
+                placeholder="enter glob like *.mov"/>
             <button ng-click="fctrl.onchange(filter, true);filter=''" ng-disabled="form.$invalid">add</button>
         </form>
     </div>
@@ -103,7 +163,8 @@
            min="1"
            max="5"
            required="1"
-           ng-disabled="stateReadOnly">
+           ng-disabled="stateReadOnly"
+           tooltip="{{tt['spid']}}">
        </span>
         <span ng-show="state.mode == 'sealed-copy'">
         Output Streams
@@ -112,7 +173,8 @@
            min="1"
            max="5"
            required="1"
-           ng-disabled="stateReadOnly">
+           ng-disabled="stateReadOnly"
+           tooltip="{{tt['spod']}}">
        </span>
     </div>
 

@@ -224,6 +224,7 @@ func NewRestHandler(onStateChange func(bool, bool, api.Result, string), socketUR
 			// replicate defaults used by CLI
 			Mode:      verify.Name,
 			Spid:      1,
+			Spod:      1,
 			Fep:       []string{api.FilterVolatile.String()},
 			Format:    codec.GobName,
 			Verbosity: api.Error.String(),
