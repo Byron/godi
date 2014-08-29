@@ -154,4 +154,21 @@ controller("FilterController", ["$scope",
             }
         }, true);
     }
-]);
+]).
+controller("LocationController", [function LocationController(){
+    this.$mode = "directory";
+    var ctrl = this;
+
+    this.setMode = function setMode(mode) {
+        if (mode != "directory" && mode != "file" && mode != "seal") {
+            alert("input mode must be one of 'directory', 'mode', 'seal'");
+        }
+        ctrl.$mode = mode;
+    }
+
+    this.listLocations = function listLocations(path) {
+        return [1, 2, 3, path]
+    }
+
+    return this
+}]);

@@ -14,12 +14,13 @@ import (
 	"github.com/Byron/godi/codec"
 	"github.com/Byron/godi/seal"
 	"github.com/Byron/godi/testlib"
+	"github.com/Byron/godi/web/server/rest"
 
 	"github.com/gorilla/websocket"
 )
 
 const (
-	plain     = plainct
+	plain     = rest.PlainContent
 	delay     = 50 * time.Millisecond
 	apiURL    = "/api"
 	socketURL = "/socket"
@@ -30,11 +31,14 @@ func TestRESTState(t *testing.T) {
 
 	wsh := NewWebSocketHandler()
 	mux.Handle(socketURL, wsh)
-	mux.Handle(apiURL, NewRestHandler(wsh.restStateHandler, socketURL))
+	stateURL := apiURL + "/state"
+	dirURL := apiURL + "/dirlist/"
+	mux.Handle(stateURL, rest.NewStateHandler(wsh.restStateHandler, socketURL))
+	mux.Handle(dirURL, rest.NewDirHandler())
 
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
-	url := srv.URL + apiURL
+	url := srv.URL + stateURL
 
 	ws, _, err := websocket.DefaultDialer.Dial("ws://"+srv.URL[len("http://"):]+socketURL, nil)
 	if err != nil {
@@ -62,9 +66,9 @@ func TestRESTState(t *testing.T) {
 		} else if res.StatusCode != stat {
 			body, _ := ioutil.ReadAll(res.Body)
 			t.Fatalf("Expected status %d, got %d(%s): %s", stat, res.StatusCode, http.StatusText(res.StatusCode), string(body))
-		} else if !strings.HasPrefix(res.Header.Get(ctkey), ct) {
-			t.Fatalf("Expected content type %s, got %s", ct, res.Header.Get(ctkey))
-		} else if ct == jsonct && res.ContentLength == 0 {
+		} else if !strings.HasPrefix(res.Header.Get(rest.ContentKey), ct) {
+			t.Fatalf("Expected content type %s, got %s", ct, res.Header.Get(rest.ContentKey))
+		} else if ct == rest.JsonContent && res.ContentLength == 0 {
 			t.Fatalf("Got empty json reply")
 		} else {
 			t.Log(msg)
@@ -80,9 +84,9 @@ func TestRESTState(t *testing.T) {
 
 	// GET
 	req, _ = http.NewRequest("GET", url, nil)
-	res := checkReq(req, http.StatusOK, jsonct, "Managed to get status")
-	if res.Header.Get(isrwparam) != "true" {
-		t.Fatalf("Unexpected RW value: '%v'", res.Header.Get(isrwparam))
+	res := checkReq(req, http.StatusOK, rest.JsonContent, "Managed to get status")
+	if res.Header.Get(rest.HPIsRW) != "true" {
+		t.Fatalf("Unexpected RW value: '%v'", res.Header.Get(rest.HPIsRW))
 	}
 
 	// POST: Invalid state makes us fail the precondition
@@ -93,7 +97,7 @@ func TestRESTState(t *testing.T) {
 	defer testlib.RmTree(datasetTree)
 
 	// Make a change
-	ns := state{
+	ns := rest.State{
 		Mode:      seal.ModeSeal,
 		Verbosity: api.Info.String(),
 		Spid:      1,
@@ -104,8 +108,8 @@ func TestRESTState(t *testing.T) {
 		Format: "FOO",
 	}
 
-	convertJson := func(s state, w io.WriteCloser) {
-		go func() { s.json(w); w.Close() }()
+	convertJson := func(s rest.State, w io.WriteCloser) {
+		go func() { s.Json(w); w.Close() }()
 	}
 
 	// PUT: invalid
@@ -120,18 +124,18 @@ func TestRESTState(t *testing.T) {
 
 	// Get defaults
 	req, _ = http.NewRequest("DEFAULTS", url, nil)
-	checkReq(req, http.StatusOK, jsonct, "Can get default values, in the form of constants the user can select")
+	checkReq(req, http.StatusOK, rest.JsonContent, "Can get default values, in the form of constants the user can select")
 
 	// PUT: valid
 	ns.Format = codec.GobName
 	r, w = io.Pipe()
 	convertJson(ns, w)
 	req, _ = http.NewRequest("PUT", url, r)
-	res = checkReq(req, http.StatusOK, jsonct, "Should have changed the state")
+	res = checkReq(req, http.StatusOK, rest.JsonContent, "Should have changed the state")
 
 	// quick comparison, ns should actually be the same. Can't compare directly though
-	var s state
-	if err := s.fromJson(res.Body); err != nil {
+	var s rest.State
+	if err := s.FromJson(res.Body); err != nil {
 		t.Fatal(err)
 	}
 	if s.Format != ns.Format || s.Mode != ns.Mode || s.LastError != "" {
@@ -140,7 +144,7 @@ func TestRESTState(t *testing.T) {
 
 	// POST: Valid - empty state
 	req, _ = http.NewRequest("POST", url, nil)
-	res = checkReq(req, http.StatusOK, jsonct, "Should have set the machine in motion")
+	res = checkReq(req, http.StatusOK, rest.JsonContent, "Should have set the machine in motion")
 
 	// Can't change while it's going. It shouldn't change the state in that case either (something we don't check here)
 	for _, m := range []string{"POST", "PUT"} {
@@ -175,8 +179,8 @@ func TestRESTState(t *testing.T) {
 	startedAt := time.Now()
 	for s.IsRunning {
 		req, _ = http.NewRequest("GET", url, nil)
-		res = checkReq(req, http.StatusOK, jsonct, "Can get status after operation was cancelled")
-		s.fromJson(res.Body)
+		res = checkReq(req, http.StatusOK, rest.JsonContent, "Can get status after operation was cancelled")
+		s.FromJson(res.Body)
 		time.Sleep(delay)
 	}
 	if time.Now().Sub(startedAt) < delay {
@@ -193,4 +197,12 @@ func TestRESTState(t *testing.T) {
 	} else {
 		t.Logf("Consumed %d websocket events", numWSReceives)
 	}
+
+	// TEST DIR LISTING
+	listurl := srv.URL + dirURL
+	req, _ = http.NewRequest("PUT", listurl, nil)
+	checkReq(req, http.StatusMethodNotAllowed, plain, "Nothing but get is allowed")
+
+	req, _ = http.NewRequest("GET", listurl, nil)
+	res = checkReq(req, http.StatusOK, rest.JsonContent, "Get on root should return something")
 }

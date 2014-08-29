@@ -1,4 +1,4 @@
-package server
+package rest
 
 import (
 	"encoding/json"
@@ -17,15 +17,15 @@ import (
 )
 
 const (
-	ctkey         = "Content-Type"
-	jsonct        = "application/json"
-	plainct       = "text/plain"
-	isrwparam     = "X-is-RW"
+	ContentKey    = "Content-Type"
+	JsonContent   = "application/json"
+	PlainContent  = "text/plain"
+	HPIsRW        = "X-is-RW"
 	maxInactivity = 5 * time.Minute
 )
 
 // A struct for json serialization and deserialization
-type state struct {
+type State struct {
 	Mode         string   `json:"mode"`
 	Verbosity    string   `json:"verbosity"`
 	Spid         int      `json:"spid"`         // streams per input device
@@ -57,12 +57,12 @@ var valueDefaults = defaults{
 }
 
 // Write ourselves to w as json
-func (s *state) json(w io.Writer) error {
+func (s *State) Json(w io.Writer) error {
 	return json.NewEncoder(w).Encode(s)
 }
 
-// instantiate ourselves from json. Automatically verifies ourselves to assure we are a valid state
-func (s *state) fromJson(r io.Reader) error {
+// instantiate ourselves from json. Automatically verifies ourselves to assure we are a valid State
+func (s *State) FromJson(r io.Reader) error {
 	err := json.NewDecoder(r).Decode(s)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (s *state) fromJson(r io.Reader) error {
 // Check our own consistency and return an error if something is wrong.
 // Will be nil otherwise.
 // All values must be set if 'non-null-only' is true
-func (s *state) verify(checkNullValue bool) error {
+func (s *State) verify(checkNullValue bool) error {
 	if (len(s.Mode) > 0 || checkNullValue) && s.Mode != verify.Name && s.Mode != seal.ModeCopy && s.Mode != seal.ModeSeal {
 		return fmt.Errorf("Invalid mode: '%s'", s.Mode)
 	}
@@ -141,9 +141,9 @@ func hasChanged(lhs, rhs []string) bool {
 	return false
 }
 
-// Apply the given, possibly partial state, ignoring all null values
+// Apply the given, possibly partial State, ignoring all null values
 // Return an error if one of the new values is invalid. Boolean signals that we actually changed
-func (s *state) apply(o state) (bool, error) {
+func (s *State) apply(o State) (bool, error) {
 	ns := *s
 	changed := false
 
@@ -197,11 +197,11 @@ func (s *state) apply(o state) (bool, error) {
 
 // An http handler to manage our simplistic rest API.
 // It supports only GET, POST and DELETE
-// GET returns the current state and provides information about the who last changed the state
-// POST allows to change the state, and returns a token indicating the owner of the status change
+// GET returns the current State and provides information about the who last changed the State
+// POST allows to change the State, and returns a token indicating the owner of the status change
 // DELETE stop current operations, only valid if the user matches the one that started the operation
 type restHandler struct {
-	st              state
+	st              State
 	r               api.Runner // our runner in case something is going on, nil otherwise
 	o               string     //IP of original requester
 	cancelRequested bool
@@ -211,16 +211,16 @@ type restHandler struct {
 }
 
 // Returns a usable REST handler.
-// The callback allows to respond to state-changes, calls to it are synchronized and thus serial only.
+// The callback allows to respond to State-changes, calls to it are synchronized and thus serial only.
 // f(isEnd, result) - isEnd is True only when the operation is now finished, result is nil in that case
-// If isEnd is false and result is nil, this indicates that our state changed
-func NewRestHandler(onStateChange func(bool, bool, api.Result, string), socketURL string) http.Handler {
+// If isEnd is false and result is nil, this indicates that our State changed
+func NewStateHandler(onStateChange func(bool, bool, api.Result, string), socketURL string) http.Handler {
 	if onStateChange == nil {
 		panic("Callback must be set")
 	}
 	handler := restHandler{
 		cb: onStateChange,
-		st: state{
+		st: State{
 			// replicate defaults used by CLI
 			Mode:      verify.Name,
 			Spid:      1,
@@ -292,21 +292,21 @@ func (r *restHandler) isOwner(remoteAddr string) bool {
 	return err == nil && o == r.o
 }
 
-// Returns true if the given remoteAddr may change our state
+// Returns true if the given remoteAddr may change our State
 func (r *restHandler) CanWrite(remoteAddr string) bool {
 	return len(r.o) == 0 || r.isOwner(remoteAddr)
 }
 
-// Execute the state we currently have
+// Execute the State we currently have
 // Return error string and status code. If there is no error, status will be StatusOK
-// The new state may be partial, and contain zero values which will just be ignored
+// The new State may be partial, and contain zero values which will just be ignored
 func (r *restHandler) execute(remoteAddr string) (string, int) {
 	r.l.Lock()
 	defer r.l.Unlock()
 
 	// If something is in progress, request a delete
 	if r.isInProgress() {
-		return "Cannot change state if something is currently inprogress. Abort it using the DELETE method", http.StatusPreconditionFailed
+		return "Cannot change State if something is currently inprogress. Abort it using the DELETE method", http.StatusPreconditionFailed
 	}
 
 	if err := r.st.verify(true); err != nil {
@@ -320,7 +320,7 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 
 	// At this point, we expect remoteAddr to be the owner
 	if !r.isOwner(remoteAddr) {
-		return "You must own the state to be allowed to execute it", http.StatusUnauthorized
+		return "You must own the State to be allowed to execute it", http.StatusUnauthorized
 	}
 
 	items := r.st.Sources
@@ -344,7 +344,7 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 		}
 	default:
 		{
-			return "Unsupported mode passed state.verify() - might need a runner factory", http.StatusInternalServerError
+			return "Unsupported mode passed State.verify() - might need a runner factory", http.StatusInternalServerError
 		}
 	}
 
@@ -367,9 +367,9 @@ func (r *restHandler) execute(remoteAddr string) (string, int) {
 	return "", http.StatusOK
 }
 
-// Apply the given (partial) state to our own.
+// Apply the given (partial) State to our own.
 // On error, return a string and a non-OK status code
-func (r *restHandler) applyState(ns state, remoteAddr, clientID string) (string, int) {
+func (r *restHandler) applyState(ns State, remoteAddr, clientID string) (string, int) {
 	r.l.Lock()
 	defer r.l.Unlock()
 	changed := false
@@ -419,7 +419,7 @@ func (r *restHandler) handleOperation(runner api.Runner) {
 	}
 
 	{
-		// Reset our state and store result. Reset owner
+		// Reset our State and store result. Reset owner
 		r.r = nil
 		r.st.LastError = errMsg
 		r.st.IsRunning = false
@@ -429,30 +429,30 @@ func (r *restHandler) handleOperation(runner api.Runner) {
 
 	r.l.Unlock()
 
-	// inform that we are done - we do that after our state has changed just
+	// inform that we are done - we do that after our State has changed just
 	// to assure rest calls will definitely have the expected result
 	r.cb(false, true, nil, "")
 }
 
 func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
-	w.Header().Set(ctkey, jsonct)
+	w.Header().Set(ContentKey, JsonContent)
 
 	// UTILITIES
 	/////////////
 	doWriteState := func() {
 		r.l.RLock()
-		r.st.json(w)
+		r.st.Json(w)
 		r.l.RUnlock()
 	}
 
 	doPut := func(writeState bool) (res bool) {
-		var newState state
-		if err := newState.fromJson(rq.Body); err != nil && err != io.EOF {
+		var newState State
+		if err := newState.FromJson(rq.Body); err != nil && err != io.EOF {
 			http.Error(w, err.Error(), http.StatusPreconditionFailed)
 		} else if msg, status := r.applyState(newState, rq.RemoteAddr, rq.Header.Get("Client-ID")); status != http.StatusOK {
 			http.Error(w, msg, status)
 		} else {
-			// on success, return the current state
+			// on success, return the current State
 			if writeState {
 				doWriteState()
 			}
@@ -469,8 +469,8 @@ func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 			r.l.RLock()
 			{
 				// post if remote has RW access !
-				w.Header().Set(isrwparam, fmt.Sprint(r.CanWrite(rq.RemoteAddr)))
-				if err := r.st.json(w); err != nil {
+				w.Header().Set(HPIsRW, fmt.Sprint(r.CanWrite(rq.RemoteAddr)))
+				if err := r.st.Json(w); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 				}
 			}
@@ -488,7 +488,7 @@ func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 				return
 			}
 
-			// Execute the current state
+			// Execute the current State
 			if msg, status := r.execute(rq.RemoteAddr); status != http.StatusOK {
 				http.Error(w, msg, status)
 			} else {
@@ -513,7 +513,7 @@ func (r *restHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 					close(r.r.CancelChannel())
 					r.cancelRequested = true
 				}
-				w.Header().Set(ctkey, plainct)
+				w.Header().Set(ContentKey, PlainContent)
 			}
 			r.l.Unlock()
 		}

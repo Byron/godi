@@ -4,6 +4,8 @@ package server
 import (
 	"net/http"
 
+	"github.com/Byron/godi/web/server/rest"
+
 	"github.com/elazarl/go-bindata-assetfs"
 )
 
@@ -23,7 +25,7 @@ func NewHandler() *http.ServeMux {
 	baseURL := "/api/v1/"
 	socketURL := baseURL + "websocket"
 	mux.Handle(socketURL, webHandler)
-	mux.Handle(baseURL+"state", NewRestHandler(webHandler.restStateHandler, socketURL))
+	mux.Handle(baseURL+"state", rest.NewStateHandler(webHandler.restStateHandler, socketURL))
 
 	return mux
 }

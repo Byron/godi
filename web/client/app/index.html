@@ -36,6 +36,7 @@
     <link rel="stylesheet" href="css/bootstrap/css/bootstrap.css">
     <link rel="stylesheet" href="css/app.css" />
     <script src="bower_components/html5-boilerplate/js/vendor/modernizr-2.6.2.min.js"></script>
+    <script src="bower_components/angular/angular.js"></script>
 </head>
 
 <body ng-controller="GodiController">
@@ -53,7 +54,7 @@
     <div ng-view></div>
 
     <!-- COMMANDLINE -->
-    <div id="commandline" ng-hide="isUpdating">
+    <div ng-cloak id="commandline" ng-hide="isUpdating">
         <code>
         godi 
             <span ng-show="state.spid > 1" tooltip="{{tt['spid']}}">-spid {{state.spid}}</span>
@@ -70,7 +71,7 @@
     </div>
 
     <!-- MODE SELECT -->
-    <div id="mode-select" ng-hide="isUpdating">
+    <div ng-cloak id="mode-select" ng-hide="isUpdating">
         <h2>Operation</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -83,7 +84,7 @@
     </div>
 
     <!-- FORMAT SELECT -->
-    <div id="format-select" ng-hide="isUpdating || state.mode == 'verify'">
+    <div ng-cloak id="format-select" ng-hide="isUpdating || state.mode == 'verify'">
         <h2>Seal Format</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -96,7 +97,7 @@
     </div>
 
     <!-- VERBOSITY-SELECT -->
-    <div id="verbosity-select" ng-hide="isUpdating">
+    <div ng-cloak id="verbosity-select" ng-hide="isUpdating">
         <h2>Verbosity</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -109,7 +110,7 @@
     </div>
 
     <!-- INPUT FILTERING -->
-    <div id="input-filters" ng-hide="isUpdating" ng-controller="FilterController as fctrl">
+    <div ng-cloak id="input-filters" ng-hide="isUpdating" ng-controller="FilterController as fctrl">
         <h2>File Exclude Patterns</h2>
         <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
         <span 
@@ -133,7 +134,7 @@
                 ng-model="filter" 
                 ng-blur="fctrl.replace($index, filter)" 
                 ng-keypress="fctrl.keyHandler($event, $index, filter)" 
-                required
+                required="1"
                 tooltip="Ignore all files matching glob '{{filter}}'"/>
             <button ng-click="fctrl.onchange(filter, false)" ng-hide="stateReadOnly">X</button>
             <br>
@@ -142,11 +143,10 @@
         <br/>
         <form name="form" ng-hide="stateReadOnly">
             <input 
-                ng-hide="isUpdating" 
                 type="text" 
                 ng-model="filter" 
                 name="filter" 
-                required
+                required="1"
                 unique-and-no-fep-default
                 placeholder="enter glob like *.mov"/>
             <button ng-click="fctrl.onchange(filter, true);filter=''" ng-disabled="form.$invalid">add</button>
@@ -154,7 +154,7 @@
     </div>
 
     <!-- STREAMS -->
-    <div id="streams" ng-hide="isUpdating">
+    <div ng-cloak id="streams" ng-hide="isUpdating">
         <h2>Streams</h2>
         <span>
         Input Streams
@@ -178,6 +178,19 @@
        </span>
     </div>
 
+    <!-- SOURCES/DESTINATIONS -->
+    <div ng-cloak id="sources" ng-hide="isUpdating" ng-controller="LocationController as lctrl" ng-init="lctrl.setMode('file')">
+        <h2>Sources</h2>
+        <input 
+            type="text"
+            ng-model="newSource"
+            placeholder="source directory/file"
+            typeahead="val for val in lctrl.listLocations($viewValue)"
+            typeahead-loading="isLoadingLocations"
+        >
+        {{newSource}}
+        <i ng-show="isLoadingLocations" class="glyphicon glyphicon-refresh"></i>
+    </div>
 
     <br>
     <br>
@@ -195,7 +208,6 @@
     <!-- In production use:
   <script src="//ajax.googleapis.com/ajax/libs/angularjs/x.x.x/angular.min.js"></script>
   -->
-    <script src="bower_components/angular/angular.js"></script>
     <script src="js/ui-bootstrap-tpls-0.11.0.js"></script>
     <script src="bower_components/angular-route/angular-route.js"></script>
     <script src="bower_components/angular-resource/angular-resource.js"></script>
