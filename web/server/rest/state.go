@@ -214,7 +214,7 @@ type restHandler struct {
 // The callback allows to respond to State-changes, calls to it are synchronized and thus serial only.
 // f(isEnd, result) - isEnd is True only when the operation is now finished, result is nil in that case
 // If isEnd is false and result is nil, this indicates that our State changed
-func NewStateHandler(onStateChange func(bool, bool, api.Result, string), socketURL string) http.Handler {
+func NewStateHandler(onStateChange func(bool, bool, api.Result, string), socketURL string) *restHandler {
 	if onStateChange == nil {
 		panic("Callback must be set")
 	}
@@ -295,6 +295,11 @@ func (r *restHandler) isOwner(remoteAddr string) bool {
 // Returns true if the given remoteAddr may change our State
 func (r *restHandler) CanWrite(remoteAddr string) bool {
 	return len(r.o) == 0 || r.isOwner(remoteAddr)
+}
+
+// Return a shallow copy of our state - don't alter array fields !
+func (r *restHandler) State() State {
+	return r.st
 }
 
 // Execute the State we currently have

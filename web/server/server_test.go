@@ -1,11 +1,13 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"strings"
 	"testing"
 	"time"
@@ -33,8 +35,9 @@ func TestRESTState(t *testing.T) {
 	mux.Handle(socketURL, wsh)
 	stateURL := apiURL + "/state"
 	dirURL := apiURL + "/dirlist/"
-	mux.Handle(stateURL, rest.NewStateHandler(wsh.restStateHandler, socketURL))
-	mux.Handle(dirURL, rest.NewDirHandler())
+	sth := rest.NewStateHandler(wsh.restStateHandler, socketURL)
+	mux.Handle(stateURL, sth)
+	mux.Handle(dirURL, rest.NewDirHandler(sth.State))
 
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -203,6 +206,13 @@ func TestRESTState(t *testing.T) {
 	req, _ = http.NewRequest("PUT", listurl, nil)
 	checkReq(req, http.StatusMethodNotAllowed, plain, "Nothing but get is allowed")
 
-	req, _ = http.NewRequest("GET", listurl, nil)
+	q := make(neturl.Values)
+	q.Add(rest.QPath, "/")
+	q.Add(rest.QType, rest.TypeAll)
+	req, _ = http.NewRequest("GET", listurl+"?"+q.Encode(), nil)
 	res = checkReq(req, http.StatusOK, rest.JsonContent, "Get on root should return something")
+
+	var infos []rest.ItemInfo
+	json.NewDecoder(res.Body).Decode(&infos)
+	fmt.Println(infos)
 }

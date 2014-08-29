@@ -25,7 +25,9 @@ func NewHandler() *http.ServeMux {
 	baseURL := "/api/v1/"
 	socketURL := baseURL + "websocket"
 	mux.Handle(socketURL, webHandler)
-	mux.Handle(baseURL+"state", rest.NewStateHandler(webHandler.restStateHandler, socketURL))
+	sth := rest.NewStateHandler(webHandler.restStateHandler, socketURL)
+	mux.Handle(baseURL+"state", sth)
+	mux.Handle(baseURL+"dirlist", rest.NewDirHandler(sth.State))
 
 	return mux
 }
