@@ -3,10 +3,10 @@
 /* Controllers */
 
 angular.module('godiwi.controllers', []).
-controller('GodiController', ['$scope', '$location', '$resource', 'clientID',
-    function NewGodiController($scope, $location, $resource, clientID) {
+controller('GodiController', ['apiURL', '$scope', '$location', '$resource', 'clientID',
+    function NewGodiController(apiURL, $scope, $location, $resource, clientID) {
         var header = {"Client-ID": clientID};
-        var State = $resource('/api/v1/state', null, {
+        var State = $resource(apiURL + 'state', null, {
             defaults: {
                 method: "DEFAULTS",
                 headers: header,
@@ -155,10 +155,13 @@ controller("FilterController", ["$scope",
         }, true);
     }
 ]).
-controller("LocationController", ["$scope", function LocationController($scope)){
+controller("LocationController", ["apiURL", "$scope", "$resource", function LocationController(apiURL, $scope, $resource) {
+    var DirList = $resource(apiURL + 'dirlist?type=:type&path=:path', {type: function() {
+        return $scope.state.mode == 'verify' ? 'sealOnly' : 'all'
+    }})
+
     this.listLocations = function listLocations(path) {
-        var mode = $scope.state.mode == 'verify' ? 'sealOnly' : 'all';
-        return [1, 2, 3, path, mode]
+        return DirList.query({'path': path})
     }
 
     return this
