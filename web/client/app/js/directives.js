@@ -38,4 +38,18 @@ directive('uniqueAndNoFepDefault', function() {
             });
         }
     };
+}).
+directive('pathinput', function() {
+    return {
+        restrict: 'E',
+        templateUrl: 'pathTemplate.html',
+        scope: {
+            mode: '=',
+            paths: '=',
+        },
+        link:  function link(scope, element, attrs) {
+            scope.title = attrs['title'] || "TITLE UNSET"
+            scope.type = attrs['type'] || "source"
+        }
+    }
 });

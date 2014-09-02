@@ -157,12 +157,11 @@ controller("FilterController", ["$scope",
 ]).
 controller("LocationController", ["apiURL", "$scope", "$http", function LocationController(apiURL, $scope, $http) {
     var ctrl = this
-    ctrl.items = []
     $scope.isValid = false
     this.listLocations = function listLocations(path) {
-        ctrl.items = $http.get(apiURL + 'dirlist', {
+        return $http.get(apiURL + 'dirlist', {
             params: {
-                'type': $scope.state.mode == 'verify' ? 'sealOnly' : 'all', 
+                'type': ($scope.type == 'source' && ($scope.mode == 'verify' ? 'sealOnly' : 'all')) || 'all', 
                 'path': path,
             }}
         ).then(function success(res) {
@@ -173,12 +172,11 @@ controller("LocationController", ["apiURL", "$scope", "$http", function Location
             $scope.isValid = false;
             return []
         })
-        return ctrl.items
     }
 
     this.onSelect = function onSelect($item, $model, $label) {
-        $scope.isValid = $scope.state.mode == 'verify' ? !$item.isDir : true
-        $scope.newSource = $item.path
+        $scope.isValid = $scope.mode == 'verify' ? !$item.isDir : true
+        $scope.newPath = $item.path
     }
 
     return this
