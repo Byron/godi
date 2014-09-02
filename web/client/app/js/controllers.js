@@ -56,6 +56,10 @@ controller('GodiController', ['apiURL', '$scope', '$location', '$resource', 'cli
         // Will load up the websocket once we know the address, the first time we receive the state
         this.gotUpdateCallbackAt = Date.now();
         var parent = this;
+
+        $scope.isDone = true
+        $scope.results = []
+
         var firstStateHandler = function(state, header) {
             updateDone(null, header);
 
@@ -66,12 +70,20 @@ controller('GodiController', ['apiURL', '$scope', '$location', '$resource', 'cli
                     if (d) {
                         if (d.state === 0 && d.clientID != clientID) { // state change
                             $scope.state.$get(null, function(val, header) {
-                                console.log("WS FETCHED", clientID, d.clientID);
                                 parent.gotUpdateCallbackAt = Date.now();
                                 updateReadOnly(header);
                             });
+                        } else if (d.state == 1) { // state result
+                            $scope.isDone = false;
+                            $scope.results.push(d);
+                        } else if (d.state == 2) {// state begin
+                            $scope.isDone = false;
+                            $scope.results = [];
+                        } else if (d.state == 3) {// state finished
+                            $scope.isDone = true;
                         }
-                    }
+                        $scope.$digest()
+                    }// have json result
                 };
                 // keep it around
                 $scope.$socket = conn;
@@ -87,7 +99,9 @@ controller('GodiController', ['apiURL', '$scope', '$location', '$resource', 'cli
                 parent.gotUpdateCallbackAt = 0;
                 return;
             }
-            nval.$update({}, updateDone, updateFailed);
+            if (!nval.isRunning) {
+                nval.$update({}, updateDone, updateFailed);
+            }
         }, true);
 
         return this;
@@ -180,4 +194,4 @@ controller("LocationController", ["apiURL", "$scope", "$http", function Location
     }
 
     return this
-}]);
+}])

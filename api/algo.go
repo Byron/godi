@@ -64,10 +64,15 @@ func Aggregate(results <-chan Result, done <-chan bool,
 	// We set this value to be quite responsive
 	ticker := time.NewTicker(StatisticalResultInterval)
 	go func() {
+		// We might try to send through a closed channel, especially in web-mode
+		defer func() {
+			recover()
+		}()
 		for now := range ticker.C {
 			select {
 			case <-done:
 				ticker.Stop()
+				return
 			default:
 			}
 

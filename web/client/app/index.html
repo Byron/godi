@@ -82,7 +82,13 @@
                     ng-repeat="dest in state.destinations">{{dest}}{{$last ? "" : " "}}
                 </span>
             </span>
-        </code>        
+        </code>
+        <button ng-click="state.$post()" ng-hide="stateReadOnly">Run!</button>
+        <button ng-click="state.$delete()" ng-hide="stateReadOnly || isDone">Cancel</button>
+        <div ng-hide="isDone && results.length == 0">
+            <p ng-repeat="res in results">{{res.message}}</p>
+        </div>
+        <button ng-click="results = []" ng-hide="results.length == 0">Clear</button>
     </div>
 
     <!-- MODE SELECT -->
@@ -257,6 +263,7 @@
     <div ng-show="isUpdating">Fetching data - please wait.</div>
     <div ng-show="and(updateFailed, !stateReadOnly)">ERROR Putting data</div>
     <div ng-hide="stateReadOnly">WRITE MODE</div>
+    <div >{{results.length}}</div>
 
     <!-- In production use:
   <script src="//ajax.googleapis.com/ajax/libs/angularjs/x.x.x/angular.min.js"></script>

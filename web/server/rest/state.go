@@ -412,9 +412,31 @@ func (r *restHandler) handleOperation(runner api.Runner) {
 
 	// We will filter out TimedStatistics here
 	r.cb(true, false, nil, "")
+
+	statsFilter := api.StatisticsFilter{
+		LastResultShownAt:    time.Now(),
+		FirstStatisticsAfter: 125 * time.Millisecond,
+	}
+	// we can expect this to be correct here (it was verified when set)
+	verbosity, _ := api.ParseImportance(r.st.Verbosity)
+
 	err := api.StartEngine(runner, func(res api.Result) {
 		r.l.Lock()
+
 		r.lmat = time.Now()
+
+		_, prio := res.Info()
+		if !verbosity.MayLog(prio) {
+			r.l.Unlock()
+			return
+		}
+		if !statsFilter.OK(prio) {
+			r.l.Unlock()
+			return
+		}
+
+		statsFilter.LastResultShownAt = time.Now()
+
 		r.cb(false, false, res, "")
 		r.l.Unlock()
 	})
