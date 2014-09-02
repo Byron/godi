@@ -35,7 +35,7 @@ type ItemInfo struct {
 func (i *ItemInfo) fromFileInfo(tree string, fi os.FileInfo) {
 	i.Item = fi.Name()
 	i.Path = filepath.Join(tree, i.Item)
-	i.IsDir = fi.Mode()&os.ModeDir == os.ModeDir
+	i.IsDir = fi.IsDir()
 }
 
 // Write the given FileInfos in a suitable format to a the given writer
@@ -52,7 +52,7 @@ func (d *dirHandler) filter(fis []os.FileInfo, sealOnly bool) (out []os.FileInfo
 
 toNextFile:
 	for _, fi := range fis {
-		if sealOnly && api.FilterSeals.Matches(fi.Name(), fi.Mode()) {
+		if sealOnly && !fi.IsDir() && !api.FilterSeals.Matches(fi.Name(), fi.Mode()) {
 			continue toNextFile
 		}
 
@@ -94,7 +94,7 @@ func (r *dirHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 	///////////////
 	q := rq.URL.Query()
 	if len(q.Get(QPath)) == 0 || len(q.Get(QType)) == 0 {
-		http.Error(w, fmt.Sprintf("You have to specify the %s and %s query strings", QPath, QType), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("You have to specify the '%s' and '%s' within the query string", QPath, QType), http.StatusBadRequest)
 		return
 	}
 
@@ -102,7 +102,7 @@ func (r *dirHandler) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 	qp := q.Get(QPath)
 	sealOnly := qt == TypeSeal
 	if qt != TypeSeal && qt != TypeAll {
-		http.Error(w, fmt.Sprintf("Invalid request type, expected one of %s, %s", TypeAll, TypeSeal), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Invalid request type, expected one of '%s', '%s'", TypeAll, TypeSeal), http.StatusBadRequest)
 		return
 	}
 

@@ -155,13 +155,30 @@ controller("FilterController", ["$scope",
         }, true);
     }
 ]).
-controller("LocationController", ["apiURL", "$scope", "$resource", function LocationController(apiURL, $scope, $resource) {
-    var DirList = $resource(apiURL + 'dirlist?type=:type&path=:path', {type: function() {
-        return $scope.state.mode == 'verify' ? 'sealOnly' : 'all'
-    }})
-
+controller("LocationController", ["apiURL", "$scope", "$http", function LocationController(apiURL, $scope, $http) {
+    var ctrl = this
+    ctrl.items = []
+    $scope.isValid = false
     this.listLocations = function listLocations(path) {
-        return DirList.query({'path': path})
+        ctrl.items = $http.get(apiURL + 'dirlist', {
+            params: {
+                'type': $scope.state.mode == 'verify' ? 'sealOnly' : 'all', 
+                'path': path,
+            }}
+        ).then(function success(res) {
+            // It's never valid unless the item is actually selected
+            $scope.isValid = false;
+            return res.data;
+        }, function error (code) {
+            $scope.isValid = false;
+            return []
+        })
+        return ctrl.items
+    }
+
+    this.onSelect = function onSelect($item, $model, $label) {
+        $scope.isValid = $scope.state.mode == 'verify' ? !$item.isDir : true
+        $scope.newSource = $item.path
     }
 
     return this

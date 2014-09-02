@@ -222,13 +222,15 @@ func NewStateHandler(onStateChange func(bool, bool, api.Result, string), socketU
 		cb: onStateChange,
 		st: State{
 			// replicate defaults used by CLI
-			Mode:      verify.Name,
-			Spid:      1,
-			Spod:      1,
-			Fep:       []string{api.FilterVolatile.String()},
-			Format:    codec.GobName,
-			Verbosity: api.Error.String(),
-			SocketURL: socketURL,
+			Sources:      []string{},
+			Destinations: []string{},
+			Mode:         verify.Name,
+			Spid:         1,
+			Spod:         1,
+			Fep:          []string{api.FilterVolatile.String()},
+			Format:       codec.GobName,
+			Verbosity:    api.Error.String(),
+			SocketURL:    socketURL,
 		},
 		lmat: time.Now(),
 	}

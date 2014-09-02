@@ -26,6 +26,10 @@
 
         'spid': 'Amount of parallel streams per input device',
         'spod': 'Amount of parallel streams per output device',
+
+        'source_verify': 'The seal file(s) to be verified',
+        'source_seal': 'File or directory to produce a seal file for',
+        'source_sealed-copy': 'File or directory to copy to a given destination directory while sealing'
     }
     ">
     <title>Godi Web</title>
@@ -65,8 +69,17 @@
                                 tooltip="{{tt[fep] || 'Ignore all files matching glob \'fep\''}}">{{fep}}{{$last ? '"' : ','}}</span>
             </span>
             <span tooltip="{{tt[state.mode]}}">{{state.mode}} </span>
-            <span ng-show="state.mode != 'verify' && state.format != 'gob'" tooltip="{{tt[state.format]}}">--format={{state.format}}</span>
-            <span ng-show="state.mode == 'sealed-copy' && state.spod > 1" tooltip="{{tt['spod']}}">-spod {{state.spod}}</span>
+            <span ng-show="state.mode != 'verify' && state.format != 'gob'" tooltip="{{tt[state.format]}}">--format={{state.format}} </span>
+            <span ng-show="state.mode == 'sealed-copy' && state.spod > 1" tooltip="{{tt['spod']}}">-spod {{state.spod}} </span>
+            <span 
+                tooltip="{{tt['source_' + state.mode]}}"
+                ng-repeat="source in state.sources">{{source}}{{$last ? "" : " "}}
+            </span>
+            <span 
+                ng-show="state.mode == 'sealed-copy'"
+                tooltip="{{tt['source_' + state.mode]}}"
+                ng-repeat="dest in state.destinations">{{dest}}{{$last ? "" : " "}}
+            </span>
         </code>        
     </div>
 
@@ -180,16 +193,40 @@
 
     <!-- SOURCES/DESTINATIONS -->
     <div ng-cloak id="sources" ng-hide="isUpdating" ng-controller="LocationController as lctrl">
+     <script type="text/ng-template" id="dirTemplate.html">
+      <a>
+          <img ng-src="{{ match.model.isDir ? 'img/folder.png' : 'img/file.png' }}" width="16">
+          <span bind-html-unsafe="match.label | typeaheadHighlight:query"></span>
+      </a>
+    </script>
         <h2>Sources</h2>
-        <input 
-            type="text"
-            ng-model="newSource"
-            placeholder="source directory/file"
-            typeahead="val for val in lctrl.listLocations($viewValue)"
-            typeahead-loading="isLoadingLocations"
-        >
-        {{newSource}}
-        <i ng-show="isLoadingLocations" class="glyphicon glyphicon-refresh"></i>
+        <span 
+            ng-repeat="source in state.sources track by $index">
+            <input 
+                ng-disabled="true" 
+                type="text" 
+                ng-trim="true"
+                ng-model="source"/>
+            <button ng-click="state.sources.splice($index, 1)" ng-hide="stateReadOnly">X</button>
+            <br>
+        </span>
+        <span ng-hide="stateReadOnly">
+            <br>
+            <input 
+                type="text"
+                ng-model="newSource"
+                placeholder="source directory/file"
+                typeahead="val.item for val in lctrl.listLocations($viewValue)"
+                typeahead-loading="isLoadingLocations"
+                typeahead-on-select="lctrl.onSelect($item, $model, $label)"
+                typeahead-template-url="dirTemplate.html"
+            >
+            <button 
+                ng-click="state.sources.push(newSource);newSource=''" 
+                ng-disabled="!isValid || !newSource || newSource.length==0"
+                tooltip="{{tt['source_' + state.mode] || ''}}">add</button>
+            <i ng-show="isLoadingLocations" class="glyphicon glyphicon-refresh"></i>
+        </span>
     </div>
 
     <br>

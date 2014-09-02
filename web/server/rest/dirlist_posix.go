@@ -6,14 +6,23 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // return a list of filesytem information entries matching the given path. We will automatically
 // put it into /dir/*basename* to match everything that looks like path
 // It is expected to use a leading slash to indicate the filesystem root (native for posix)
 func filesytemItems(path string) (out []os.FileInfo, err error) {
+	endsWithSep := strings.HasSuffix(path, string(filepath.Separator))
 	path = filepath.Clean(path)
-	di, err := os.Open(filepath.Dir(path))
+
+	dir := path
+	if !endsWithSep {
+		dir = filepath.Dir(path)
+	}
+
+	di, err := os.Open(dir)
 	if err != nil {
 		return
 	}
@@ -24,11 +33,15 @@ func filesytemItems(path string) (out []os.FileInfo, err error) {
 		return
 	}
 
-	var glob string
-	if strings.HasSuffix(path, "/") {
-		glob = "*"
-	} else {
-		glob = "*" + filepath.Base(path) + "*"
+	glob := "*"
+	if !endsWithSep {
+		bs := filepath.Base(path)
+		glob = ""
+		for len(bs) > 0 {
+			r, size := utf8.DecodeRuneInString(bs)
+			glob += "*[" + string(unicode.ToUpper(r)) + string(unicode.ToLower(r)) + "]*"
+			bs = bs[size:]
+		}
 	}
 
 	for _, fi := range dirInfos {
