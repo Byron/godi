@@ -30,3 +30,12 @@
   content: "";
   padding: 0;
 }
+
+.output {
+  padding: 4px 4px;
+  font-size: 90%;
+  color: #FFFFFF;
+  white-space: nowrap;
+  background-color: #585858;
+  border-radius: 4px;
+}

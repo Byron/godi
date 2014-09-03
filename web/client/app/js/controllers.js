@@ -46,6 +46,7 @@ controller('GodiController', ['apiURL', '$scope', '$location', '$resource', 'cli
         };
         updateDone(); // init variables
 
+        $scope.alerts = []
         $scope.stateReadOnly = true;
         $scope.isUpdating = true; // we are updating now
 
@@ -73,16 +74,18 @@ controller('GodiController', ['apiURL', '$scope', '$location', '$resource', 'cli
                                 parent.gotUpdateCallbackAt = Date.now();
                                 updateReadOnly(header);
                             });
-                        } else if (d.state == 1) { // state result
-                            $scope.isDone = false;
-                            $scope.results.push(d);
-                        } else if (d.state == 2) {// state begin
-                            $scope.isDone = false;
-                            $scope.results = [];
-                        } else if (d.state == 3) {// state finished
-                            $scope.isDone = true;
+                        } else {
+                            if (d.state == 1) { // state result
+                                $scope.isDone = false;
+                                $scope.results.push(d);
+                            } else if (d.state == 2) {// state begin
+                                $scope.isDone = false;
+                                $scope.results = [];
+                            } else if (d.state == 3) {// state finished
+                                $scope.isDone = true;
+                            }
+                            $scope.$digest()
                         }
-                        $scope.$digest()
                     }// have json result
                 };
                 // keep it around
@@ -103,6 +106,14 @@ controller('GodiController', ['apiURL', '$scope', '$location', '$resource', 'cli
                 nval.$update({}, updateDone, updateFailed);
             }
         }, true);
+
+        this.run = function run() {
+            // Clear errors before we start something new
+            $scope.alerts = []
+            $scope.state.$post({}, null, function failed(res) {
+                $scope.alerts.push(res)    
+            })
+        }
 
         return this;
     }
