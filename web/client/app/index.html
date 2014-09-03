@@ -50,7 +50,7 @@
   <![endif]-->
 
     <!-- COMMANDLINE -->
-    <div ng-cloak id="commandline" ng-hide="isUpdating" style="overflow:auto">
+    <div ng-cloak id="commandline" ng-hide="isUpdating" style="overflow:auto;margin-top:50px">
         <alert ng-repeat="alert in alerts" type="{{alert.status && 'danger' || null}}" close="alerts.splice($index, 1)">{{alert.data}}</alert>
         <code>
         godi 
@@ -66,22 +66,24 @@
             <span ng-show="state.mode == 'sealed-copy' && state.spod > 1" tooltip="{{tt['spod']}}">-spod {{state.spod}} </span>
             <span 
                 tooltip="{{tt['source_' + state.mode]}}"
-                ng-repeat="source in state.sources">{{source}}{{$last ? "" : " "}}
+                ng-repeat="source in state.sources track by $index">{{source}}{{$last ? "" : " "}}
             </span>
             <span ng-show="state.mode == 'sealed-copy'">
                 -- 
                 <span 
                     tooltip="{{tt['source_' + state.mode]}}"
-                    ng-repeat="dest in state.destinations">{{dest}}{{$last ? "" : " "}}
+                    ng-repeat="dest in state.destinations track by $index">{{dest}}{{$last ? "" : " "}}
                 </span>
             </span>
         </code>
     </div>
-    <button ng-click="gctrl.run()" ng-hide="stateReadOnly">Run!</button>
-    <button ng-click="results = []" ng-hide="results.length == 0 || !isDone">Clear</button>
-    <button ng-click="state.$delete()" ng-hide="stateReadOnly || isDone">Cancel</button>
-    <div class="output" ng-hide="isDone && results.length == 0">
-        <span ng-repeat="res in results">{{res.message}}<br></span>
+    <div class="panel-pig">
+        <button ng-click="gctrl.run()" ng-hide="stateReadOnly">Run!</button>
+        <button ng-click="results = []" ng-hide="results.length == 0 || !isDone">Clear</button>
+        <button ng-click="state.$delete()" ng-hide="stateReadOnly || isDone">Cancel</button>
+    </div>
+    <div class="output" ng-hide="isDone && results.length == 0" keep-scroll>
+        <span ng-repeat="res in results" scroll-item>{{res.message}}<br></span>
     </div>
 
     <!-- OPERATION SELECT -->
@@ -205,30 +207,33 @@
             <h2>{{title}}</h2>
             <span 
                 ng-repeat="path in paths track by $index">
-                <input 
-                    ng-disabled="true" 
-                    type="text" 
-                    ng-trim="true"
-                    ng-model="path"/>
-                <button ng-click="paths.splice($index, 1)" ng-hide="stateReadOnly">X</button>
-                <br>
+                <button ng-click="paths.splice($index, 1)" ng-hide="stateReadOnly" style="float:right">X</button>
+                <div class="inputbox">
+                    <input
+                        ng-disabled="true" 
+                        type="text" 
+                        ng-trim="true"
+                        ng-model="path"/>
+                </div>
             </span>
             <span ng-hide="stateReadOnly">
                 <br>
-                <input 
-                    type="text"
-                    ng-model="newPath"
-                    placeholder="{{mode}} directory/file"
-                    typeahead="val.item for val in lctrl.listLocations($viewValue)"
-                    typeahead-loading="isLoadingLocations"
-                    typeahead-on-select="lctrl.onSelect($item, $model, $label)"
-                    typeahead-template-url="dirTemplate.html"
-                >
-                <button 
+                <button
+                    style="float:right"
                     ng-click="paths.push(newPath);newPath=''" 
                     ng-disabled="!isValid || !newPath || newPath.length==0">add
                 </button>
+                <div class="inputbox">
+                    <input 
+                        type="text"
+                        ng-model="newPath"
+                        placeholder="{{mode}} directory/file"
+                        typeahead="val.item for val in lctrl.listLocations($viewValue)"
+                        typeahead-loading="isLoadingLocations"
+                        typeahead-on-select="lctrl.onSelect($item, $model, $label)"
+                        typeahead-template-url="dirTemplate.html"/>
                 <i ng-show="isLoadingLocations" class="glyphicon glyphicon-refresh"></i>
+                </div>
             </span>
         </div>
     </script>
