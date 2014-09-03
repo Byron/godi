@@ -44,18 +44,19 @@
 </head>
 
 <body ng-controller="GodiController as gctrl">
+    <div class="wrapper">
     <!--[if lt IE 7]>
       <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
   <![endif]-->
 
     <!-- COMMANDLINE -->
-    <div ng-cloak id="commandline" ng-hide="isUpdating">
+    <div ng-cloak id="commandline" ng-hide="isUpdating" style="overflow:auto">
         <alert ng-repeat="alert in alerts" type="{{alert.status && 'danger' || null}}" close="alerts.splice($index, 1)">{{alert.data}}</alert>
         <code>
         godi 
             <span ng-show="state.spid > 1" tooltip="{{tt['spid']}}">-spid {{state.spid}}</span>
             <span ng-show="state.verbosity != 'error'" 
-                tooltip="{{tt[state.verbosity]}}">--verbosity={{state.verbosity}}</span>
+                tooltip="{{tt[state.verbosity]}}">--verbosity={{state.verbosity}} </span>
             <span ng-hide="state.fep.length == 1 && state.fep[0] == 'VOLATILE'">--file-exclude-patterns={{state.fep.length == 0 ? '' : '"'}} <span
                                 ng-repeat="fep in state.fep"
                                 tooltip="{{tt[fep] || 'Ignore all files matching glob \'fep\''}}">{{fep}}{{$last ? '"' : ','}}</span>
@@ -75,16 +76,16 @@
                 </span>
             </span>
         </code>
-        <button ng-click="gctrl.run()" ng-hide="stateReadOnly">Run!</button>
-        <button ng-click="results = []" ng-hide="results.length == 0 || !isDone">Clear</button>
-        <button ng-click="state.$delete()" ng-hide="stateReadOnly || isDone">Cancel</button>
-        <div class="output" ng-hide="isDone && results.length == 0">
-            <span ng-repeat="res in results">{{res.message}}<br></span>
-        </div>
+    </div>
+    <button ng-click="gctrl.run()" ng-hide="stateReadOnly">Run!</button>
+    <button ng-click="results = []" ng-hide="results.length == 0 || !isDone">Clear</button>
+    <button ng-click="state.$delete()" ng-hide="stateReadOnly || isDone">Cancel</button>
+    <div class="output" ng-hide="isDone && results.length == 0">
+        <span ng-repeat="res in results">{{res.message}}<br></span>
     </div>
 
-    <!-- MODE SELECT -->
-    <div ng-cloak id="mode-select" ng-hide="isUpdating">
+    <!-- OPERATION SELECT -->
+    <div ng-cloak id="mode-select" ng-hide="isUpdating" class="panel">
         <h2>Operation</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -96,21 +97,8 @@
         </div>
     </div>
 
-    <!-- FORMAT SELECT -->
-    <div ng-cloak id="format-select" ng-hide="isUpdating || state.mode == 'verify'">
-        <h2>Seal Format</h2>
-        <div class="btn-group">
-            <label class="btn btn-primary" 
-                ng-repeat="format in default.formats" 
-                ng-model="state.format" 
-                btn-radio="'{{format}}'" 
-                ng-disabled="stateReadOnly" 
-                tooltip="{{tt[format]}}">{{format}}</label>
-        </div>
-    </div>
-
     <!-- VERBOSITY-SELECT -->
-    <div ng-cloak id="verbosity-select" ng-hide="isUpdating">
+    <div ng-cloak id="verbosity-select" ng-hide="isUpdating" class="panel">
         <h2>Verbosity</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -122,8 +110,46 @@
         </div>
     </div>
 
+    <!-- FORMAT SELECT -->
+    <div ng-cloak id="format-select" ng-hide="isUpdating || state.mode == 'verify'" class="panel">
+        <h2>Seal Format</h2>
+        <div class="btn-group">
+            <label class="btn btn-primary" 
+                ng-repeat="format in default.formats" 
+                ng-model="state.format" 
+                btn-radio="'{{format}}'" 
+                ng-disabled="stateReadOnly" 
+                tooltip="{{tt[format]}}">{{format}}</label>
+        </div>
+    </div>
+
+    <!-- STREAMS -->
+    <div ng-cloak id="streams" ng-hide="isUpdating" class="panel">
+        <h2>Streams</h2>
+        <span>
+        Input Streams
+        <input type="number"
+           ng-model="state.spid"
+           min="1"
+           max="5"
+           required="1"
+           ng-disabled="stateReadOnly"
+           tooltip="{{tt['spid']}}">
+       </span>
+        <span ng-show="state.mode == 'sealed-copy'">
+        Output Streams
+        <input type="number"
+           ng-model="state.spod"
+           min="1"
+           max="5"
+           required="1"
+           ng-disabled="stateReadOnly"
+           tooltip="{{tt['spod']}}">
+       </span>
+    </div>
+
     <!-- INPUT FILTERING -->
-    <div ng-cloak id="input-filters" ng-hide="isUpdating" ng-controller="FilterController as fctrl">
+    <div ng-cloak id="input-filters" ng-hide="isUpdating" ng-controller="FilterController as fctrl" class="panel-big">
         <h2>File Exclude Patterns</h2>
         <!-- list all default filters - unfortunately track by will run before ng-init, can't use filter there -->
         <span 
@@ -166,31 +192,6 @@
         </form>
     </div>
 
-    <!-- STREAMS -->
-    <div ng-cloak id="streams" ng-hide="isUpdating">
-        <h2>Streams</h2>
-        <span>
-        Input Streams
-        <input type="number"
-           ng-model="state.spid"
-           min="1"
-           max="5"
-           required="1"
-           ng-disabled="stateReadOnly"
-           tooltip="{{tt['spid']}}">
-       </span>
-        <span ng-show="state.mode == 'sealed-copy'">
-        Output Streams
-        <input type="number"
-           ng-model="state.spod"
-           min="1"
-           max="5"
-           required="1"
-           ng-disabled="stateReadOnly"
-           tooltip="{{tt['spod']}}">
-       </span>
-    </div>
-
     <!-- SOURCES/DESTINATIONS -->
     <script type="text/ng-template" id="dirTemplate.html">
       <a>
@@ -231,20 +232,26 @@
             </span>
         </div>
     </script>
-    <pathinput
-        paths="state.sources"
-        title="Sources"
-        type='source'
-        mode='state.mode'></pathinput>
-    <pathinput
-        ng-show="state.mode == 'sealed-copy'"
-        paths="state.destinations" 
-        title="Destinations" 
-        type='destination'
-        mode='state.mode'></pathinput>
+    <div class="panel-big">
+        <pathinput
+            class="panel"
+            paths="state.sources"
+            title="Sources"
+            type='source'
+            mode='state.mode'></pathinput>
+        <pathinput
+            class="panel"
+            ng-show="state.mode == 'sealed-copy'"
+            paths="state.destinations" 
+            title="Destinations" 
+            type='destination'
+            mode='state.mode'></pathinput>
+    </div>
 
-    <input type="checkbox" ng-click="debugMode=!debugMode"/>Debug Mode
-    <div ng-show="debugMode" ng-init="debugMode=false">
+    <div class="panel-big">
+        <input type="checkbox" ng-click="debugMode=!debugMode"/>Debug Mode
+    </div>
+    <div ng-show="debugMode" ng-init="debugMode=false" class="panel-big">
         <br>
         <br>
         <br>
@@ -271,5 +278,6 @@
     <script src="js/controllers.js"></script>
     <script src="js/filters.js"></script>
     <script src="js/directives.js"></script>
+    </div>
 </body>
 </html>

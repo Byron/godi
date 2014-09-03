@@ -31,11 +31,34 @@
   padding: 0;
 }
 
+.panel {
+  float: left;
+  width: 50%;
+}
+
+.panel-big {
+  float:left;
+  width: 100%;
+}
+
 .output {
+  margin-top: 5px;
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
   padding: 4px 4px;
+  max-height: 600px;
   font-size: 90%;
   color: #FFFFFF;
   white-space: nowrap;
+  overflow: auto;
   background-color: #585858;
   border-radius: 4px;
 }
+
+.wrapper {
+  width: 720px;
+  margin: 0 auto;
+  min-height: 100%;
+  height: auto !important;
+  height: 100%;
+}
+
