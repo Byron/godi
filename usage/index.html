@@ -143,7 +143,9 @@
         <li class="main active"><a href="#how-to-run-godi">How to Run Godi</a></li>
         
     
-        <li class="main "><a href="#helping-yourself">Helping Yourself</a></li>
+        <li class="main "><a href="#helping-yourself">Helping Yourself ...</a></li>
+        
+            <li><a href="#graphically">... Graphically</a></li>
         
     
         <li class="main "><a href="#subcommands">Subcommands</a></li>
@@ -163,7 +165,7 @@
 <h2 id="how-to-run-godi">How to Run Godi</h2>
 <p>Godi is a command-line program, which requires you to use a terminal emulator to run it and see its output. If you are unfamiliar with terminals or don't have the time to look into how to use one, <code>godi</code> isn't for you.</p>
 <p>You can at all times and without negative effects <a href="https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_cancelled.mov.gif">abort a running command</a> by pressing <code>ctrl+c</code>, which is the same as for all other command-line tools.</p>
-<h2 id="helping-yourself">Helping Yourself</h2>
+<h2 id="helping-yourself">Helping Yourself ...</h2>
 <p>It's not always feasible to consult the Internet to learn how to do something. Good to know that <code>godi</code> has all the help you will ever need to use it built right into itself.</p>
 <p>It has a modern command-line interface which uses sub-commands to separate distinct features from each other. In any case, you will always see an elaborate help text as follows.</p>
 <pre class="prettyprint well"><code class="bash"># General help
@@ -179,6 +181,13 @@ $ godi --help
 # and the same for subcommands
 $ godi seal -h
 $ godi seal --help
+</code></pre>
+
+<h3 id="graphically">... Graphically</h3>
+<p>The graphical web-frontend allows to use all godi-features from within the browser. That way, you can watch the progress of running operations, or trigger <code>godi</code> operations from your tablet and while on the go.</p>
+<p>Thanks to tool-tips, it's certainly much easier to learn than the commandline, especially due to the included commandline-generator displaying the respective godi commandline.</p>
+<p>To bring up the web-frontend, just run <code>godi web</code> in your terminal.</p>
+<pre class="prettyprint well"><code>godi web
 </code></pre>
 
 <h2 id="subcommands">Subcommands</h2>
