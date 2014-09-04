@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/Byron/godi/web/server"
 
@@ -96,6 +98,14 @@ func action(c *gcli.Context, info *serverInfo) {
 		Addr:    info.addr,
 		Handler: info.mux,
 	}
+
+	// Respond to abort requests
+	signals := make(chan os.Signal, 2)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signals
+		os.Exit(2)
+	}()
 
 	err := s.ListenAndServe()
 	if err != nil {
