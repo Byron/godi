@@ -1,5 +1,23 @@
 This page is addressed to go-developers who would like to get a better understanding of how `godi` performs it's tasks.
 
+## Build Instructions
+
+Building `godi` can be accomplished as usual. However, in order to build the web-frontend, additional dependencies are required.
+
+To accomplish this, change directory into the `web/client` directory and follow the installation instructions of the [README.md](https://github.com/angular/angular-seed/blob/master/README.md) found therein.
+
+Once the installation is complete, you can build godi by providing the "web" build tag, such as in
+
+```
+# from the project root
+
+## Update the clientdata.go file to allow building and local debugging
+go-bindata -debug -ignore "[/\\\\]\\..*" -nomemcopy=true -o $bindatadest -pkg=server -prefix=web/client/app web/client/app/...
+
+# from the project root
+go build -tags web
+```
+
 ## Package Overview
 
 `godi` is a small package with just a few parts, as illustrated by the following diagram.

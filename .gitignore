@@ -2,6 +2,7 @@
 *.sublime-workspace
 
 godi
+web/server/clientdata.go
 /build/
 /pages/
 /doc/
