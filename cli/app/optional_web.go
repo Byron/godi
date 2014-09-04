@@ -12,3 +12,17 @@ import (
 func optionalSubCommands() []cli.Command {
 	return wcli.SubCommands()
 }
+
+func setupApp(app *cli.App) {
+
+	action := func(c *cli.Context) {
+		wcli.RunWebServer(
+			&wcli.ServerInfo{
+				Addr:    "localhost:9078",
+				MayOpen: true,
+			},
+		)
+	}
+
+	app.Action = action
+}

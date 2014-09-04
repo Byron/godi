@@ -35,17 +35,17 @@ to everyone who can reach this host on any network interface.
 You may also specify any IP assigned to an interface to restrict availability.`, defaultAddress)
 )
 
-type serverInfo struct {
-	mux     *http.ServeMux
-	addr    string
-	mayOpen bool
+type ServerInfo struct {
+	Mux     *http.ServeMux
+	Addr    string
+	MayOpen bool
 }
 
 // return subcommands for our particular area of algorithms
 func SubCommands() []gcli.Command {
 	out := make([]gcli.Command, 1)
 
-	var info serverInfo
+	var info ServerInfo
 
 	web := gcli.Command{
 		Name:      Name,
@@ -70,33 +70,38 @@ func SubCommands() []gcli.Command {
 	return out
 }
 
-func before(c *gcli.Context, info *serverInfo) error {
-	info.addr = c.String(addressFlagName)
-	if info.addr == "" {
+func before(c *gcli.Context, info *ServerInfo) error {
+	info.Addr = c.String(addressFlagName)
+	if info.Addr == "" {
 		return errors.New("Server address must not be empty")
 	}
 
-	info.mayOpen = !c.Bool(noOpenFlagName)
-	info.mux = server.NewHandler()
+	info.MayOpen = !c.Bool(noOpenFlagName)
 	return nil
 }
 
-func action(c *gcli.Context, info *serverInfo) {
-	addr := info.addr
+func action(c *gcli.Context, info *ServerInfo) {
+	RunWebServer(info)
+}
+
+func RunWebServer(info *ServerInfo) {
+	addr := info.Addr
+	info.Mux = server.NewHandler()
 	if !strings.HasPrefix(addr, httpProtocol) {
-		addr = httpProtocol + info.addr
+		addr = httpProtocol + info.Addr
 	}
 
 	fmt.Println("About to listen on ", addr)
-	if info.mayOpen {
+	fmt.Println("Hit CTRL+C to close")
+	if info.MayOpen {
 		if err := open.Start(addr); err != nil {
 			fmt.Fprint(os.Stderr, err)
 		}
 	}
 
 	s := http.Server{
-		Addr:    info.addr,
-		Handler: info.mux,
+		Addr:    info.Addr,
+		Handler: info.Mux,
 	}
 
 	// Respond to abort requests

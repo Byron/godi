@@ -84,5 +84,7 @@ func NewGodiApp() *cli.App {
 
 	gocli.AddAdditinalFlags(app)
 
+	setupApp(app)
+
 	return app
 }
