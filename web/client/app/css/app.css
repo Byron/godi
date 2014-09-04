@@ -31,10 +31,11 @@
   padding: 0;
 }
 
-.panel {
+.panel-half {
   float: left;
   width: 50%;
   margin-top: 5px;
+  padding-right: 10px;
 }
 
 .panel-big {
@@ -42,8 +43,32 @@
   width: 100%;
 }
 
+code {
+  color: white;
+  background: black;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary.active,
+.open .dropdown-toggle.btn-primary {
+  background-color: #658CAD
+}
+
+.btn-primary {
+  background-color: #8EAFCC
+}
+
+h1 {
+    color: black;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.35);
+}
+
 h2 {
   font-size: 20px;
+  color: lightgrey;
+  text-shadow: 1px 1px 2px #000000;
 }
 
 .inputbox { 

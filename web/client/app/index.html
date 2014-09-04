@@ -45,12 +45,15 @@
 
 <body ng-controller="GodiController as gctrl">
     <div class="wrapper">
+    <h1>
+    Godi Web
+    </h1>
     <!--[if lt IE 7]>
       <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
   <![endif]-->
 
     <!-- COMMANDLINE -->
-    <div ng-cloak id="commandline" ng-hide="isUpdating" style="overflow:auto;margin-top:50px">
+    <div ng-cloak id="commandline" ng-hide="isUpdating" style="overflow-x:scroll;overflow-y:hidden;margin-top:50px">
         <alert ng-repeat="alert in alerts" type="{{alert.status && 'danger' || null}}" close="alerts.splice($index, 1)">{{alert.data}}</alert>
         <code>
         godi 
@@ -77,7 +80,7 @@
             </span>
         </code>
     </div>
-    <div class="panel-pig">
+    <div class="panel-pig" style="margin-top:5px">
         <button ng-click="gctrl.run()" ng-hide="stateReadOnly">Run!</button>
         <button ng-click="results = []" ng-hide="results.length == 0 || !isDone">Clear</button>
         <button ng-click="state.$delete()" ng-hide="stateReadOnly || isDone">Cancel</button>
@@ -87,7 +90,7 @@
     </div>
 
     <!-- OPERATION SELECT -->
-    <div ng-cloak id="mode-select" ng-hide="isUpdating" class="panel">
+    <div ng-cloak id="mode-select" ng-hide="isUpdating" class="panel-half">
         <h2>Operation</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -100,7 +103,7 @@
     </div>
 
     <!-- VERBOSITY-SELECT -->
-    <div ng-cloak id="verbosity-select" ng-hide="isUpdating" class="panel">
+    <div ng-cloak id="verbosity-select" ng-hide="isUpdating" class="panel-half">
         <h2>Verbosity</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -113,7 +116,7 @@
     </div>
 
     <!-- FORMAT SELECT -->
-    <div ng-cloak id="format-select" ng-hide="isUpdating || state.mode == 'verify'" class="panel">
+    <div ng-cloak id="format-select" ng-hide="isUpdating || state.mode == 'verify'" class="panel-half">
         <h2>Seal Format</h2>
         <div class="btn-group">
             <label class="btn btn-primary" 
@@ -126,7 +129,7 @@
     </div>
 
     <!-- STREAMS -->
-    <div ng-cloak id="streams" ng-hide="isUpdating" class="panel">
+    <div ng-cloak id="streams" ng-hide="isUpdating" class="panel-half">
         <h2>Streams</h2>
         <span>
         Input Streams
@@ -237,29 +240,23 @@
             </span>
         </div>
     </script>
-    <div class="panel-big">
-        <pathinput
-            class="panel"
-            paths="state.sources"
-            title="Sources"
-            type='source'
-            mode='state.mode'></pathinput>
-        <pathinput
-            class="panel"
-            ng-show="state.mode == 'sealed-copy'"
-            paths="state.destinations" 
-            title="Destinations" 
-            type='destination'
-            mode='state.mode'></pathinput>
-    </div>
-
-    <div class="panel-big">
-        <input type="checkbox" ng-click="debugMode=!debugMode"/>Debug Mode
+    <pathinput
+        class="panel-big"
+        paths="state.sources"
+        title="Sources"
+        type='source'
+        mode='state.mode'></pathinput>
+    <pathinput
+        class="panel-big"
+        ng-show="state.mode == 'sealed-copy'"
+        paths="state.destinations" 
+        title="Destinations" 
+        type='destination'
+        mode='state.mode'></pathinput>
+    <div class="panel-big" style="margin-top:50px">
+        <input type="checkbox" ng-click="debugMode=!debugMode"/>Debug Info
     </div>
     <div ng-show="debugMode" ng-init="debugMode=false" class="panel-big">
-        <br>
-        <br>
-        <br>
         <div>Angular seed app: v
             <span app-version></span>
             <br>{{state}}
@@ -269,7 +266,6 @@
         <div ng-show="isUpdating">Fetching data - please wait.</div>
         <div ng-show="and(updateFailed, !stateReadOnly)">ERROR Putting data</div>
         <div ng-hide="stateReadOnly">WRITE MODE</div>
-        <div >{{results.length}}</div>
     </div>
 
     <!-- In production use:
