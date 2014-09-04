@@ -5,7 +5,10 @@ if ![[ `which go-bindata` &>/dev/null ]]; then
 	exit 2
 fi
 
+version=${1:?First argument must be the version you are building, like v1.1.0}
+
 base="`dirname $0`/../.."
+build_dir=build
 
 cd $base || exit $?
 
@@ -17,7 +20,22 @@ mv $bindatadest $bindatadest.orig &>/dev/null
 go-bindata -ignore "[/\\\\]\\..*" -nomemcopy=true -o $bindatadest -pkg=server -prefix=web/client/app web/client/app/... || exit  $?
 go fmt $bindatadest || exit $?
 
-gox -ldflags="-w -s" -tags web -verbose -arch=amd64 -os="linux darwin windows" -output="build/{{.OS}}_{{.Arch}}/{{.Dir}}" github.com/Byron/godi
+for mode in web ""; do
+	arg=""
+	suffix=""
+	if [[ $mode == web ]]; then
+		arg="-tags web"
+		suffix="_"
+	fi
+	echo "building $mode godi ..."
+	basename=godi_${mode}${suffix}${version}
+	gox -ldflags="-w -s" $arg -verbose -arch=amd64 -os="linux darwin windows" -output="$build_dir/$basename/{{.OS}}_{{.Arch}}/{{.Dir}}" github.com/Byron/godi
+
+	(cd $build_dir && zip --quiet -r -9 $basename.zip $basename)&
+done
+
+echo "Waiting for archives to be created ..."
+wait
 
 # Restore possibly existing debug version
 mv $bindatadest.orig $bindatadest &>/dev/null

@@ -26,7 +26,6 @@ Therefore, if your data files change a lot, `godi` is not for you.
 **Verify that data is still intact as compared against the seal**
 ![verify](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_verify.mov.gif)
 
-
 **Seal valuable data and duplicate it to two backup devices**
 ![sealed-copy](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy.mov.gif)
 
