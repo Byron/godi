@@ -10,7 +10,12 @@ base="`dirname $0`/../.."
 cd $base || exit $?
 
 bindatadest=web/server/clientdata.go
+# NOTE: use -debug flag to compile in debug mode instead, to keep files live !
+# go-bindata -debug ...
 go-bindata -ignore "[/\\\\]\\..*" -nomemcopy=true -o $bindatadest -pkg=server -prefix=web/client/app web/client/app/... || exit  $?
 go fmt $bindatadest || exit $?
 
 gox -ldflags="-w -s" -verbose -arch=amd64 -os="linux darwin windows" -output="build/{{.OS}}_{{.Arch}}/{{.Dir}}" github.com/Byron/godi
+
+# Just make sure we keep a debug-compatible version, to safe some space in our repository
+git checkout $bindatadest
