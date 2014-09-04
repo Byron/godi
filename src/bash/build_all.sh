@@ -12,8 +12,12 @@ cd $base || exit $?
 bindatadest=web/server/clientdata.go
 # NOTE: use -debug flag to compile in debug mode instead, to keep files live !
 # go-bindata -debug ...
+# Make sure we keep possible debug versions around ... 
+mv $bindatadest $bindatadest.orig &>/dev/null
 go-bindata -ignore "[/\\\\]\\..*" -nomemcopy=true -o $bindatadest -pkg=server -prefix=web/client/app web/client/app/... || exit  $?
 go fmt $bindatadest || exit $?
 
 gox -ldflags="-w -s" -tags web -verbose -arch=amd64 -os="linux darwin windows" -output="build/{{.OS}}_{{.Arch}}/{{.Dir}}" github.com/Byron/godi
 
+# Restore possibly existing debug version
+mv $bindatadest.orig $bindatadest &>/dev/null

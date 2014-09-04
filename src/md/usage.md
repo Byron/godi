@@ -6,7 +6,7 @@ Godi is a command-line program, which requires you to use a terminal emulator to
 
 You can at all times and without negative effects [abort a running command](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy_cancelled.mov.gif) by pressing `ctrl+c`, which is the same as for all other command-line tools.
 
-## Helping Yourself
+## Helping Yourself ...
 
 It's not always feasible to consult the Internet to learn how to do something. Good to know that `godi` has all the help you will ever need to use it built right into itself.
 
@@ -26,6 +26,18 @@ $ godi --help
 # and the same for subcommands
 $ godi seal -h
 $ godi seal --help
+```
+
+### ... Graphically
+
+The graphical web-frontend allows to use all godi-features from within the browser. That way, you can watch the progress of running operations, or trigger `godi` operations from your tablet and while on the go.
+
+Thanks to tool-tips, it's certainly much easier to learn than the commandline, especially due to the included commandline-generator displaying the respective godi commandline.
+
+To bring up the web-frontend, just run `godi web` in your terminal.
+
+```
+godi web
 ```
 
 ## Subcommands

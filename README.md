@@ -33,6 +33,9 @@ Therefore, if your data files change a lot, `godi` is not for you.
 **Seal valuable data and duplicate it to two backup devices [PARANOID VERSION]**
 ![sealed-copy-verify](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/gif/godi_sealed-copy-verify.mov.gif)
 
+**Operate godi and do all of the above with a graphical web-frontend**
+![web](https://raw.githubusercontent.com/Byron/godi/web-resources/lib/png/godi-web.png)
+
 Read more [on the documentation page](http://byron.github.io/godi)
 
 ## Features
@@ -41,6 +44,7 @@ Read more [on the documentation page](http://byron.github.io/godi)
 * [atomically](http://en.wikipedia.org/wiki/Atomic_operation) duplicate data to one or more locations while protecting it against corruption, without fearing to overwrite existing files.
 * use all [available device bandwidth and CPU cores](details.md#Performance Considerations) to finish your work *much* faster
 * runs on all major and minor [platforms and architectures](http://golang.org/doc/install#requirements)
+* provides a graphical web-frontend with multi-user support
 
 ## Installation
 
