@@ -231,11 +231,11 @@
                         type="text"
                         ng-model="newPath"
                         placeholder="{{mode}} directory/file"
+                        ng-keypress="lctrl.keyHandler($event)" 
                         typeahead="val.item for val in lctrl.listLocations($viewValue)"
                         typeahead-loading="isLoadingLocations"
                         typeahead-on-select="lctrl.onSelect($item, $model, $label)"
                         typeahead-template-url="dirTemplate.html"/>
-                <i ng-show="isLoadingLocations" class="glyphicon glyphicon-refresh"></i>
                 </div>
             </span>
         </div>

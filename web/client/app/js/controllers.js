@@ -204,5 +204,18 @@ controller("LocationController", ["apiURL", "$scope", "$http", function Location
         $scope.newPath = $item.path
     }
 
+    this.keyHandler = function onEnter(event) {
+        if (event.keyIdentifier != "Enter") {
+            return
+        }
+
+        if (!$scope.isValid || !$scope.newPath || $scope.newPath.length == 0) {
+            return
+        }
+
+        $scope.paths.push($scope.newPath); 
+        $scope.newPath = ""
+    }
+
     return this
 }])
