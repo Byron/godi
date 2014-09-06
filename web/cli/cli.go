@@ -12,8 +12,8 @@ import (
 
 	"github.com/Byron/godi/web/server"
 
-	"github.com/Byron/open-golang/open"
 	gcli "github.com/codegangsta/cli"
+	"github.com/skratchdot/open-golang/open"
 )
 
 const (
