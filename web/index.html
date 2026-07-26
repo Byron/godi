@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Godi Web</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <main>
+    <h1>Godi Web</h1>
+    <form id="controls">
+      <label>Operation <select name="mode"><option>verify</option><option>seal</option><option>sealed-copy</option></select></label>
+      <label>Verbosity <select name="verbosity"><option>error</option><option>info</option></select></label>
+      <label>Format <select name="format"><option>gob</option><option>mhl</option></select></label>
+      <label>Input streams <input name="spid" type="number" min="1" value="1"></label>
+      <label>Output streams <input name="spod" type="number" min="1" value="1"></label>
+      <label>Filters <input name="fep" value="VOLATILE" placeholder="comma-separated"></label>
+      <label>Sources <textarea name="sources" placeholder="one path per line"></textarea></label>
+      <label>Destinations <textarea name="destinations" placeholder="one path per line"></textarea></label>
+      <label><input name="verify" type="checkbox"> Verify copies after writing</label>
+      <div class="buttons"><button type="submit">Run</button><button type="button" id="cancel">Cancel</button></div>
+    </form>
+    <pre id="command"></pre>
+    <pre id="output" aria-live="polite"></pre>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+:root { color-scheme: light dark; font: 16px system-ui, sans-serif; }
+body { margin: 0; }
+main { max-width: 900px; margin: auto; padding: 2rem; }
+form { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem; }
+label { display: grid; gap: .35rem; }
+input,select,textarea,button { font: inherit; padding: .55rem; }
+textarea { min-height: 6rem; }
+.buttons { display: flex; align-items: end; gap: .5rem; }
+pre { white-space: pre-wrap; padding: 1rem; background: color-mix(in srgb, CanvasText 8%, Canvas); }
+#output { min-height: 8rem; max-height: 45vh; overflow: auto; }

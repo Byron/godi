@@ -1,8 +1,7 @@
 *~
 *.sublime-workspace
 
-godi
-web/server/clientdata.go
+/target/
 /build/
 /pages/
 /doc/
